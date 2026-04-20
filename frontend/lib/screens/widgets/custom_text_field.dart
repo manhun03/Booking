@@ -108,7 +108,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 12,
-                vertical: 14,
+                vertical: 10,
               ),
             ),
           ),
