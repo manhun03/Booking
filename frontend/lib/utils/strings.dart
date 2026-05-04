@@ -8,11 +8,25 @@ class AppStrings {
   static const String loginSubtitle = 'Log in to your account';
   static const String emailLabel = 'Email*';
   static const String emailHint = 'Enter your email';
-  static const String passwordLabel = 'Password*';
-  static const String passwordHint = 'Enter your password';
   static const String loginButton = 'Log in';
   static const String loginWithGoogle = 'Log in with Google';
-  static const String forgotPassword = 'Forgot your password?';
   static const String dontHaveAccount = "Don't have an account?";
+
+  // Sign Up Screen
   static const String signUp = 'Sign Up';
+  static const String signUpSubtitle = 'Create your new account';
+  static const String nameLabel = 'Name*';
+  static const String signUpWithGoogle = 'Sign up with Google';
+  static const String nameSubtitle = 'Enter your name';
+
+  // Password
+  static const String passwordLabel = 'Password*';
+  static const String passwordHint = 'Enter your password';
+  static const String forgotPassword = 'Forgot your password?';
+  static const String forgotPasswordSubtitle = 'Please enter your email to reset your\npassword.';
+  static const String createNewPassword = 'Create New Password';
+  static const String createNewPasswordSubtitle = 'Enter a new password to secure your\naccount.';
+  static const String newPasswordLabel = 'New Password*';
+  static const String confirmPasswordLabel = 'Confirm Password*';
+  static const String confirmPasswordHint = 'Enter your password again';
 }
