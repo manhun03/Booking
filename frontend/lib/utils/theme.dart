@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'colors.dart';
 
 class AppTheme {
@@ -8,11 +9,12 @@ class AppTheme {
       brightness: Brightness.light,
       primaryColor: AppColors.colorPrimary,
       scaffoldBackgroundColor: AppColors.colorBg,
+      fontFamily: GoogleFonts.roboto().fontFamily,
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.colorPrimary,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: const TextStyle(
+        titleTextStyle: GoogleFonts.roboto(
           color: Colors.white,
           fontSize: 18,
           fontWeight: FontWeight.bold,
@@ -22,7 +24,7 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.colorPrimary,
           foregroundColor: Colors.white,
-          textStyle: const TextStyle(
+          textStyle: GoogleFonts.roboto(
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
@@ -38,7 +40,7 @@ class AppTheme {
             color: AppColors.colorPrimary,
             width: 1.5,
           ),
-          textStyle: const TextStyle(
+          textStyle: GoogleFonts.roboto(
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -47,36 +49,36 @@ class AppTheme {
           ),
         ),
       ),
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(
+      textTheme: TextTheme(
+        headlineLarge: GoogleFonts.roboto(
           fontSize: 28,
           fontWeight: FontWeight.bold,
           color: AppColors.textPrimary,
         ),
-        headlineMedium: TextStyle(
+        headlineMedium: GoogleFonts.roboto(
           fontSize: 24,
           fontWeight: FontWeight.bold,
           color: AppColors.textPrimary,
         ),
-        titleLarge: TextStyle(
+        titleLarge: GoogleFonts.roboto(
           fontSize: 20,
           fontWeight: FontWeight.bold,
           color: AppColors.textPrimary,
         ),
-        titleMedium: TextStyle(
+        titleMedium: GoogleFonts.roboto(
           fontSize: 16,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
-        bodyLarge: TextStyle(
+        bodyLarge: GoogleFonts.roboto(
           fontSize: 16,
           color: AppColors.textPrimary,
         ),
-        bodyMedium: TextStyle(
+        bodyMedium: GoogleFonts.roboto(
           fontSize: 14,
           color: AppColors.textMuted,
         ),
-        labelSmall: TextStyle(
+        labelSmall: GoogleFonts.roboto(
           fontSize: 12,
           color: AppColors.textMuted,
         ),
