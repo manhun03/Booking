@@ -56,8 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleForgotPassword() {
-    // TODO: Navigate to forgot password screen
-    print('Forgot password');
+    Navigator.pushNamed(context, '/forgotPassword');
   }
 
   @override
@@ -258,8 +257,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           GestureDetector(
                             onTap: () {
-                              // TODO: Navigate to signup screen
-                              print('Navigate to sign up');
+                              Navigator.pushNamed(context, '/signup');
                             },
                             child: const Text(
                               AppStrings.signUp,
