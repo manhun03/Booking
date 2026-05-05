@@ -60,7 +60,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
           // Header with 3-Column Layout
           SliverToBoxAdapter(
             child: Container(
-              color: AppColors.white,
+              color: AppColors.colorBg,
               padding: const EdgeInsets.all(16),
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -76,7 +76,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                           flex: 1,
                           child: Container(
                             decoration: BoxDecoration(
-                              color: AppColors.colorBg,
+                              color: AppColors.white,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: AppColors.divider),
                             ),
@@ -87,9 +87,16 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                         // Center Header
                         Expanded(
                           flex: 2,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.divider),
+                            ),
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                               Row(
                                 children: [
                                   IconButton(
@@ -126,6 +133,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                                 ),
                               ),
                             ],
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -134,7 +142,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                           flex: 1,
                           child: Container(
                             decoration: BoxDecoration(
-                              color: AppColors.colorBg,
+                              color: AppColors.white,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: AppColors.divider),
                             ),
