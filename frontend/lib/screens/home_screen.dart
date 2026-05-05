@@ -34,17 +34,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Map<String, dynamic>> festivals = [
     {
-      'title': 'Festival Nghĩ Dưỡng Biển 2025',
-      'date': '01-08 Tháng 7, 2025',
+      'title': 'Festival Nghỉ Dưỡng Biển 2026',
+      'date': '01-08 Tháng 7, 2026',
       'location': 'Location',
-      'description': 'Tận hưởng kỳ nghỉ hè tuyệt vời tại các bãi biển đẹp nhất. Bao gồm tour du lịch, ăn uống ngon và các dịch vụ cao cấp. Xem tự tối >',
+      'description':
+          'Tận hưởng kỳ nghỉ hè tuyệt vời tại các bãi biển đẹp nhất. Bao gồm tour du lịch, ăn uống ngon và các dịch vụ cao cấp.',
       'image': '🏝️',
     },
     {
-      'title': 'Bữa Nghĩ & Trăn Lâm Du Lịch 2025',
-      'date': '3-8-15 Tháng 2025',
+      'title': 'Hội Nghị & Triển Lãm Du Lịch 2026',
+      'date': '3-8-15 Tháng 2026',
       'location': 'Location',
-      'description': 'Trải nghiệm kỳ nghỉ thật khác biệt với những gợi ý du lịch độc đáo. Khám phá những điểm đến mới lạ, thưởng thức ẩm thực địa phương và thư giãn tại các resort 5 sao. Xem tất cả >',
+      'description':
+          'Trải nghiệm kỳ nghỉ thật khác biệt với những gợi ý du lịch độc đáo. Khám phá những điểm đến mới lạ, thưởng thức ẩm thực địa phương và thư giãn tại các resort 5 sao.',
       'image': '🛏️',
     },
   ];
@@ -53,7 +55,20 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _selectedIndex = index;
     });
-    // TODO: Navigate to different screens based on index
+    switch (index) {
+      case 1:
+        Navigator.of(context).pushNamed('/message');
+        break;
+      case 2:
+        Navigator.of(context).pushNamed('/booking');
+        break;
+      case 3:
+        Navigator.of(context).pushNamed('/search');
+        break;
+      case 4:
+        Navigator.of(context).pushNamed('/more');
+        break;
+    }
   }
 
   @override
@@ -67,7 +82,8 @@ class _HomeScreenState extends State<HomeScreen> {
               // Header
               Container(
                 color: AppColors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -129,9 +145,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               // Destinations Section
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     const Text(
                       'Vòng quanh thế giới',
@@ -149,91 +166,190 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 160,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: destinations.length,
-                        itemBuilder: (context, index) {
-                          final destination = destinations[index];
-                          return Padding(
-                            padding: EdgeInsets.only(right: index < destinations.length - 1 ? 12 : 0),
-                            child: Container(
-                              width: 110,
-                              decoration: BoxDecoration(
-                                color: AppColors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
+                    const SizedBox(height: 24),
+                    // Destinations Cards - Horizontal Row
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(
+                          destinations.length,
+                          (index) {
+                            final destination = destinations[index];
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                left: index == 0 ? 0 : 8,
+                                right: index == destinations.length - 1 ? 0 : 8,
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Image placeholder
-                                  Container(
-                                    width: double.infinity,
-                                    height: 80,
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.of(context).pushNamed(
+                                    '/hotel-detail',
+                                    arguments: destination,
+                                  );
+                                },
+                                child: SizedBox(
+                                  width: 160,
+                                  height: 180,
+                                  child: Container(
                                     decoration: BoxDecoration(
-                                      color: AppColors.colorBg,
-                                      borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(12),
-                                        topRight: Radius.circular(12),
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        destination['image'],
-                                        style: const TextStyle(fontSize: 32),
-                                      ),
-                                    ),
-                                  ),
-                                  // Content
-                                  Padding(
-                                    padding: const EdgeInsets.all(8),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          destination['name'],
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.textPrimary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          destination['price'],
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.colorPrimary,
-                                          ),
-                                        ),
-                                        Text(
-                                          destination['nights'],
-                                          style: const TextStyle(
-                                            fontSize: 9,
-                                            color: AppColors.textSecondary,
-                                          ),
+                                      color: AppColors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.08),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 4),
                                         ),
                                       ],
                                     ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          // Image placeholder
+                                          Container(
+                                            width: double.infinity,
+                                            height: 90,
+                                            color: AppColors.colorBg,
+                                            child: Center(
+                                              child: Text(
+                                                destination['image'],
+                                                style: const TextStyle(
+                                                    fontSize: 40),
+                                              ),
+                                            ),
+                                          ),
+                                          // Content
+                                          Expanded(
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(10),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.center,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .spaceBetween,
+                                                children: [
+                                                  Text(
+                                                    destination['name'],
+                                                    textAlign: TextAlign.center,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          AppColors.textPrimary,
+                                                    ),
+                                                  ),
+                                                  Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      Text(
+                                                        destination['price'],
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: const TextStyle(
+                                                          fontSize: 10,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color: AppColors
+                                                              .colorPrimary,
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        destination['nights'],
+                                                        style: const TextStyle(
+                                                          fontSize: 9,
+                                                          color: AppColors
+                                                              .textSecondary,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ],
+                ),
+              ),
+              // Search Bar Section
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Tìm kiếm khách sạn...',
+                      hintStyle: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: AppColors.textSecondary,
+                        size: 20,
+                      ),
+                      suffixIcon: GestureDetector(
+                        onTap: () {
+                          // TODO: Open filters
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.colorBg,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.tune,
+                            color: AppColors.colorPrimary,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 14,
+                        horizontal: 4,
+                      ),
+                    ),
+                    onSubmitted: (value) {
+                      Navigator.of(context).pushNamed('/search');
+                    },
+                  ),
                 ),
               ),
               // Festival Cards Section
@@ -281,7 +397,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       // Date and Location
                                       Row(
@@ -414,9 +531,9 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'Home',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.favorite_outline),
-              activeIcon: Icon(Icons.favorite),
-              label: 'Favorites',
+              icon: Icon(Icons.mail_outline),
+              activeIcon: Icon(Icons.mail),
+              label: 'Message',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.book_outlined),
