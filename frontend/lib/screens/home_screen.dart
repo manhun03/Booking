@@ -143,6 +143,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isDesktop = constraints.maxWidth > 900;
+                  final body = Column(
+                    children: [
               // Destinations Section
               Padding(
                 padding:
@@ -456,13 +461,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       const SizedBox(height: 12),
                                       // View More Button
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: OutlinedButton(
-                                          onPressed: () {
-                                            // TODO: Navigate to details
-                                          },
-                                          style: OutlinedButton.styleFrom(
+                                      Center(
+                                        child: SizedBox(
+                                          width: 160,
+                                          child: OutlinedButton(
+                                            onPressed: () {
+                                              // TODO: Navigate to details
+                                            },
+                                            style: OutlinedButton.styleFrom(
                                             side: const BorderSide(
                                               color: AppColors.colorPrimary,
                                               width: 1,
@@ -481,6 +487,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ),
                                         ),
                                       ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -494,6 +501,64 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 20),
+                    ],
+                  );
+
+                  if (!isDesktop) {
+                    return Column(
+                      children: [
+                        body,
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _buildSidebar(
+                                  '\u{1F4E2}',
+                                  'Qu\u1EA3ng c\u00E1o',
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildSidebar(
+                                  '\u{1F381}',
+                                  '\u01AFu \u0111\u00E3i \u0111\u1EB7c bi\u1EC7t',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: constraints.maxWidth * 0.2,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 24, 0, 0),
+                          child: _buildSidebar('\u{1F4E2}', 'Qu\u1EA3ng c\u00E1o'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(child: body),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: constraints.maxWidth * 0.2,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 24, 16, 0),
+                          child: _buildSidebar(
+                            '\u{1F381}',
+                            '\u01AFu \u0111\u00E3i \u0111\u1EB7c bi\u1EC7t',
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -551,6 +616,54 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSidebar(String icon, String label) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 300;
+        final containerHeight = isCompact ? 80.0 : 100.0;
+        final fontSize = isCompact ? 28.0 : 36.0;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.divider),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                height: containerHeight,
+                decoration: BoxDecoration(
+                  color: AppColors.colorBg,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.divider),
+                ),
+                child: Center(
+                  child: Text(
+                    icon,
+                    style: TextStyle(fontSize: fontSize),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

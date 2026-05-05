@@ -85,56 +85,183 @@ class _RoomListScreenState extends State<RoomListScreen> {
       backgroundColor: AppColors.colorBg,
       body: CustomScrollView(
         slivers: [
-          // Header
-          SliverAppBar(
-            backgroundColor: AppColors.white,
-            elevation: 1,
-            pinned: true,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-              onPressed: () => Navigator.pop(context),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.share, color: AppColors.textPrimary),
-                onPressed: () {},
-              ),
-            ],
-          ),
           // Content
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    'Chọn chỗ ở của bạn',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isDesktop = constraints.maxWidth > 900;
+                final body = Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSelectionHeader(),
+                      const SizedBox(height: 16),
+                      // Room Cards
+                      ..._buildRoomCards(),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  // Subtitle
-                  Text(
-                    '${rooms.length} tùy chọn đã cập nhật hôm qua',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textMuted,
+                );
+
+                if (!isDesktop) {
+                  return Column(
+                    children: [
+                      body,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _buildSidebar(
+                                '\u{1F4E2}',
+                                'Qu\u1EA3ng c\u00E1o',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildSidebar(
+                                '\u{1F381}',
+                                '\u01AFu \u0111\u00E3i \u0111\u1EB7c bi\u1EC7t',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: constraints.maxWidth * 0.2,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 0, 0),
+                        child: _buildSidebar('\u{1F4E2}', 'Qu\u1EA3ng c\u00E1o'),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Room Cards
-                  ..._buildRoomCards(),
-                ],
-              ),
+                    const SizedBox(width: 16),
+                    Expanded(child: body),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: constraints.maxWidth * 0.2,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(0, 16, 16, 0),
+                        child: _buildSidebar(
+                          '\u{1F381}',
+                          '\u01AFu \u0111\u00E3i \u0111\u1EB7c bi\u1EC7t',
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSelectionHeader() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.divider),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                padding: EdgeInsets.zero,
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: AppColors.textPrimary,
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Ch\u1ECDn ch\u1ED7 c\u1EE7a b\u1EA1n',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '27 thg 9 - 30 thg 9',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Gi\u00E1 \u0111\u00E3 \u0111\u01B0\u1EE3c \u0111\u1ED5i v\u1EDBi m\u1ED9t VND \u24D8',
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.textMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebar(String icon, String label) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 300;
+        final containerHeight = isCompact ? 80.0 : 100.0;
+        final fontSize = isCompact ? 28.0 : 36.0;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.divider),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                height: containerHeight,
+                decoration: BoxDecoration(
+                  color: AppColors.colorBg,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.divider),
+                ),
+                child: Center(
+                  child: Text(
+                    icon,
+                    style: TextStyle(fontSize: fontSize),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
