@@ -236,7 +236,13 @@ class _HotelDetailScreenState extends State<HotelDetailScreen>
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  '/room-list',
+                  arguments: hotelData,
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.colorPrimary,
                 foregroundColor: Colors.white,

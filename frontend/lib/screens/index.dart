@@ -11,4 +11,5 @@ export 'message_screen.dart';
 export 'booking_screen.dart';
 export 'more_screen.dart';
 export 'hotel_detail_screen.dart';
+export 'room_list_screen.dart';
 export 'widgets/custom_text_field.dart';
