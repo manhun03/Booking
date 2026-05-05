@@ -41,7 +41,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
         'selected': false,
       },
       {
-        'name': 'Suite Có Giường Cỏ King',
+        'name': 'Suite Có Giường Cỡ King',
         'type': '1 giường đôi',
         'image': '🏨',
         'amenities': [
@@ -59,7 +59,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
         'selected': false,
       },
       {
-        'name': 'Phòng Deluxe với Giường Cỏ King',
+        'name': 'Phòng Deluxe với Giường Cỡ King',
         'type': '1 giường đôi',
         'image': '🏨',
         'amenities': [
@@ -110,7 +110,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
                 children: [
                   // Title
                   Text(
-                    'chọn chỗ ở của bạn',
+                    'Chọn chỗ ở của bạn',
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -350,8 +350,15 @@ class _RoomListScreenState extends State<RoomListScreen> {
                       ),
                     ),
                     onPressed: () {
-                      // Handle room selection
-                      _showRoomSelectedDialog(room['name']);
+                      // Navigate to room detail screen
+                      Navigator.pushNamed(
+                        context,
+                        '/room-detail',
+                        arguments: {
+                          'room': room,
+                          'hotel': widget.hotel,
+                        },
+                      );
                     },
                     child: const Text(
                       'Chọn',
@@ -387,21 +394,5 @@ class _RoomListScreenState extends State<RoomListScreen> {
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]}.',
         );
-  }
-
-  void _showRoomSelectedDialog(String roomName) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Phòng đã chọn'),
-        content: Text('Bạn đã chọn: $roomName'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 }

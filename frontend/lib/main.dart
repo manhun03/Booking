@@ -13,6 +13,7 @@ import 'screens/booking_screen.dart';
 import 'screens/more_screen.dart';
 import 'screens/hotel_detail_screen.dart';
 import 'screens/room_list_screen.dart';
+import 'screens/room_detail_screen.dart';
 import 'utils/theme.dart';
 
 void main() {
@@ -51,6 +52,7 @@ class HHBNBookingApp extends StatelessWidget {
             builder: (context) => HotelDetailScreen(hotel: hotel),
             settings: settings,
           );
+        }
         if (settings.name == '/room-list') {
           final hotel = settings.arguments as Map<String, dynamic>?;
           return MaterialPageRoute(
@@ -58,6 +60,14 @@ class HHBNBookingApp extends StatelessWidget {
             settings: settings,
           );
         }
+        if (settings.name == '/room-detail') {
+          final args = settings.arguments as Map<String, dynamic>?;
+          final room = args?['room'] as Map<String, dynamic>?;
+          final hotel = args?['hotel'] as Map<String, dynamic>?;
+          return MaterialPageRoute(
+            builder: (context) => RoomDetailScreen(room: room, hotel: hotel),
+            settings: settings,
+          );
         }
         return null;
       },
