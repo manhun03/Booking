@@ -85,7 +85,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     children: [
                       ElevatedButton(
                         onPressed: () {
-                          Navigator.pushNamed(context, '/login');
+                          Navigator.pushNamed(context, '/signup');
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.grey[300],
