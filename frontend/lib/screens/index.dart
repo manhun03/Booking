@@ -1,6 +1,10 @@
 export 'splash_screen.dart';
 export 'login_screen.dart';
 export 'welcome_screen.dart';
+export 'signup_screen.dart';
+export 'forgot_password_screen.dart';
+export 'otp_screen.dart';
+export 'create_new_password_screen.dart';
 export 'home_screen.dart';
 export 'search_screen.dart';
 export 'message_screen.dart';
