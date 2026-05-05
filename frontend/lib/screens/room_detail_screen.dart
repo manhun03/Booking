@@ -66,7 +66,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
               children: [
                 // Left Sidebar - Full Height
                 SizedBox(
-                  width: constraints.maxWidth * 0.15,
+                  width: constraints.maxWidth * 0.2,
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
@@ -79,7 +79,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 // Center Content - Scrollable
                 Expanded(
                   child: CustomScrollView(
@@ -152,11 +152,11 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                 const SizedBox(width: 12),
                 // Right Sidebar - Full Height
                 SizedBox(
-                  width: constraints.maxWidth * 0.15,
+                  width: constraints.maxWidth * 0.2,
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: _buildSidebar('🎁', 'Ưu đãi đặc biệt'),
