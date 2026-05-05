@@ -18,7 +18,14 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
   @override
   void initState() {
     super.initState();
-    roomData = widget.room ?? defaultRoom;
+    roomData = _mergeRoomData(widget.room ?? defaultRoom);
+  }
+
+  Map<String, dynamic> _mergeRoomData(Map<String, dynamic> room) {
+    return {
+      ...defaultRoom,
+      ...room,
+    };
   }
 
   final Map<String, dynamic> defaultRoom = {
@@ -214,13 +221,13 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
           const Divider(height: 1, color: AppColors.divider),
           const SizedBox(height: 12),
           // Additional Info
-          _buildInfoRow('👥', 'Giá cho ${roomData['guests']}'),
+          _buildInfoRow('👥', 'Giá cho ${roomData['guests'] ?? ''}'),
           const SizedBox(height: 8),
-          _buildInfoRow('🚫', 'Phí hủy: ${roomData['cancellationPolicy']}'),
+          _buildInfoRow('🚫', 'Phí hủy: ${roomData['cancellationPolicy'] ?? ''}'),
           const SizedBox(height: 8),
-          _buildInfoRow('💳', roomData['paymentNote']),
+          _buildInfoRow('💳', roomData['paymentNote'] ?? ''),
           const SizedBox(height: 8),
-          _buildInfoRow('🔔', roomData['earlyCheckout']),
+          _buildInfoRow('🔔', roomData['earlyCheckout'] ?? ''),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(10),
@@ -235,16 +242,16 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                   style: TextStyle(fontSize: 14),
                 ),
                 const SizedBox(width: 8),
-                Text(
+                const Text(
                   'Có báo sáng (thanh toán tại chỗ ngủ)',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '(${_formatPrice(roomData['extraFee'])} VND)',
+                  '(${_formatPrice(roomData['extraFee'] as int? ?? 0)} VND)',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textMuted,
@@ -301,7 +308,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '${_formatPrice(roomData['price'])} VNĐ',
+            '${_formatPrice((roomData['price'] as int?) ?? 0)} VNĐ',
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -310,7 +317,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            '+ ${_formatPrice(roomData['taxAndFee'])} VNĐ thuế và phí',
+            '+ ${_formatPrice((roomData['taxAndFee'] as int?) ?? 0)} VNĐ thuế và phí',
             style: const TextStyle(
               fontSize: 12,
               color: AppColors.textMuted,
@@ -338,7 +345,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${_formatPrice(roomData['price'])} VND · $roomCount phòng',
+                    '${_formatPrice((roomData['price'] as int?) ?? 0)} VND · $roomCount phòng',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -347,7 +354,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    roomData['description'],
+                    roomData['description'] ?? '',
                     style: const TextStyle(
                       fontSize: 11,
                       color: AppColors.textMuted,
