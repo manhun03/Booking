@@ -55,38 +55,40 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.colorBg,
-      body: CustomScrollView(
-        slivers: [
-          // Header with 3-Column Layout
-          SliverToBoxAdapter(
-            child: Container(
-              color: AppColors.colorBg,
-              padding: const EdgeInsets.all(16),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isDesktop = constraints.maxWidth > 900;
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isDesktop = constraints.maxWidth > 900;
 
-                  if (isDesktop) {
-                    // 3-Column Header for Desktop
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+          if (isDesktop) {
+            // 3-Column Layout for Desktop - Sidebars extend full height
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Left Sidebar - Full Height
+                SizedBox(
+                  width: constraints.maxWidth * 0.15,
+                  child: SingleChildScrollView(
+                    child: Column(
                       children: [
-                        // Left Empty Box
-                        Expanded(
-                          flex: 1,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.divider),
-                            ),
-                            height: 60,
-                          ),
+                        const SizedBox(height: 16),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: _buildSidebar('📢', 'Quảng cáo'),
                         ),
-                        const SizedBox(width: 12),
-                        // Center Header
-                        Expanded(
-                          flex: 2,
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Center Content - Scrollable
+                Expanded(
+                  child: CustomScrollView(
+                    slivers: [
+                      // Header
+                      SliverToBoxAdapter(
+                        child: Container(
+                          color: AppColors.colorBg,
+                          padding: const EdgeInsets.all(16),
                           child: Container(
                             decoration: BoxDecoration(
                               color: AppColors.white,
@@ -97,156 +99,157 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                              Row(
-                                children: [
-                                  IconButton(
-                                    padding: EdgeInsets.zero,
-                                    icon: const Icon(Icons.arrow_back,
-                                        color: AppColors.textPrimary),
-                                    onPressed: () => Navigator.pop(context),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'Chọn chỗ của bạn',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textPrimary,
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      icon: const Icon(Icons.arrow_back,
+                                          color: AppColors.textPrimary),
+                                      onPressed: () => Navigator.pop(context),
                                     ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'Chọn chỗ của bạn',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '27 thg 9 - 30 thg 9',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '27 thg 9 - 30 thg 9',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Giá đã được đối với một VND ⓘ',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textMuted,
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Giá đã được đối với một VND ⓘ',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textMuted,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        // Right Empty Box
-                        Expanded(
-                          flex: 1,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.divider),
-                            ),
-                            height: 60,
-                          ),
-                        ),
-                      ],
-                    );
-                  } else {
-                    // Single Column Header for Mobile
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              icon: const Icon(Icons.arrow_back,
-                                  color: AppColors.textPrimary),
-                              onPressed: () => Navigator.pop(context),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Chọn chỗ của bạn',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          '27 thg 9 - 30 thg 9',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Giá đã được đối với một VND ⓘ',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ],
-                    );
-                  }
-                },
-              ),
-            ),
-          ),
-          // Main Content with Responsive Layout
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isDesktop = constraints.maxWidth > 900;
-
-                  if (isDesktop) {
-                    // 3-Column Layout for Desktop
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Left Sidebar
-                        Expanded(
-                          flex: 1,
-                          child: _buildSidebar('📢', 'Quảng cáo'),
-                        ),
-                        const SizedBox(width: 12),
-                        // Center Main Card
-                        Expanded(
-                          flex: 2,
+                      ),
+                      // Room Card
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
                           child: _buildRoomCard(),
                         ),
-                        const SizedBox(width: 12),
-                        // Right Sidebar
-                        Expanded(
-                          flex: 1,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Right Sidebar - Full Height
+                SizedBox(
+                  width: constraints.maxWidth * 0.15,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 16),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: _buildSidebar('🎁', 'Ưu đãi đặc biệt'),
                         ),
                       ],
-                    );
-                  } else {
-                    // Single Column Layout for Mobile
-                    return Column(
+                    ),
+                  ),
+                ),
+              ],
+            );
+          } else {
+            // Single Column Layout for Mobile
+            return CustomScrollView(
+              slivers: [
+                // Header
+                SliverToBoxAdapter(
+                  child: Container(
+                    color: AppColors.colorBg,
+                    padding: const EdgeInsets.all(16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.divider),
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              IconButton(
+                                padding: EdgeInsets.zero,
+                                icon: const Icon(Icons.arrow_back,
+                                    color: AppColors.textPrimary),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Chọn chỗ của bạn',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            '27 thg 9 - 30 thg 9',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Giá đã được đối với một VND ⓘ',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Room Card
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildRoomCard(),
+                  ),
+                ),
+                // Sidebars on Mobile
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
                       children: [
-                        _buildRoomCard(),
-                        const SizedBox(height: 16),
                         _buildSidebar('📢', 'Quảng cáo'),
                         const SizedBox(height: 12),
                         _buildSidebar('🎁', 'Ưu đãi đặc biệt'),
                       ],
-                    );
-                  }
-                },
-              ),
-            ),
-          ),
-        ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+        },
       ),
     );
   }
