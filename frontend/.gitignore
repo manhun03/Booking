@@ -52,7 +52,6 @@ migrate_working_dir/
 /build/
 
 # Web support:
-lib/generated_plugin_registrant.dart
 
 # Symbolication related
 app.*.symbols

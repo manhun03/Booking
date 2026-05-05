@@ -67,7 +67,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
               onPressed: () => Navigator.pop(context),
             ),
             title: const Text(
-              'chọn chỗ của bạn',
+              'Chọn chỗ của bạn',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -103,17 +103,104 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
               ),
             ),
           ),
-          // Room Card
+          // Main Content with 3-Column Layout
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Column(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildRoomCard(),
-                  const SizedBox(height: 24),
-                  _buildPricingSection(),
-                  const SizedBox(height: 24),
-                  _buildBookingSection(),
+                  // Left Sidebar
+                  Expanded(
+                    flex: 1,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.divider),
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 100,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              color: AppColors.colorBg,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppColors.divider),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '📢',
+                                style: const TextStyle(fontSize: 40),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Quảng cáo',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Center Main Card
+                  Expanded(
+                    flex: 2,
+                    child: SingleChildScrollView(
+                      child: _buildRoomCard(),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Right Sidebar
+                  Expanded(
+                    flex: 1,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.divider),
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 100,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              color: AppColors.colorBg,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppColors.divider),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '🎁',
+                                style: const TextStyle(fontSize: 40),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Ưu đãi đặc biệt',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -223,7 +310,8 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
           // Additional Info
           _buildInfoRow('👥', 'Giá cho ${roomData['guests'] ?? ''}'),
           const SizedBox(height: 8),
-          _buildInfoRow('🚫', 'Phí hủy: ${roomData['cancellationPolicy'] ?? ''}'),
+          _buildInfoRow(
+              '🚫', 'Phí hủy: ${roomData['cancellationPolicy'] ?? ''}'),
           const SizedBox(height: 8),
           _buildInfoRow('💳', roomData['paymentNote'] ?? ''),
           const SizedBox(height: 8),
@@ -260,6 +348,117 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: AppColors.divider),
+          const SizedBox(height: 12),
+          // Pricing Section
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Giá 1 đêm',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${_formatPrice((roomData['price'] as int?) ?? 0)} VNĐ',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '+ ${_formatPrice((roomData['taxAndFee'] as int?) ?? 0)} VNĐ thuế và phí',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: AppColors.divider),
+          const SizedBox(height: 12),
+          // Booking Section
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.colorBg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.divider),
+            ),
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_formatPrice((roomData['price'] as int?) ?? 0)} VND · $roomCount phòng',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      roomData['description'] ?? '',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Phù hợp cho có gia đình',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF2E7D32),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.colorPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+              onPressed: () {
+                _showBookingConfirmation();
+              },
+              child: const Text(
+                'Đặt phòng',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.white,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -288,125 +487,13 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
   }
 
   Widget _buildPricingSection() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.divider),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Giá 1 đêm',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.textMuted,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${_formatPrice((roomData['price'] as int?) ?? 0)} VNĐ',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '+ ${_formatPrice((roomData['taxAndFee'] as int?) ?? 0)} VNĐ thuế và phí',
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textMuted,
-            ),
-          ),
-        ],
-      ),
-    );
+    // This method is no longer used - pricing is now integrated in _buildRoomCard()
+    return const SizedBox.shrink();
   }
 
   Widget _buildBookingSection() {
-    return Column(
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.divider),
-          ),
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${_formatPrice((roomData['price'] as int?) ?? 0)} VND · $roomCount phòng',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    roomData['description'] ?? '',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'Phù hợp cho có gia đình',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF2E7D32),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.colorPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
-              ),
-            ),
-            onPressed: () {
-              _showBookingConfirmation();
-            },
-            child: const Text(
-              'Đặt phòng',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.white,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-      ],
-    );
+    // This method is no longer used - booking section is now integrated in _buildRoomCard()
+    return const SizedBox.shrink();
   }
 
   String _formatPrice(int price) {
