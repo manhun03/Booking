@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../utils/colors.dart';
+import 'widgets/responsive_page.dart';
 
 class MoreScreen extends StatefulWidget {
   const MoreScreen({Key? key}) : super(key: key);
@@ -11,36 +13,48 @@ class MoreScreen extends StatefulWidget {
 class _MoreScreenState extends State<MoreScreen> {
   int _selectedIndex = 4;
 
-  final List<Map<String, dynamic>> menuItems = [
+  static const List<Map<String, dynamic>> _menuItems = [
     {
-      'icon': Icons.person,
+      'icon': Icons.person_outline,
       'title': 'Account Settings',
-      'subtitle': 'Manage your profile',
+      'subtitle': 'Manage your profile and personal information',
+      'route': '/user-profile',
+      'color': AppColors.colorPrimary,
     },
     {
-      'icon': Icons.favorite,
+      'icon': Icons.favorite_border,
       'title': 'Favorites',
-      'subtitle': 'Your favorite hotels',
+      'subtitle': 'Review hotels and rooms you saved',
+      'route': '/favorite',
+      'color': Color(0xFFE11D48),
     },
     {
-      'icon': Icons.card_giftcard,
+      'icon': Icons.card_giftcard_outlined,
       'title': 'Promotions',
-      'subtitle': 'View available deals',
+      'subtitle': 'Apply deals and limited hotel offers',
+      'route': '/promotion',
+      'color': Color(0xFFD97706),
     },
     {
-      'icon': Icons.help,
-      'title': 'Help & Support',
-      'subtitle': 'Contact us anytime',
+      'icon': Icons.language_outlined,
+      'title': 'Language',
+      'subtitle': 'Change app language and region',
+      'route': '/language',
+      'color': Color(0xFF0891B2),
     },
     {
-      'icon': Icons.privacy_tip,
+      'icon': Icons.privacy_tip_outlined,
       'title': 'Privacy Policy',
-      'subtitle': 'Terms and conditions',
+      'subtitle': 'Terms, privacy and booking policies',
+      'route': '/legal-policies',
+      'color': Color(0xFF7C3AED),
     },
     {
       'icon': Icons.logout,
       'title': 'Logout',
       'subtitle': 'Sign out of your account',
+      'route': '',
+      'color': Color(0xFFDC2626),
     },
   ];
 
@@ -48,14 +62,7 @@ class _MoreScreenState extends State<MoreScreen> {
     setState(() {
       _selectedIndex = index;
     });
-    if (index == 3) {
-      Navigator.of(context).pushNamed('/search');
-    } else if (index != 4) {
-      _navigateToScreen(index);
-    }
-  }
 
-  void _navigateToScreen(int index) {
     switch (index) {
       case 0:
         Navigator.of(context).pushNamed('/home');
@@ -66,174 +73,448 @@ class _MoreScreenState extends State<MoreScreen> {
       case 2:
         Navigator.of(context).pushNamed('/booking');
         break;
+      case 3:
+        Navigator.of(context).pushNamed('/search');
+        break;
+      case 4:
+        break;
     }
+  }
+
+  void _handleMenuTap(Map<String, dynamic> item) {
+    final route = _textValue(item, 'route');
+    final title = _textValue(item, 'title');
+
+    if (route.isNotEmpty) {
+      Navigator.of(context).pushNamed(route);
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$title clicked')),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        color: AppColors.colorBg,
-        child: Column(
-          children: [
-            // Header
-            Container(
-              color: AppColors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: const Text(
-                'More',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+    return ResponsivePageScaffold(
+      mobileBody: Column(
+        children: [
+          _buildMobileHeader(),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+              itemBuilder: (context, index) {
+                return _buildMobileMenuItem(_menuItems[index]);
+              },
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemCount: _menuItems.length,
+            ),
+          ),
+        ],
+      ),
+      desktopBody: _buildDesktopPage(context),
+      mobileBottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildDesktopPage(BuildContext context) {
+    return WebAppShell(
+      title: 'Menu',
+      subtitle:
+          'Quản lý tài khoản, ưu đãi, cài đặt và các tác vụ hỗ trợ trong cùng một khu vực.',
+      selectedIndex: 4,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stackPanels = constraints.maxWidth < 920;
+          final profilePanel = _buildProfilePanel(context);
+          final menuPanel = _buildDesktopMenuPanel();
+
+          if (stackPanels) {
+            return Column(
+              children: [
+                profilePanel,
+                const SizedBox(height: 18),
+                menuPanel,
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(width: 340, child: profilePanel),
+              const SizedBox(width: 24),
+              Expanded(child: menuPanel),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildProfilePanel(BuildContext context) {
+    return WebPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.white, width: 3),
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF6D4C41),
+                      Color(0xFFD7A86E),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.person,
+                  color: AppColors.white,
+                  size: 34,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'EasyStay User',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Member account',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          _buildProfileStat(
+            icon: Icons.bookmark_added_outlined,
+            label: 'Bookings',
+            value: '12',
+          ),
+          const SizedBox(height: 10),
+          _buildProfileStat(
+            icon: Icons.favorite_border,
+            label: 'Saved hotels',
+            value: '8',
+          ),
+          const SizedBox(height: 10),
+          _buildProfileStat(
+            icon: Icons.card_giftcard_outlined,
+            label: 'Promotions',
+            value: '3',
+          ),
+          const SizedBox(height: 22),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.of(context).pushNamed('/user-profile'),
+              icon: const Icon(Icons.manage_accounts_outlined, size: 18),
+              label: const Text('Edit profile'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.colorPrimary,
+                foregroundColor: AppColors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
-            // Menu Items
-            Expanded(
-              child: ListView.builder(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                itemCount: menuItems.length,
-                itemBuilder: (context, index) {
-                  final item = menuItems[index];
-                  return GestureDetector(
-                    onTap: () {
-                      if (item['title'] == 'Logout') {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Logged out successfully'),
-                          ),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${item['title']} clicked'),
-                          ),
-                        );
-                      }
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: AppColors.divider,
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: AppColors.colorBg,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              item['icon'],
-                              color: AppColors.colorPrimary,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item['title'],
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  item['subtitle'],
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Icon(
-                            Icons.chevron_right,
-                            color: AppColors.textSecondary,
-                            size: 20,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
+    );
+  }
+
+  Widget _buildDesktopMenuPanel() {
+    return WebPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Quick actions',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
             ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onBottomNavTapped,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          selectedItemColor: AppColors.colorPrimary,
-          unselectedItemColor: AppColors.textSecondary,
-          selectedLabelStyle: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
           ),
-          unselectedLabelStyle: const TextStyle(
-            fontSize: 10,
+          const SizedBox(height: 6),
+          const Text(
+            'Các mục được sắp xếp dạng lưới để thao tác nhanh trên website.',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
           ),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.mail_outline),
-              activeIcon: Icon(Icons.mail),
-              label: 'Message',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.book_outlined),
-              activeIcon: Icon(Icons.book),
-              label: 'Booking',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.search),
-              label: 'Search',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.more_horiz),
-              label: 'More',
-            ),
-          ],
+          const SizedBox(height: 20),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 700 ? 2 : 1;
+              final spacing = columns == 2 ? 14.0 : 0.0;
+              final itemWidth =
+                  (constraints.maxWidth - spacing) / columns.toDouble();
+
+              return Wrap(
+                spacing: spacing,
+                runSpacing: 14,
+                children: [
+                  for (final item in _menuItems)
+                    SizedBox(
+                      width: itemWidth,
+                      child: _buildDesktopMenuItem(item),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileHeader() {
+    return Container(
+      width: double.infinity,
+      color: AppColors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: const Center(
+        child: Text(
+          'Menu',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildMobileMenuItem(Map<String, dynamic> item) {
+    return InkWell(
+      onTap: () => _handleMenuTap(item),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.divider),
+        ),
+        child: _buildMenuItemContent(item, compact: true),
+      ),
+    );
+  }
+
+  Widget _buildDesktopMenuItem(Map<String, dynamic> item) {
+    final color = _colorValue(item, 'color');
+
+    return InkWell(
+      onTap: () => _handleMenuTap(item),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 104),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.14)),
+        ),
+        child: _buildMenuItemContent(item),
+      ),
+    );
+  }
+
+  Widget _buildMenuItemContent(
+    Map<String, dynamic> item, {
+    bool compact = false,
+  }) {
+    final color = _colorValue(item, 'color');
+    final icon = _iconValue(item, 'icon');
+
+    return Row(
+      children: [
+        Container(
+          width: compact ? 40 : 46,
+          height: compact ? 40 : 46,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: compact ? 20 : 22),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _textValue(item, 'title'),
+                style: TextStyle(
+                  fontSize: compact ? 13 : 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _textValue(item, 'subtitle'),
+                maxLines: compact ? 1 : 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.3,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Icon(
+          Icons.chevron_right,
+          color: AppColors.textSecondary,
+          size: 20,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProfileStat({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.colorBg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.colorPrimary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.colorPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onBottomNavTapped,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        selectedItemColor: AppColors.colorPrimary,
+        unselectedItemColor: AppColors.textSecondary,
+        selectedLabelStyle: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: const TextStyle(fontSize: 10),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.mail_outline),
+            activeIcon: Icon(Icons.mail),
+            label: 'Message',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book_outlined),
+            activeIcon: Icon(Icons.book),
+            label: 'Booking',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.search),
+            label: 'Search',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.more_horiz),
+            label: 'Menu',
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _textValue(Map<String, dynamic> data, String key) {
+    final value = data[key];
+    if (value == null) return '';
+    return value.toString();
+  }
+
+  IconData _iconValue(Map<String, dynamic> data, String key) {
+    final value = data[key];
+    if (value is IconData) return value;
+    return Icons.circle_outlined;
+  }
+
+  Color _colorValue(Map<String, dynamic> data, String key) {
+    final value = data[key];
+    if (value is Color) return value;
+    return AppColors.colorPrimary;
   }
 }

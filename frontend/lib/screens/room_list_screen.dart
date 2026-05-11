@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../utils/colors.dart';
-import '../utils/strings.dart';
+import 'widgets/responsive_page.dart';
 
 class RoomListScreen extends StatefulWidget {
-  final Map<String, dynamic>? hotel;
-
   const RoomListScreen({Key? key, this.hotel}) : super(key: key);
+
+  final Map<String, dynamic>? hotel;
 
   @override
   State<RoomListScreen> createState() => _RoomListScreenState();
@@ -81,86 +81,107 @@ class _RoomListScreenState extends State<RoomListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.colorBg,
-      body: CustomScrollView(
+    return ResponsivePageScaffold(
+      mobileBody: CustomScrollView(
         slivers: [
-          // Content
           SliverToBoxAdapter(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isDesktop = constraints.maxWidth > 900;
-                final body = Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSelectionHeader(),
+                  const SizedBox(height: 16),
+                  ..._buildRoomCards(),
+                  Row(
                     children: [
-                      _buildSelectionHeader(),
-                      const SizedBox(height: 16),
-                      // Room Cards
-                      ..._buildRoomCards(),
+                      Expanded(
+                        child: _buildSidebar('📢', 'Quảng cáo'),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildSidebar('🎁', 'Ưu đãi đặc biệt'),
+                      ),
                     ],
                   ),
-                );
-
-                if (!isDesktop) {
-                  return Column(
-                    children: [
-                      body,
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _buildSidebar(
-                                '\u{1F4E2}',
-                                'Qu\u1EA3ng c\u00E1o',
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildSidebar(
-                                '\u{1F381}',
-                                '\u01AFu \u0111\u00E3i \u0111\u1EB7c bi\u1EC7t',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                }
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: constraints.maxWidth * 0.2,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 0, 0),
-                        child: _buildSidebar('\u{1F4E2}', 'Qu\u1EA3ng c\u00E1o'),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(child: body),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: constraints.maxWidth * 0.2,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 16, 16, 0),
-                        child: _buildSidebar(
-                          '\u{1F381}',
-                          '\u01AFu \u0111\u00E3i \u0111\u1EB7c bi\u1EC7t',
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
+                ],
+              ),
             ),
           ),
         ],
       ),
+      desktopBody: _buildDesktopPage(),
+    );
+  }
+
+  Widget _buildDesktopPage() {
+    return WebAppShell(
+      title: 'Chọn phòng',
+      subtitle:
+          'So sánh loại phòng, tiện nghi, chính sách hủy và giá trước khi tiếp tục đặt phòng.',
+      selectedIndex: 3,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 320,
+            child: Column(
+              children: [
+                _buildSelectionHeader(),
+                const SizedBox(height: 16),
+                WebPanel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Tóm tắt lựa chọn',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildDesktopMetric(
+                        Icons.king_bed_outlined,
+                        '${rooms.length} loại phòng',
+                      ),
+                      const SizedBox(height: 10),
+                      _buildDesktopMetric(
+                        Icons.payments_outlined,
+                        'Thanh toán linh hoạt',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 24),
+          Expanded(
+            child: Column(children: _buildRoomCards()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopMetric(IconData icon, String label) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppColors.colorPrimary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -268,7 +289,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
   List<Widget> _buildRoomCards() {
     return List.generate(
       rooms.length,
-      (index) => _buildRoomCard(index),
+      _buildRoomCard,
     );
   }
 
@@ -376,9 +397,9 @@ class _RoomListScreenState extends State<RoomListScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         '✓ Tiện nghi phòng',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
@@ -498,7 +519,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
                 ),
                 const SizedBox(height: 8),
                 // EasyStay Link
-                Center(
+                const Center(
                   child: Text(
                     'Chi tiết 2 phòng trên EasyStay.com',
                     style: TextStyle(

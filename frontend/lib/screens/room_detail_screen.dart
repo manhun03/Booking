@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../utils/colors.dart';
+import 'widgets/responsive_page.dart';
 
 class RoomDetailScreen extends StatefulWidget {
+  const RoomDetailScreen({Key? key, this.room, this.hotel}) : super(key: key);
+
   final Map<String, dynamic>? room;
   final Map<String, dynamic>? hotel;
-
-  const RoomDetailScreen({Key? key, this.room, this.hotel}) : super(key: key);
 
   @override
   State<RoomDetailScreen> createState() => _RoomDetailScreenState();
@@ -53,203 +54,105 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.colorBg,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isDesktop = constraints.maxWidth > 900;
-
-          if (isDesktop) {
-            // 3-Column Layout for Desktop - Sidebars extend full height
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+    return ResponsivePageScaffold(
+      mobileBody: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: _buildHeaderCard(),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _buildRoomCard(),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildSidebar('📢', 'Quảng cáo'),
+                  const SizedBox(height: 12),
+                  _buildSidebar('🎁', 'Ưu đãi đặc biệt'),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      desktopBody: WebAppShell(
+        title: roomData['name'] as String,
+        subtitle:
+            'Xem tiện nghi, chính sách, giá phòng và tiếp tục điền thông tin đặt phòng trên layout web rộng rãi.',
+        selectedIndex: 3,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 920),
+            child: Column(
               children: [
-                // Left Sidebar - Full Height
-                SizedBox(
-                  width: constraints.maxWidth * 0.2,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 16),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: _buildSidebar('📢', 'Quảng cáo'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Center Content - Scrollable
-                Expanded(
-                  child: CustomScrollView(
-                    slivers: [
-                      // Header
-                      SliverToBoxAdapter(
-                        child: Container(
-                          color: AppColors.colorBg,
-                          padding: const EdgeInsets.all(16),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.divider),
-                            ),
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      padding: EdgeInsets.zero,
-                                      icon: const Icon(Icons.arrow_back,
-                                          color: AppColors.textPrimary),
-                                      onPressed: () => Navigator.pop(context),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      'Chọn chỗ của bạn',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '27 thg 9 - 30 thg 9',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Giá đã được đối với một VND ⓘ',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.textMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Room Card
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: _buildRoomCard(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Right Sidebar - Full Height
-                SizedBox(
-                  width: constraints.maxWidth * 0.2,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 20),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: _buildSidebar('🎁', 'Ưu đãi đặc biệt'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                _buildHeaderCard(),
+                const SizedBox(height: 18),
+                _buildRoomCard(),
               ],
-            );
-          } else {
-            // Single Column Layout for Mobile
-            return CustomScrollView(
-              slivers: [
-                // Header
-                SliverToBoxAdapter(
-                  child: Container(
-                    color: AppColors.colorBg,
-                    padding: const EdgeInsets.all(16),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.divider),
-                      ),
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              IconButton(
-                                padding: EdgeInsets.zero,
-                                icon: const Icon(Icons.arrow_back,
-                                    color: AppColors.textPrimary),
-                                onPressed: () => Navigator.pop(context),
-                              ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'Chọn chỗ của bạn',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            '27 thg 9 - 30 thg 9',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Giá đã được đối với một VND ⓘ',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.divider),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                padding: EdgeInsets.zero,
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: AppColors.textPrimary,
                 ),
-                // Room Card
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: _buildRoomCard(),
-                  ),
+                onPressed: () => Navigator.pop(context),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Chọn chỗ của bạn',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
                 ),
-                // Sidebars on Mobile
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        _buildSidebar('📢', 'Quảng cáo'),
-                        const SizedBox(height: 12),
-                        _buildSidebar('🎁', 'Ưu đãi đặc biệt'),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }
-        },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '27 thg 9 - 30 thg 9',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Giá đã được đối với một VND ⓘ',
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.textMuted,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -596,7 +499,15 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                 ),
               ),
               onPressed: () {
-                _showBookingConfirmation();
+                Navigator.pushNamed(
+                  context,
+                  '/booking-form',
+                  arguments: {
+                    'room': roomData,
+                    'hotel': widget.hotel,
+                    'roomCount': roomCount,
+                  },
+                );
               },
               child: const Text(
                 'Đặt phòng',
@@ -635,64 +546,10 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
     );
   }
 
-  Widget _buildPricingSection() {
-    // This method is no longer used - pricing is now integrated in _buildRoomCard()
-    return const SizedBox.shrink();
-  }
-
-  Widget _buildBookingSection() {
-    // This method is no longer used - booking section is now integrated in _buildRoomCard()
-    return const SizedBox.shrink();
-  }
-
   String _formatPrice(int price) {
     return price.toString().replaceAllMapped(
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]}.',
         );
-  }
-
-  void _showBookingConfirmation() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xác nhận đặt phòng'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Phòng: ${roomData['name']}'),
-            const SizedBox(height: 8),
-            Text('Số phòng: $roomCount'),
-            const SizedBox(height: 8),
-            Text(
-              'Tổng giá: ${_formatPrice(roomData['price'] * roomCount)} VNĐ',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: AppColors.colorPrimary,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.colorPrimary,
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Đặt phòng thành công!')),
-              );
-            },
-            child: const Text('Xác nhận'),
-          ),
-        ],
-      ),
-    );
   }
 }

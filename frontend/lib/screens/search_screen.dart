@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../utils/colors.dart';
+import 'widgets/responsive_page.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({Key? key}) : super(key: key);
@@ -11,58 +13,61 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   late TextEditingController _searchController;
   String _sortBy = 'Default';
-  List<String> _selectedTags = ['Tag'];
+  final List<String> _selectedTags = ['Hà Nội', '2 người'];
   bool _hasSearched = false;
   int _selectedIndex = 3;
 
-  final List<Map<String, dynamic>> suggestedHotels = [
+  static const List<Map<String, dynamic>> _suggestedHotels = [
     {
-      'icon': '🏨',
-      'name': 'Mương Thanh Grand Hotel',
+      'icon': Icons.apartment_outlined,
+      'name': 'Mường Thanh Grand Hotel',
       'location': 'Hoàn Kiếm, Hà Nội',
+      'color': AppColors.colorPrimary,
     },
     {
-      'icon': '🏨',
+      'icon': Icons.hotel_outlined,
       'name': 'Golden Lotus Hotel',
       'location': 'Hoàn Kiếm, Hà Nội',
+      'color': Color(0xFFD97706),
     },
     {
-      'icon': '🏨',
+      'icon': Icons.water_outlined,
       'name': 'West Lake Hotel',
       'location': 'Tây Hồ, Hà Nội',
+      'color': Color(0xFF0891B2),
     },
   ];
 
-  final List<Map<String, dynamic>> searchResults = [
+  static const List<Map<String, dynamic>> _searchResults = [
     {
-      'image': '🏨',
       'name': 'Hanoi Grand Palace Hotel',
-      'location': '123 Láng Hạ, Hàng Bà, Hà Nội',
+      'location': '123 Láng Hạ, Ba Đình, Hà Nội',
       'rating': 4.7,
-      'price': '2,500,000 VND / đêm',
-      'date': 'Ngày 12-14, Tháng 11 2024',
-      'rooms': '2 Người lớn 1 Phòng',
+      'price': '2.500.000 VND / đêm',
+      'date': 'Ngày 12 - 14, Tháng 11 2024',
+      'rooms': '2 người lớn, 1 phòng',
       'reviews': '412 đánh giá',
+      'palette': [Color(0xFF9FB5C8), Color(0xFFECE6DD)],
     },
     {
-      'image': '🏨',
       'name': 'Lakeside Harmony Hotel',
-      'location': '5 Đình Tân Hoàng, Hoàn Kiếm, Hà Nội',
+      'location': '5 Đinh Tiên Hoàng, Hoàn Kiếm, Hà Nội',
       'rating': 4.5,
-      'price': '2,300,000 VND / đêm',
-      'date': 'Ngày 20-24, Tháng 10 2024',
-      'rooms': 'Khách 2 Người lớn 1 Phòng',
+      'price': '2.300.000 VND / đêm',
+      'date': 'Ngày 20 - 24, Tháng 10 2024',
+      'rooms': '2 người lớn, 1 phòng',
       'reviews': '523 đánh giá',
+      'palette': [Color(0xFF6A8D73), Color(0xFFE7F1E8)],
     },
     {
-      'image': '🏨',
       'name': 'Royal Orchid Hotel',
       'location': '45 Nguyễn Chí Thanh, Đống Đa, Hà Nội',
       'rating': 4.2,
-      'price': '1,800,000 VND / đêm',
-      'date': 'Ngày 15-18, Tháng 9 2024',
-      'rooms': 'Khách 2 Người lớn 1 Phòng',
+      'price': '1.800.000 VND / đêm',
+      'date': 'Ngày 15 - 18, Tháng 9 2024',
+      'rooms': '2 người lớn, 1 phòng',
       'reviews': '657 đánh giá',
+      'palette': [Color(0xFFB56576), Color(0xFFF6E4E8)],
     },
   ];
 
@@ -84,6 +89,13 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
+  void _clearSearch() {
+    setState(() {
+      _hasSearched = false;
+      _searchController.clear();
+    });
+  }
+
   void _removeTag(String tag) {
     setState(() {
       _selectedTags.remove(tag);
@@ -94,6 +106,7 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() {
       _selectedIndex = index;
     });
+
     switch (index) {
       case 0:
         Navigator.of(context).pushNamed('/home');
@@ -104,6 +117,8 @@ class _SearchScreenState extends State<SearchScreen> {
       case 2:
         Navigator.of(context).pushNamed('/booking');
         break;
+      case 3:
+        break;
       case 4:
         Navigator.of(context).pushNamed('/more');
         break;
@@ -112,553 +127,816 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        color: AppColors.colorBg,
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Header
-              Container(
-                color: AppColors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: AppColors.textPrimary,
-                        size: 24,
-                      ),
-                    ),
-                    const Text(
-                      'Search',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        // TODO: Open filters
-                      },
-                      child: const Icon(
-                        Icons.tune,
-                        color: AppColors.colorPrimary,
-                        size: 24,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Search Input
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Tìm kiếm...',
-                    hintStyle: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                    ),
-                    prefixIcon: const Icon(
-                      Icons.search,
-                      color: AppColors.textSecondary,
-                      size: 20,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: AppColors.divider,
-                        width: 1,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: AppColors.divider,
-                        width: 1,
-                      ),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 12,
-                      horizontal: 12,
-                    ),
-                  ),
-                  onSubmitted: _performSearch,
-                ),
-              ),
-              // Filter Button
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.divider),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        // TODO: Open filter options
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 16,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.tune,
-                              color: AppColors.colorPrimary,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'Search',
-                              style: TextStyle(
-                                color: AppColors.colorPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              // Sort By
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Sort by',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        // TODO: Open sort options
-                      },
-                      child: Row(
-                        children: [
-                          Text(
-                            _sortBy,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const Icon(
-                            Icons.arrow_drop_down,
-                            color: AppColors.textSecondary,
-                            size: 20,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // If not searched - show suggested hotels with tags
-              if (!_hasSearched) ...[
-                // Tags
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Wrap(
-                    spacing: 8,
-                    children: List.generate(
-                      _selectedTags.length,
-                      (index) {
-                        final tag = _selectedTags[index];
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: AppColors.divider,
-                            ),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                tag,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              GestureDetector(
-                                onTap: () => _removeTag(tag),
-                                child: const Icon(
-                                  Icons.close,
-                                  size: 14,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Info text
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Showing 0 of 100',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          // TODO: View all
-                        },
-                        child: const Text(
-                          'Xóa tìm kiếm',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.red,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Suggested Hotels List
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: List.generate(
-                      suggestedHotels.length,
-                      (index) {
-                        final hotel = suggestedHotels[index];
-                        return Padding(
-                          padding: EdgeInsets.only(
-                            bottom: index < suggestedHotels.length - 1 ? 12 : 0,
-                          ),
-                          child: GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).pushNamed(
-                                '/hotel-detail',
-                                arguments: hotel,
-                              );
-                            },
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.colorBg,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      hotel['icon'],
-                                      style: const TextStyle(fontSize: 20),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        hotel['name'],
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                      Text(
-                                        hotel['location'],
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ] else ...[
-                // Search results - Hotel Cards with images
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: List.generate(
-                      searchResults.length,
-                      (index) {
-                        final hotel = searchResults[index];
-                        return Padding(
-                          padding: EdgeInsets.only(
-                            bottom: index < searchResults.length - 1 ? 16 : 0,
-                          ),
-                          child: GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).pushNamed(
-                                '/hotel-detail',
-                                arguments: hotel,
-                              );
-                            },
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: AppColors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  children: [
-                                    // Image
-                                    Container(
-                                      width: 100,
-                                      height: 100,
-                                      color: AppColors.colorBg,
-                                      child: Center(
-                                        child: Text(
-                                          hotel['image'],
-                                          style: const TextStyle(fontSize: 32),
-                                        ),
-                                      ),
-                                    ),
-                                    // Info
-                                    Expanded(
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(12),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            // Title with rating
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    hotel['name'],
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color:
-                                                          AppColors.textPrimary,
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 4),
-                                                const Icon(
-                                                  Icons.star,
-                                                  size: 14,
-                                                  color: Colors.orange,
-                                                ),
-                                                const SizedBox(width: 2),
-                                                Text(
-                                                  hotel['rating'].toString(),
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w600,
-                                                    color:
-                                                        AppColors.textPrimary,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 4),
-                                            // Location
-                                            Text(
-                                              hotel['location'],
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                color: AppColors.textSecondary,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            // Price
-                                            Text(
-                                              hotel['price'],
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.colorPrimary,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            // Date
-                                            Row(
-                                              children: [
-                                                const Icon(
-                                                  Icons.calendar_today,
-                                                  size: 12,
-                                                  color:
-                                                      AppColors.textSecondary,
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  hotel['date'],
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
-                                                    color:
-                                                        AppColors.textSecondary,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 2),
-                                            // Rooms
-                                            Row(
-                                              children: [
-                                                const Icon(
-                                                  Icons.hotel,
-                                                  size: 12,
-                                                  color:
-                                                      AppColors.textSecondary,
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  hotel['rooms'],
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
-                                                    color:
-                                                        AppColors.textSecondary,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 2),
-                                            // Reviews
-                                            Text(
-                                              hotel['reviews'],
-                                              style: const TextStyle(
-                                                fontSize: 10,
-                                                color: AppColors.textSecondary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
+    return ResponsivePageScaffold(
+      mobileBody: Column(
+        children: [
+          _buildMobileHeader(context),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: _buildMobileContent(),
+            ),
+          ),
+        ],
+      ),
+      desktopBody: _buildDesktopPage(context),
+      mobileBottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildDesktopPage(BuildContext context) {
+    return WebAppShell(
+      title: 'Search',
+      subtitle:
+          'Tìm khách sạn theo điểm đến, lọc nhanh theo nhu cầu và xem kết quả phù hợp trên màn hình rộng.',
+      selectedIndex: 3,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stackPanels = constraints.maxWidth < 920;
+          final filterPanel = _buildDesktopFilterPanel();
+          final resultPanel = _buildDesktopResultPanel();
+
+          if (stackPanels) {
+            return Column(
+              children: [
+                filterPanel,
+                const SizedBox(height: 18),
+                resultPanel,
               ],
-              const SizedBox(height: 20),
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(width: 340, child: filterPanel),
+              const SizedBox(width: 24),
+              Expanded(child: resultPanel),
             ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDesktopFilterPanel() {
+    return WebPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Bộ lọc tìm kiếm',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildSearchField(),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              onPressed: () => _performSearch(_searchController.text),
+              icon: const Icon(Icons.search, size: 18),
+              label: const Text('Tìm kiếm'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.colorPrimary,
+                foregroundColor: AppColors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _buildSortRow(),
+          const SizedBox(height: 18),
+          _buildTagWrap(),
+          const SizedBox(height: 22),
+          _buildFilterTile(
+            icon: Icons.calendar_month_outlined,
+            label: 'Ngày lưu trú',
+            value: '12 - 14 Tháng 11',
+          ),
+          const SizedBox(height: 10),
+          _buildFilterTile(
+            icon: Icons.people_outline,
+            label: 'Số khách',
+            value: '2 người lớn',
+          ),
+          const SizedBox(height: 10),
+          _buildFilterTile(
+            icon: Icons.payments_outlined,
+            label: 'Ngân sách',
+            value: '1.8M - 2.5M VND',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopResultPanel() {
+    return WebPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _hasSearched ? 'Kết quả phù hợp' : 'Gợi ý phổ biến',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _clearSearch,
+                child: const Text('Xóa tìm kiếm'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _hasSearched
+                ? 'Showing ${_searchResults.length} of 100'
+                : 'Showing ${_suggestedHotels.length} suggested hotels',
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (_hasSearched)
+            Column(
+              children: [
+                for (var index = 0; index < _searchResults.length; index++) ...[
+                  _buildResultCard(_searchResults[index], wide: true),
+                  if (index < _searchResults.length - 1)
+                    const SizedBox(height: 14),
+                ],
+              ],
+            )
+          else
+            _buildSuggestedList(wide: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileContent() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: _buildSearchField(),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _buildSearchButton(),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: _buildSortRow(),
+        ),
+        if (!_hasSearched) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _buildTagWrap(),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _buildShowingRow(),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _buildSuggestedList(),
+          ),
+        ] else ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                for (var index = 0; index < _searchResults.length; index++) ...[
+                  _buildResultCard(_searchResults[index]),
+                  if (index < _searchResults.length - 1)
+                    const SizedBox(height: 16),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildMobileHeader(BuildContext context) {
+    return Container(
+      color: AppColors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: const Icon(
+              Icons.arrow_back,
+              color: AppColors.textPrimary,
+              size: 24,
+            ),
+          ),
+          const Text(
+            'Search',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+            onPressed: () {},
+            icon: const Icon(
+              Icons.tune,
+              color: AppColors.colorPrimary,
+              size: 22,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return TextField(
+      controller: _searchController,
+      decoration: InputDecoration(
+        hintText: 'Tìm kiếm khách sạn...',
+        hintStyle: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 14,
+        ),
+        prefixIcon: const Icon(
+          Icons.search,
+          color: AppColors.textSecondary,
+          size: 20,
+        ),
+        filled: true,
+        fillColor: AppColors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.divider),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.divider),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.colorPrimary),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 12,
+          horizontal: 12,
+        ),
+      ),
+      onSubmitted: _performSearch,
+    );
+  }
+
+  Widget _buildSearchButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 46,
+      child: OutlinedButton.icon(
+        onPressed: () => _performSearch(_searchController.text),
+        icon: const Icon(Icons.tune, size: 18),
+        label: const Text('Search'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.colorPrimary,
+          side: const BorderSide(color: AppColors.divider),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
+    );
+  }
+
+  Widget _buildSortRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'Sort by',
+          style: TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+          ),
         ),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onBottomNavTapped,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          selectedItemColor: AppColors.colorPrimary,
-          unselectedItemColor: AppColors.textSecondary,
-          selectedLabelStyle: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
+        InkWell(
+          onTap: () {
+            setState(() {
+              _sortBy = _sortBy == 'Default' ? 'Highest rating' : 'Default';
+            });
+          },
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Row(
+              children: [
+                Text(
+                  _sortBy,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textSecondary,
+                  size: 20,
+                ),
+              ],
+            ),
           ),
-          unselectedLabelStyle: const TextStyle(
-            fontSize: 10,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTagWrap() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final tag in _selectedTags)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.divider),
+                borderRadius: BorderRadius.circular(6),
+                color: AppColors.white,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    tag,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: () => _removeTag(tag),
+                    child: const Icon(
+                      Icons.close,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShowingRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'Showing 0 of 100',
+          style: TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondary,
           ),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home',
+        ),
+        GestureDetector(
+          onTap: _clearSearch,
+          child: const Text(
+            'Xóa tìm kiếm',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.red,
+              fontWeight: FontWeight.w600,
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.mail_outline),
-              activeIcon: Icon(Icons.mail),
-              label: 'Message',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSuggestedList({bool wide = false}) {
+    return Column(
+      children: [
+        for (var index = 0; index < _suggestedHotels.length; index++) ...[
+          _buildSuggestedHotel(_suggestedHotels[index], wide: wide),
+          if (index < _suggestedHotels.length - 1)
+            SizedBox(height: wide ? 12 : 14),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSuggestedHotel(
+    Map<String, dynamic> hotel, {
+    bool wide = false,
+  }) {
+    final color = _colorValue(hotel, 'color');
+
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).pushNamed('/hotel-detail', arguments: hotel);
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: EdgeInsets.all(wide ? 14 : 0),
+        decoration: wide
+            ? BoxDecoration(
+                color: AppColors.colorBg,
+                borderRadius: BorderRadius.circular(8),
+              )
+            : null,
+        child: Row(
+          children: [
+            Container(
+              width: wide ? 48 : 40,
+              height: wide ? 48 : 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _iconValue(hotel, 'icon'),
+                color: color,
+                size: wide ? 24 : 20,
+              ),
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.book_outlined),
-              activeIcon: Icon(Icons.book),
-              label: 'Booking',
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _textValue(hotel, 'name'),
+                    style: TextStyle(
+                      fontSize: wide ? 15 : 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _textValue(hotel, 'location'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.search),
-              label: 'Search',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.more_horiz),
-              label: 'More',
-            ),
+            if (wide)
+              const Icon(
+                Icons.chevron_right,
+                color: AppColors.textSecondary,
+              ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildResultCard(
+    Map<String, dynamic> hotel, {
+    bool wide = false,
+  }) {
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).pushNamed('/hotel-detail', arguments: hotel);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.divider),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: wide
+            ? _buildWideResultContent(hotel)
+            : _buildMobileResultContent(hotel),
+      ),
+    );
+  }
+
+  Widget _buildMobileResultContent(Map<String, dynamic> hotel) {
+    return Row(
+      children: [
+        _buildHotelImage(hotel, width: 100, height: 116),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: _buildResultDetails(hotel),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWideResultContent(Map<String, dynamic> hotel) {
+    return Row(
+      children: [
+        _buildHotelImage(hotel, width: 168, height: 150),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: _buildResultDetails(hotel, wide: true),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(right: 18),
+          child: SizedBox(
+            height: 42,
+            child: OutlinedButton(
+              onPressed: () {
+                Navigator.of(context)
+                    .pushNamed('/hotel-detail', arguments: hotel);
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.colorPrimary,
+                side: const BorderSide(color: AppColors.colorPrimary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Xem chi tiết'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildResultDetails(
+    Map<String, dynamic> hotel, {
+    bool wide = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _textValue(hotel, 'name'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: wide ? 16 : 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.star, size: 14, color: Colors.orange),
+            const SizedBox(width: 2),
+            Text(
+              _textValue(hotel, 'rating'),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Text(
+          _textValue(hotel, 'location'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _textValue(hotel, 'price'),
+          style: TextStyle(
+            fontSize: wide ? 14 : 12,
+            fontWeight: FontWeight.w800,
+            color: AppColors.colorPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        _buildMetaLine(Icons.calendar_today, _textValue(hotel, 'date')),
+        const SizedBox(height: 4),
+        _buildMetaLine(Icons.hotel, _textValue(hotel, 'rooms')),
+        const SizedBox(height: 4),
+        Text(
+          _textValue(hotel, 'reviews'),
+          style: const TextStyle(
+            fontSize: 10,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHotelImage(
+    Map<String, dynamic> hotel, {
+    required double width,
+    required double height,
+  }) {
+    final palette = _paletteValue(hotel);
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(12),
+        bottomLeft: Radius.circular(12),
+      ),
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: palette,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: const Icon(
+          Icons.apartment,
+          size: 36,
+          color: AppColors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetaLine(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 12, color: AppColors.textSecondary),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterTile({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.colorBg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.colorPrimary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onBottomNavTapped,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        selectedItemColor: AppColors.colorPrimary,
+        unselectedItemColor: AppColors.textSecondary,
+        selectedLabelStyle: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: const TextStyle(fontSize: 10),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.mail_outline),
+            activeIcon: Icon(Icons.mail),
+            label: 'Message',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book_outlined),
+            activeIcon: Icon(Icons.book),
+            label: 'Booking',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.search),
+            label: 'Search',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.more_horiz),
+            label: 'Menu',
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _textValue(Map<String, dynamic> data, String key) {
+    final value = data[key];
+    if (value == null) return '';
+    return value.toString();
+  }
+
+  IconData _iconValue(Map<String, dynamic> data, String key) {
+    final value = data[key];
+    if (value is IconData) return value;
+    return Icons.apartment_outlined;
+  }
+
+  Color _colorValue(Map<String, dynamic> data, String key) {
+    final value = data[key];
+    if (value is Color) return value;
+    return AppColors.colorPrimary;
+  }
+
+  List<Color> _paletteValue(Map<String, dynamic> data) {
+    final value = data['palette'];
+    if (value is List<Color> && value.length >= 2) return value;
+    return const [Color(0xFF9FB5C8), Color(0xFFECE6DD)];
   }
 }
