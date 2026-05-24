@@ -29,7 +29,7 @@ public class SecurityConfig {
                 .cors(cors -> {})
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/actuator/health").permitAll()
+                        .requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/actuator/health", "/api/ai-chat/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/hotels", "/api/hotels/*", "/api/hotels/*/images", "/api/hotels/*/images/ordered").permitAll()
                         .requestMatchers("/api/hotels/search", "/api/hotels/by-province", "/api/hotels/all-with-province", "/api/hotels/*/with-location").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/provinces/**", "/api/wards/**").permitAll()

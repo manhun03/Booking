@@ -52,6 +52,8 @@ app:
     project-id: hotelapp-63196
   google:
     client-id: ${GOOGLE_CLIENT_ID:883824205385-182f65ondho5qnima9ladd5j7qk2b40h.apps.googleusercontent.com}
+  ai-agent:
+    base-url: ${AI_AGENT_BASE_URL:http://localhost:8000}
   payment:
     vnpay:
       pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
