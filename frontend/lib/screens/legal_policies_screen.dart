@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../utils/colors.dart';
+import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
 
 class LegalPoliciesScreen extends StatefulWidget {
-  const LegalPoliciesScreen({Key? key}) : super(key: key);
+  const LegalPoliciesScreen({super.key});
 
   @override
   State<LegalPoliciesScreen> createState() => _LegalPoliciesScreenState();
@@ -14,13 +15,13 @@ class _LegalPoliciesScreenState extends State<LegalPoliciesScreen> {
   int _selectedIndex = 4;
 
   static const String _termsText =
-      'Khi sử dụng ứng dụng EasyStay, bạn đồng ý tuân thủ các quy định và điều khoản do chúng tôi đưa ra. EasyStay là nền tảng giúp bạn tìm kiếm, đặt và quản lý phòng khách sạn một cách nhanh chóng, tiện lợi và an toàn.';
+      'Khi sử dụng ứng dụng StaySmart, bạn đồng ý tuân thủ các quy định và điều khoản do chúng tôi đưa ra. StaySmart là nền tảng giúp bạn tìm kiếm, đặt và quản lý phòng khách sạn một cách nhanh chóng, tiện lợi và an toàn.';
 
   static const String _usageText =
       'Người dùng cần cung cấp thông tin chính xác khi đăng ký tài khoản và đặt phòng. Việc sử dụng ứng dụng vào các mục đích gian lận, vi phạm pháp luật hoặc gây ảnh hưởng đến quyền lợi người khác đều bị nghiêm cấm.';
 
   static const String _privacyText =
-      'Chúng tôi tôn trọng và cam kết bảo vệ quyền riêng tư của bạn. EasyStay chỉ thu thập các thông tin cần thiết như họ tên, email, số điện thoại và lịch sử đặt phòng nhằm phục vụ tốt hơn cho quá trình cung cấp dịch vụ.';
+      'Chúng tôi tôn trọng và cam kết bảo vệ quyền riêng tư của bạn. StaySmart chỉ thu thập các thông tin cần thiết như họ tên, email, số điện thoại và lịch sử đặt phòng nhằm phục vụ tốt hơn cho quá trình cung cấp dịch vụ.';
 
   void _onBottomNavTapped(int index) {
     setState(() {
@@ -80,7 +81,7 @@ class _LegalPoliciesScreenState extends State<LegalPoliciesScreen> {
     return WebAppShell(
       title: 'Legal and Policies',
       subtitle:
-          'Xem các điều khoản dịch vụ, quyền riêng tư và quy định sử dụng EasyStay.',
+          'Xem các điều khoản dịch vụ, quyền riêng tư và quy định sử dụng StaySmart.',
       selectedIndex: 4,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -296,7 +297,7 @@ class _LegalPoliciesScreenState extends State<LegalPoliciesScreen> {
           ),
           const SizedBox(width: 6),
           const Text(
-            'EasyStay',
+            'StaySmart',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,
@@ -460,26 +461,6 @@ class _LegalPoliciesScreenState extends State<LegalPoliciesScreen> {
   }
 
   static Widget _buildAvatar({required double size}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 2),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF6D4C41),
-            Color(0xFFD7A86E),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Icon(
-        Icons.person,
-        size: size * 0.58,
-        color: AppColors.white,
-      ),
-    );
+    return CurrentUserAvatar(size: size);
   }
 }

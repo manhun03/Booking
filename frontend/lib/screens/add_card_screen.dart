@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../utils/colors.dart';
+import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
 
 class AddCardScreen extends StatefulWidget {
-  const AddCardScreen({Key? key}) : super(key: key);
+  const AddCardScreen({super.key});
 
   @override
   State<AddCardScreen> createState() => _AddCardScreenState();
@@ -249,7 +250,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
           ),
           const SizedBox(width: 6),
           const Text(
-            'EasyStay',
+            'StaySmart',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,
@@ -506,26 +507,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
   }
 
   static Widget _buildAvatar({required double size}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 2),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF6D4C41),
-            Color(0xFFD7A86E),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Icon(
-        Icons.person,
-        size: size * 0.58,
-        color: AppColors.white,
-      ),
-    );
+    return CurrentUserAvatar(size: size);
   }
 }

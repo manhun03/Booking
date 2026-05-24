@@ -289,7 +289,7 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
           ),
           const SizedBox(width: 4),
           const Text(
-            'EasyStay',
+            'StaySmart',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,

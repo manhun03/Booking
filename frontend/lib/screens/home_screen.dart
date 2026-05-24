@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
+import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -13,7 +15,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  final List<Map<String, dynamic>> destinations = const [
+  late List<Map<String, dynamic>> destinations;
+
+  static const List<Map<String, dynamic>> _fallbackDestinations = [
     {
       'name': 'Hà Nội',
       'price': '5,450,000 VND',
@@ -56,6 +60,25 @@ class _HomeScreenState extends State<HomeScreen> {
     },
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    destinations = List<Map<String, dynamic>>.from(_fallbackDestinations);
+    _loadDestinations();
+  }
+
+  Future<void> _loadDestinations() async {
+    try {
+      final hotels = await ApiService().fetchHotels(pageSize: 6);
+      if (!mounted || hotels.isEmpty) return;
+      setState(() {
+        destinations = hotels;
+      });
+    } catch (_) {
+      // Keep bundled demo data when the backend is not reachable.
+    }
+  }
+
   void _onBottomNavTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -91,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       desktopBody: WebAppShell(
-        title: 'EasyStay',
+        title: 'StaySmart',
         subtitle:
             'Tìm khách sạn phù hợp, theo dõi ưu đãi và mở nhanh các điểm đến đang được quan tâm.',
         selectedIndex: 0,
@@ -109,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text(
-            'EasyStay',
+            'StaySmart',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -793,26 +816,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildAvatar() {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [
-            Color(0xFF6D4C41),
-            Color(0xFFD7A86E),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: const Icon(
-        Icons.person,
-        color: AppColors.white,
-        size: 20,
-      ),
-    );
+    return const CurrentUserAvatar(size: 36);
   }
 
   Widget _buildSidebar(String icon, String label) {

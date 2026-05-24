@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 import 'widgets/responsive_page.dart';
 
 class RoomListScreen extends StatefulWidget {
-  const RoomListScreen({Key? key, this.hotel}) : super(key: key);
+  const RoomListScreen({super.key, this.hotel});
 
   final Map<String, dynamic>? hotel;
 
@@ -13,11 +15,47 @@ class RoomListScreen extends StatefulWidget {
 
 class _RoomListScreenState extends State<RoomListScreen> {
   late List<Map<String, dynamic>> rooms;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     _initializeRooms();
+    _loadRooms();
+  }
+
+  Future<void> _loadRooms() async {
+    final hotelId = _hotelId;
+    if (hotelId == null) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final loadedRooms = await ApiService().fetchRoomsByHotel(hotelId);
+      if (!mounted) return;
+      setState(() {
+        rooms = loadedRooms;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  int? get _hotelId {
+    final value = widget.hotel?['id'];
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
   void _initializeRooms() {
@@ -287,9 +325,48 @@ class _RoomListScreenState extends State<RoomListScreen> {
   }
 
   List<Widget> _buildRoomCards() {
+    if (_isLoading) {
+      return const [
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 32),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ];
+    }
+
+    if (_errorMessage != null) {
+      return [_buildStateMessage(_errorMessage!)];
+    }
+
+    if (rooms.isEmpty) {
+      return [_buildStateMessage('Khong co phong de hien thi')];
+    }
+
     return List.generate(
       rooms.length,
       _buildRoomCard,
+    );
+  }
+
+  Widget _buildStateMessage(String message) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textSecondary,
+        ),
+      ),
     );
   }
 
@@ -518,10 +595,10 @@ class _RoomListScreenState extends State<RoomListScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // EasyStay Link
+                // StaySmart Link
                 const Center(
                   child: Text(
-                    'Chi tiết 2 phòng trên EasyStay.com',
+                    'Chi tiết 2 phòng trên StaySmart.com',
                     style: TextStyle(
                       fontSize: 11,
                       color: AppColors.colorPrimary,

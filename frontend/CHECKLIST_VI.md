@@ -1,9 +1,9 @@
-# ✅ Danh sách kiểm tra - HHBN Flutter App
+# ✅ Danh sách kiểm tra - StaySmart Flutter App
 
 ## 🎯 Giao diện đã hoàn thành
 
 - [x] **Splash Screen**
-  - [x] Logo HHBN (Icon + Text)
+  - [x] Logo StaySmart (Icon + Text)
   - [x] Tagline: "Đặt phòng nhanh - Trải nghiệm sang!"
   - [x] Gradient background
   - [x] Auto-navigate sau 3 giây

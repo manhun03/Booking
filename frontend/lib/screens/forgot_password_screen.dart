@@ -88,7 +88,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Subtitle
                     const Text(
                       AppStrings.forgotPasswordSubtitle,
@@ -142,7 +142,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
             ),
           ),
-        ),      
+        ),
       ),
     );
   }

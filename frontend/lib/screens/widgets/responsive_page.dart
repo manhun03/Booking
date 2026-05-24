@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../../utils/colors.dart';
+import 'current_user_avatar.dart';
 
 class ResponsivePageScaffold extends StatelessWidget {
   const ResponsivePageScaffold({
-    Key? key,
+    super.key,
     required this.mobileBody,
     required this.desktopBody,
     this.mobileBottomNavigationBar,
     this.backgroundColor = AppColors.colorBg,
     this.desktopBreakpoint = 980,
-  }) : super(key: key);
+  });
 
   final Widget mobileBody;
   final Widget desktopBody;
@@ -55,13 +56,13 @@ class ResponsivePageScaffold extends StatelessWidget {
 
 class WebAppShell extends StatelessWidget {
   const WebAppShell({
-    Key? key,
+    super.key,
     required this.title,
     required this.subtitle,
     required this.selectedIndex,
     required this.child,
     this.maxWidth = 1180,
-  }) : super(key: key);
+  });
 
   final String title;
   final String subtitle;
@@ -116,10 +117,10 @@ class WebAppShell extends StatelessWidget {
 
 class WebPanel extends StatelessWidget {
   const WebPanel({
-    Key? key,
+    super.key,
     required this.child,
     this.padding = const EdgeInsets.all(22),
-  }) : super(key: key);
+  });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -176,7 +177,7 @@ class _WebBrandBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 const Text(
-                  'EasyStay',
+                  'StaySmart',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -199,29 +200,9 @@ class _WebBrandBar extends StatelessWidget {
                   tooltip: 'Cài đặt',
                 ),
                 const SizedBox(width: 8),
-                GestureDetector(
+                CurrentUserAvatar(
+                  size: 36,
                   onTap: () => Navigator.of(context).pushNamed('/user-profile'),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.white, width: 2),
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFF6D4C41),
-                          Color(0xFFD7A86E),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.person,
-                      size: 20,
-                      color: AppColors.white,
-                    ),
-                  ),
                 ),
               ],
             ),

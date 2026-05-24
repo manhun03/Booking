@@ -2,11 +2,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
+import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
 
 class BookingScreen extends StatefulWidget {
-  const BookingScreen({Key? key}) : super(key: key);
+  const BookingScreen({super.key});
 
   @override
   State<BookingScreen> createState() => _BookingScreenState();
@@ -15,9 +17,14 @@ class BookingScreen extends StatefulWidget {
 class _BookingScreenState extends State<BookingScreen> {
   int _selectedIndex = 2;
   bool _showHistory = false;
+  bool _isLoading = false;
+  String? _errorMessage;
   String _searchText = '';
 
-  static const List<Map<String, dynamic>> _currentBookings = [
+  late List<Map<String, dynamic>> _currentBookings;
+  late List<Map<String, dynamic>> _historyBookings;
+
+  static const List<Map<String, dynamic>> _fallbackCurrentBookings = [
     {
       'name': 'Sunset Pearl Resort',
       'location': '75 Trần Phú, Nha Trang',
@@ -35,7 +42,7 @@ class _BookingScreenState extends State<BookingScreen> {
     },
   ];
 
-  static const List<Map<String, dynamic>> _historyBookings = [
+  static const List<Map<String, dynamic>> _fallbackHistoryBookings = [
     {
       'name': 'Ocean Breeze Hotel',
       'location': '36 Lý Thường Kiệt, Hoàn Kiếm',
@@ -76,6 +83,43 @@ class _BookingScreenState extends State<BookingScreen> {
       'variant': 3,
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _currentBookings =
+        List<Map<String, dynamic>>.from(_fallbackCurrentBookings);
+    _historyBookings =
+        List<Map<String, dynamic>>.from(_fallbackHistoryBookings);
+    _loadBookings();
+  }
+
+  Future<void> _loadBookings() async {
+    if (!ApiService().isAuthenticated) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final bookings = await ApiService().fetchMyBookings();
+      if (!mounted) return;
+      setState(() {
+        _currentBookings =
+            bookings.where((booking) => booking['isHistory'] != true).toList();
+        _historyBookings =
+            bookings.where((booking) => booking['isHistory'] == true).toList();
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
   List<Map<String, dynamic>> get _visibleBookings {
     final source = _showHistory ? _historyBookings : _currentBookings;
@@ -235,6 +279,21 @@ class _BookingScreenState extends State<BookingScreen> {
   Widget _buildDesktopBookingList() {
     final bookings = _visibleBookings;
 
+    if (_isLoading) {
+      return const WebPanel(
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 34),
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return WebPanel(child: _buildStateMessage(_errorMessage!));
+    }
+
     if (bookings.isEmpty) {
       return const WebPanel(
         child: Center(
@@ -272,6 +331,27 @@ class _BookingScreenState extends State<BookingScreen> {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildStateMessage(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 22),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textSecondary,
+        ),
+      ),
     );
   }
 
@@ -414,7 +494,7 @@ class _BookingScreenState extends State<BookingScreen> {
           ),
           const SizedBox(width: 6),
           const Text(
-            'EasyStay',
+            'StaySmart',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,
@@ -625,6 +705,25 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Widget _buildBookingList() {
     final bookings = _visibleBookings;
+
+    if (_isLoading) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.only(top: 24),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 24),
+          child: _buildStateMessage(_errorMessage!),
+        ),
+      );
+    }
+
     if (bookings.isEmpty) {
       return const SliverToBoxAdapter(
         child: Padding(
@@ -937,27 +1036,7 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   static Widget _buildAvatar({required double size}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 2),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF6D4C41),
-            Color(0xFFD7A86E),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: const Icon(
-        Icons.person,
-        size: 20,
-        color: AppColors.white,
-      ),
-    );
+    return CurrentUserAvatar(size: size);
   }
 }
 

@@ -1,6 +1,6 @@
-# HHBN Hotel Booking App - Flutter Frontend
+# StaySmart Hotel Booking App - Flutter Frontend
 
-This is a Flutter-based frontend for the HHBN Hotel Booking Management System.
+This is a Flutter-based frontend for the StaySmart Hotel Booking Management System.
 
 ## Project Structure
 
@@ -8,7 +8,7 @@ This is a Flutter-based frontend for the HHBN Hotel Booking Management System.
 lib/
 ├── main.dart                 # Entry point of the application
 ├── screens/
-│   ├── splash_screen.dart   # Initial splash screen with HHBN logo
+│   ├── splash_screen.dart   # Initial splash screen with StaySmart logo
 │   ├── login_screen.dart    # Login screen with email/password
 │   └── widgets/
 │       └── custom_text_field.dart  # Reusable custom text field widget
@@ -23,7 +23,7 @@ lib/
 ## Features
 
 ### Splash Screen
-- Displays HHBN logo with tagline
+- Displays StaySmart logo with tagline
 - Auto-navigates to Login screen after 3 seconds
 - Gradient background matching design
 
@@ -103,7 +103,7 @@ The following features need to be implemented:
 ## Design Reference
 
 The UI design is based on Figma mockups:
-- Splash Screen displaying HHBN branding
+- Splash Screen displaying StaySmart branding
 - Login Screen with email/password fields
 - Google Sign-In integration
 - Responsive layout for mobile devices

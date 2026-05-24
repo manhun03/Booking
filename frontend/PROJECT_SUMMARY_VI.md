@@ -1,11 +1,11 @@
-# 📱 HHBN Hotel Booking App - Flutter Project Summary
+# 📱 StaySmart Hotel Booking App - Flutter Project Summary
 
 ## ✨ Giao diện được tạo
 
 Dự án Flutter đầy đủ đã được tạo với 2 màn hình chính:
 
 ### 1. 🎯 Màn hình Splash (Splash Screen)
-- **Logo HHBN** được hiển thị ở giữa màn hình trong một vòng tròn trắng
+- **Logo StaySmart** được hiển thị ở giữa màn hình trong một vòng tròn trắng
 - **Tagline**: "Đặt phòng nhanh - Trải nghiệm sang!"
 - **Nền gradient** từ đậm xuống sáng
 - **Tự động chuyển** sang màn hình Đăng nhập sau 3 giây
@@ -182,4 +182,4 @@ Tham khảo các file hướng dẫn:
 
 ---
 
-**Dự án Flutter cho HHBN Hotel Booking App đã sẵn sàng! 🎉**
+**Dự án Flutter cho StaySmart Hotel Booking App đã sẵn sàng! 🎉**

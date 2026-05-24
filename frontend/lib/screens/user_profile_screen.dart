@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
+import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
 
 class UserProfileScreen extends StatefulWidget {
-  const UserProfileScreen({Key? key}) : super(key: key);
+  const UserProfileScreen({super.key});
 
   @override
   State<UserProfileScreen> createState() => _UserProfileScreenState();
@@ -12,6 +14,9 @@ class UserProfileScreen extends StatefulWidget {
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
   int _selectedIndex = 4;
+  bool _isLoadingProfile = false;
+  String? _profileError;
+  Map<String, dynamic>? _profile;
 
   static const List<_ProfileMenuItem> _menuItems = [
     _ProfileMenuItem(Icons.home_outlined, 'Home', route: '/home'),
@@ -45,6 +50,67 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     ),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    if (!ApiService().isAuthenticated) {
+      if (!mounted) return;
+      setState(() {
+        _profile = _sessionProfile();
+        _isLoadingProfile = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingProfile = true;
+      _profileError = null;
+    });
+
+    try {
+      final profile = await ApiService().fetchCurrentUser();
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _isLoadingProfile = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _profile = _sessionProfile();
+        _profileError = error.toString();
+        _isLoadingProfile = false;
+      });
+    }
+  }
+
+  Map<String, dynamic> _sessionProfile() {
+    final session = ApiService().currentSession;
+    return {
+      'fullName': session?.fullName ?? 'Customer',
+      'email': session?.email ?? '',
+      'phone': '',
+      'avatarUrl': '',
+    };
+  }
+
+  Future<void> _openEditProfile() async {
+    final updated = await Navigator.of(context).pushNamed('/edit-profile');
+    if (!mounted) return;
+    if (updated is Map<String, dynamic>) {
+      setState(() {
+        _profile = updated;
+        _profileError = null;
+      });
+      return;
+    }
+    await _loadProfile();
+  }
+
   void _onBottomNavTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -70,7 +136,28 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   void _logout() {
+    ApiService().logout();
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+  }
+
+  String get _displayName {
+    final name = _textValue(_profile?['fullName']);
+    return name.isEmpty ? 'Customer' : name;
+  }
+
+  String get _displayEmail {
+    final email = _textValue(_profile?['email']);
+    return email.isEmpty ? 'Chua co email' : email;
+  }
+
+  String get _displayPhone {
+    final phone = _textValue(_profile?['phone']);
+    return phone.isEmpty ? 'Chua cap nhat' : phone;
+  }
+
+  String _textValue(dynamic value) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? '' : text;
   }
 
   @override
@@ -107,7 +194,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     return WebAppShell(
       title: 'Account Settings',
       subtitle:
-          'Quản lý hồ sơ, thông tin liên hệ và các thiết lập tài khoản EasyStay trên màn hình rộng.',
+          'Quản lý hồ sơ, thông tin liên hệ và các thiết lập tài khoản StaySmart trên màn hình rộng.',
       selectedIndex: 4,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -147,21 +234,21 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             children: [
               _buildAvatar(size: 72),
               const SizedBox(width: 16),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Nguyễn Đoàn Quân',
-                      style: TextStyle(
+                      _isLoadingProfile ? 'Dang tai ho so' : _displayName,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 4),
-                    Text(
-                      'EasyStay member',
+                    const SizedBox(height: 4),
+                    const Text(
+                      'StaySmart member',
                       style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -187,7 +274,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             width: double.infinity,
             height: 46,
             child: ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: _openEditProfile,
               icon: const Icon(Icons.edit_outlined, size: 18),
               label: const Text('Chỉnh sửa hồ sơ'),
               style: ElevatedButton.styleFrom(
@@ -330,7 +417,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
           const SizedBox(width: 6),
           const Text(
-            'EasyStay',
+            'StaySmart',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,
@@ -391,7 +478,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               size: 18,
               color: AppColors.colorPrimary,
             ),
-            onPressed: () {},
+            onPressed: _openEditProfile,
           ),
         ),
       ],
@@ -402,11 +489,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 8, bottom: 6),
+        Padding(
+          padding: const EdgeInsets.only(left: 8, bottom: 6),
           child: Text(
-            'Nguyễn Đoàn Quân',
-            style: TextStyle(
+            _isLoadingProfile ? 'Dang tai ho so' : _displayName,
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
@@ -421,9 +508,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
           child: Column(
             children: [
-              _buildInfoRow('Địa chỉ email', 'ngana@gmail.com'),
+              if (_profileError != null)
+                _buildInfoRow('Trang thai', _profileError!),
+              if (_profileError != null)
+                const Divider(height: 1, color: AppColors.divider),
+              _buildInfoRow('Địa chỉ email', _displayEmail),
               const Divider(height: 1, color: AppColors.divider),
-              _buildInfoRow('Số điện thoại', '085555492134'),
+              _buildInfoRow('Số điện thoại', _displayPhone),
               const Divider(height: 1, color: AppColors.divider),
               _buildInfoRow('Mật khẩu', '****************'),
               Align(
@@ -434,7 +525,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     width: compact ? 78 : 120,
                     height: 32,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: _openEditProfile,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.colorPrimary,
                         elevation: 0,
@@ -711,27 +802,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   static Widget _buildAvatar({required double size}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 2),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF6D4C41),
-            Color(0xFFD7A86E),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Icon(
-        Icons.person,
-        size: size * 0.58,
-        color: AppColors.white,
-      ),
-    );
+    return CurrentUserAvatar(size: size);
   }
 }
 

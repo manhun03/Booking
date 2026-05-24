@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../utils/colors.dart';
+import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
 
 class LanguageScreen extends StatefulWidget {
-  const LanguageScreen({Key? key}) : super(key: key);
+  const LanguageScreen({super.key});
 
   @override
   State<LanguageScreen> createState() => _LanguageScreenState();
@@ -82,7 +83,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
     return WebAppShell(
       title: 'Language',
       subtitle:
-          'Chọn ngôn ngữ hiển thị phù hợp cho ứng dụng và website EasyStay.',
+          'Chọn ngôn ngữ hiển thị phù hợp cho ứng dụng và website StaySmart.',
       selectedIndex: 4,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -183,7 +184,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
           ),
           const SizedBox(width: 6),
           const Text(
-            'EasyStay',
+            'StaySmart',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,
@@ -422,26 +423,6 @@ class _LanguageScreenState extends State<LanguageScreen> {
   }
 
   static Widget _buildAvatar({required double size}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 2),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF6D4C41),
-            Color(0xFFD7A86E),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Icon(
-        Icons.person,
-        size: size * 0.58,
-        color: AppColors.white,
-      ),
-    );
+    return CurrentUserAvatar(size: size);
   }
 }

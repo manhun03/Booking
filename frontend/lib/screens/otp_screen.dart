@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/colors.dart';
 
 class OtpScreen extends StatefulWidget {
-  final String? email; 
+  final String? email;
 
   const OtpScreen({Key? key, this.email}) : super(key: key);
 
@@ -146,7 +146,7 @@ class _OtpScreenState extends State<OtpScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Subtitle with dynamic email
                     RichText(
                       textAlign: TextAlign.center,
@@ -157,7 +157,9 @@ class _OtpScreenState extends State<OtpScreen> {
                           height: 1.5,
                         ),
                         children: [
-                          const TextSpan(text: 'We have just sent you 6 digit code via your\nemail '),
+                          const TextSpan(
+                              text:
+                                  'We have just sent you 6 digit code via your\nemail '),
                           TextSpan(
                             text: widget.email,
                             style: const TextStyle(
@@ -173,7 +175,8 @@ class _OtpScreenState extends State<OtpScreen> {
                     // 6 OTP Input Fields
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(6, (index) => _buildOtpBox(index)),
+                      children:
+                          List.generate(6, (index) => _buildOtpBox(index)),
                     ),
                     const SizedBox(height: 32),
 

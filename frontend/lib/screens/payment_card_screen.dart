@@ -1,20 +1,77 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 
 class PaymentCardScreen extends StatelessWidget {
   const PaymentCardScreen({
-    Key? key,
+    super.key,
     this.room,
     this.hotel,
     this.customer,
     this.roomCount = 1,
-  }) : super(key: key);
+  });
 
   final Map<String, dynamic>? room;
   final Map<String, dynamic>? hotel;
   final Map<String, dynamic>? customer;
   final int roomCount;
+
+  Future<void> _confirmBooking(BuildContext context) async {
+    final roomId = _asInt(room?['id']);
+    if (!ApiService().isAuthenticated || roomId == null) {
+      _openSuccess(context, paymentMethod: 'card');
+      return;
+    }
+
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      ),
+    );
+
+    try {
+      final booking = await ApiService().createBooking(
+        roomId: roomId,
+        guestCount: _guestCount,
+        paidAmount: 0,
+        paymentMethod: 'CARD',
+        note: customer?['email']?.toString(),
+      );
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      _openSuccess(context, paymentMethod: 'card', booking: booking);
+    } catch (error) {
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
+  }
+
+  void _openSuccess(
+    BuildContext context, {
+    required String paymentMethod,
+    Map<String, dynamic>? booking,
+  }) {
+    Navigator.pushNamed(
+      context,
+      '/booking-success',
+      arguments: {
+        'room': room,
+        'hotel': hotel,
+        'customer': customer,
+        'paymentMethod': paymentMethod,
+        'roomCount': roomCount,
+        'booking': booking,
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -683,19 +740,7 @@ class PaymentCardScreen extends StatelessWidget {
             width: double.infinity,
             height: 44,
             child: ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(
-                  context,
-                  '/booking-success',
-                  arguments: {
-                    'room': room,
-                    'hotel': hotel,
-                    'customer': customer,
-                    'paymentMethod': 'card',
-                    'roomCount': roomCount,
-                  },
-                );
-              },
+              onPressed: () => _confirmBooking(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.colorPrimary,
                 elevation: 0,
@@ -770,6 +815,12 @@ class PaymentCardScreen extends StatelessWidget {
   }
 
   int get safeRoomCount => roomCount < 1 ? 1 : roomCount;
+
+  int get _guestCount {
+    final capacity = _asInt(room?['capacity']);
+    if (capacity != null && capacity > 0) return capacity;
+    return safeRoomCount;
+  }
 
   int get _basePrice {
     final price = _asInt(room?['price']) ?? 128000;

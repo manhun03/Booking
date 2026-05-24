@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 import '../utils/strings.dart';
 import 'widgets/custom_text_field.dart';
@@ -15,6 +16,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   late TextEditingController _emailController;
   late TextEditingController _passwordController;
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -38,23 +40,55 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
   }
 
-  void _handleSignUp() {
+  Future<void> _handleSignUp() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (name.isEmpty || email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
+      _showMessage('Please fill in all fields');
       return;
     }
 
-    print('Sign Up with: $name, $email');
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await ApiService().register(
+        fullName: name,
+        email: email,
+        password: password,
+      );
+      if (!mounted) return;
+      _goToHome();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      _showMessage(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Could not connect to backend. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _handleGoogleSignUp() {
-    print('Sign Up with Google');
+    _showMessage('Google sign up is not connected on the backend yet.');
+  }
+
+  void _goToHome() {
+    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -157,7 +191,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _handleSignUp,
+                        onPressed: _isLoading ? null : _handleSignUp,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.colorPrimary,
                           foregroundColor: Colors.white,
@@ -166,13 +200,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           ),
                           elevation: 1,
                         ),
-                        child: const Text(
-                          'Sign up',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Sign up',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -185,7 +228,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         onPressed: _handleGoogleSignUp,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.textPrimary,
-                          backgroundColor: const Color.fromARGB(255, 230, 233, 238).withValues(),
+                          backgroundColor:
+                              const Color.fromARGB(255, 230, 233, 238)
+                                  .withValues(),
                           side: const BorderSide(
                             color: AppColors.divider,
                             width: 1,
@@ -197,7 +242,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.g_translate, size: 20, color: AppColors.colorPrimary), // Reusing existing icon style
+                            Icon(Icons.g_translate,
+                                size: 20,
+                                color: AppColors
+                                    .colorPrimary), // Reusing existing icon style
                             SizedBox(width: 8),
                             Text(
                               AppStrings.signUpWithGoogle,
@@ -210,7 +258,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 48),
 
                     // Terms and Conditions Footer
@@ -259,7 +307,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
               ),
             ),
-          )
+          ),
         ),
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 import '../utils/strings.dart';
 import 'widgets/custom_text_field.dart';
@@ -14,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   late TextEditingController _emailController;
   late TextEditingController _passwordController;
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -35,28 +37,54 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
+      _showMessage('Please fill in all fields');
       return;
     }
 
-    // TODO: Implement login logic
-    print('Login with email: $email');
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await ApiService().login(email: email, password: password);
+      if (!mounted) return;
+      _goToHome();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      _showMessage(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Could not connect to backend. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _handleGoogleLogin() {
-    // TODO: Implement Google login logic
-    print('Login with Google');
+    _showMessage('Google login is not connected on the backend yet.');
+  }
+
+  void _goToHome() {
+    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
   }
 
   void _handleForgotPassword() {
-    Navigator.pushNamed(context, '/forgotPassword');
+    Navigator.pushNamed(context, '/forgot-password');
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -160,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _handleLogin,
+                        onPressed: _isLoading ? null : _handleLogin,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.colorPrimary,
                           foregroundColor: Colors.white,
@@ -169,13 +197,22 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           elevation: 3,
                         ),
-                        child: const Text(
-                          AppStrings.loginButton,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                AppStrings.loginButton,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 16),

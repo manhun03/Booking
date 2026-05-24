@@ -26,6 +26,7 @@ import 'screens/payment_no_card_screen.dart';
 import 'screens/booking_success_screen.dart';
 import 'screens/bill_screen.dart';
 import 'screens/user_profile_screen.dart';
+import 'screens/edit_profile_screen.dart';
 import 'screens/favorite_screen.dart';
 import 'screens/notification_screen.dart';
 import 'screens/promotion_screen.dart';
@@ -37,16 +38,16 @@ import 'screens/legal_policies_screen.dart';
 import 'utils/theme.dart';
 
 void main() {
-  runApp(const HHBNBookingApp());
+  runApp(const StaySmartApp());
 }
 
-class HHBNBookingApp extends StatelessWidget {
-  const HHBNBookingApp({Key? key}) : super(key: key);
+class StaySmartApp extends StatelessWidget {
+  const StaySmartApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'HHBN Booking',
+      title: 'StaySmart',
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
@@ -84,6 +85,7 @@ class HHBNBookingApp extends StatelessWidget {
         },
         '/more': (context) => const MoreScreen(),
         '/user-profile': (context) => const UserProfileScreen(),
+        '/edit-profile': (context) => const EditProfileScreen(),
         '/favorite': (context) => const FavoriteScreen(),
         '/notification': (context) => const NotificationScreen(),
         '/promotion': (context) => const PromotionScreen(),

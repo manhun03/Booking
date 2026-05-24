@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../utils/colors.dart';
+import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
 
 class MoreScreen extends StatefulWidget {
-  const MoreScreen({Key? key}) : super(key: key);
+  const MoreScreen({super.key});
 
   @override
   State<MoreScreen> createState() => _MoreScreenState();
@@ -160,33 +161,10 @@ class _MoreScreenState extends State<MoreScreen> {
         children: [
           Row(
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.white, width: 3),
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF6D4C41),
-                      Color(0xFFD7A86E),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.person,
-                  color: AppColors.white,
-                  size: 34,
-                ),
+              CurrentUserAvatar(
+                size: 64,
+                borderWidth: 3,
+                onTap: () => Navigator.of(context).pushNamed('/user-profile'),
               ),
               const SizedBox(width: 14),
               const Expanded(
@@ -194,7 +172,7 @@ class _MoreScreenState extends State<MoreScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'EasyStay User',
+                      'StaySmart User',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -237,7 +215,7 @@ class _MoreScreenState extends State<MoreScreen> {
             width: double.infinity,
             height: 46,
             child: ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).pushNamed('/user-profile'),
+              onPressed: () => Navigator.of(context).pushNamed('/edit-profile'),
               icon: const Icon(Icons.manage_accounts_outlined, size: 18),
               label: const Text('Edit profile'),
               style: ElevatedButton.styleFrom(

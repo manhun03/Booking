@@ -1,8 +1,8 @@
-# HHBN Hotel Booking App - Hướng dẫn thiết lập
+# StaySmart Hotel Booking App - Hướng dẫn thiết lập
 
 ## 📱 Giới thiệu
 
-Đây là ứng dụng Flutter hoàn chỉnh cho hệ thống quản lý đặt phòng khách sạn HHBN. Ứng dụng bao gồm màn hình Splash và màn hình Đăng nhập, được thiết kế theo mockup Figma của bạn.
+Đây là ứng dụng Flutter hoàn chỉnh cho hệ thống quản lý đặt phòng khách sạn StaySmart. Ứng dụng bao gồm màn hình Splash và màn hình Đăng nhập, được thiết kế theo mockup Figma của bạn.
 
 ## 🏗️ Cấu trúc dự án
 
@@ -88,7 +88,7 @@ flutter run -d chrome
 ## 📋 Các tính năng hiện có
 
 ### 1. Màn hình Splash
-- ✅ Logo HHBN với tagline
+- ✅ Logo StaySmart với tagline
 - ✅ Chuyển đổi tự động sang màn hình Đăng nhập sau 3 giây
 - ✅ Nền có gradient
 

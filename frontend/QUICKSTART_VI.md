@@ -1,10 +1,10 @@
-# 🚀 Hướng dẫn bắt đầu nhanh - HHBN Flutter App
+# 🚀 Hướng dẫn bắt đầu nhanh - StaySmart Flutter App
 
 ## 📱 Giao diện đã được tạo
 
 Bạn có một ứng dụng Flutter hoàn chỉnh với:
 
-✅ **Màn hình Splash** - Hiển thị logo HHBN với tagline  
+✅ **Màn hình Splash** - Hiển thị logo StaySmart với tagline  
 ✅ **Màn hình Đăng nhập** - Đầy đủ với email, password, Google login  
 ✅ **Hệ thống màu sắc** - Gradient backgrounds đẹp mắt  
 ✅ **Widgets tùy chỉnh** - Custom text fields với focus states  
@@ -64,7 +64,7 @@ lib/
 ┌─────────────────────────┐
 │        GRADIENT          │
 │                         │
-│         ○ HHBN ○        │
+│         ○ StaySmart ○        │
 │                         │
 │  Đặt phòng nhanh        │
 │  Trải nghiệm sang!      │
@@ -137,7 +137,7 @@ static const Color primaryBlue = Color(0xFF1E5BA8);  // Đổi màu ở đây
 ### Đổi text/strings
 Edit file `lib/utils/strings.dart`:
 ```dart
-static const String appName = 'HHBN';  // Đổi tên ứng dụng
+static const String appName = 'StaySmart';  // Đổi tên ứng dụng
 ```
 
 ### Customize button

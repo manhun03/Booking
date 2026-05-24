@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../utils/colors.dart';
+import 'widgets/current_user_avatar.dart';
 
 class AddPromotionScreen extends StatefulWidget {
-  const AddPromotionScreen({Key? key}) : super(key: key);
+  const AddPromotionScreen({super.key});
 
   @override
   State<AddPromotionScreen> createState() => _AddPromotionScreenState();
@@ -36,7 +37,7 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
       'code': 'VIETNAM40',
       'title': 'Giảm giá tại Việt Nam trong thời gian giới hạn',
       'description':
-          'Giảm tới 40% cho các điểm lưu trú nổi bật, áp dụng khi thanh toán trên EasyStay.',
+          'Giảm tới 40% cho các điểm lưu trú nổi bật, áp dụng khi thanh toán trên StaySmart.',
       'colors': [Color(0xFFE9C088), Color(0xFFB95D34)],
       'icon': Icons.apartment,
       'cornerColor': Color(0xFFFF8A7A),
@@ -179,7 +180,7 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
           ),
           const SizedBox(width: 6),
           const Text(
-            'EasyStay',
+            'StaySmart',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,
@@ -432,27 +433,7 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
   }
 
   static Widget _buildAvatar({required double size}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 2),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF6D4C41),
-            Color(0xFFD7A86E),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: const Icon(
-        Icons.person,
-        size: 20,
-        color: AppColors.white,
-      ),
-    );
+    return CurrentUserAvatar(size: size);
   }
 }
 

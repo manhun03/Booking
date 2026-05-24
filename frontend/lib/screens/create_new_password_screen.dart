@@ -7,13 +7,14 @@ class CreateNewPasswordScreen extends StatefulWidget {
   const CreateNewPasswordScreen({Key? key}) : super(key: key);
 
   @override
-  State<CreateNewPasswordScreen> createState() => _CreateNewPasswordScreenState();
+  State<CreateNewPasswordScreen> createState() =>
+      _CreateNewPasswordScreenState();
 }
 
 class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
   late TextEditingController _newPasswordController;
   late TextEditingController _confirmPasswordController;
-  
+
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
 
@@ -107,7 +108,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Subtitle
                     const Text(
                       AppStrings.createNewPasswordSubtitle,
@@ -151,7 +152,8 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                             obscureText: _obscureConfirmPassword,
                             onTogglePassword: () {
                               setState(() {
-                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                                _obscureConfirmPassword =
+                                    !_obscureConfirmPassword;
                               });
                             },
                           ),
@@ -188,7 +190,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
               ),
             ),
           ),
-        ),  
+        ),
       ),
     );
   }

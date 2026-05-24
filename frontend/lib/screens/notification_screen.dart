@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../utils/colors.dart';
+import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
 
 class NotificationScreen extends StatefulWidget {
-  const NotificationScreen({Key? key}) : super(key: key);
+  const NotificationScreen({super.key});
 
   @override
   State<NotificationScreen> createState() => _NotificationScreenState();
@@ -109,7 +110,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return WebAppShell(
       title: 'Notification',
       subtitle:
-          'Theo dõi ưu đãi mới, tin nhắn khách sạn và các cập nhật quan trọng từ EasyStay.',
+          'Theo dõi ưu đãi mới, tin nhắn khách sạn và các cập nhật quan trọng từ StaySmart.',
       selectedIndex: 0,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -368,7 +369,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
           const SizedBox(width: 6),
           const Text(
-            'EasyStay',
+            'StaySmart',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,
@@ -726,27 +727,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   static Widget _buildAvatar({required double size}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 2),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF6D4C41),
-            Color(0xFFD7A86E),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Icon(
-        Icons.person,
-        size: size * 0.58,
-        color: AppColors.white,
-      ),
-    );
+    return CurrentUserAvatar(size: size);
   }
 
   String _textValue(Map<String, dynamic> data, String key) {

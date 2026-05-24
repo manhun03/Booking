@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 import 'widgets/responsive_page.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({Key? key}) : super(key: key);
+  const SearchScreen({super.key});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -15,9 +16,14 @@ class _SearchScreenState extends State<SearchScreen> {
   String _sortBy = 'Default';
   final List<String> _selectedTags = ['Hà Nội', '2 người'];
   bool _hasSearched = false;
+  bool _isLoading = false;
+  String? _errorMessage;
   int _selectedIndex = 3;
 
-  static const List<Map<String, dynamic>> _suggestedHotels = [
+  late List<Map<String, dynamic>> _suggestedHotels;
+  late List<Map<String, dynamic>> _searchResults;
+
+  static const List<Map<String, dynamic>> _fallbackSuggestedHotels = [
     {
       'icon': Icons.apartment_outlined,
       'name': 'Mường Thanh Grand Hotel',
@@ -38,7 +44,7 @@ class _SearchScreenState extends State<SearchScreen> {
     },
   ];
 
-  static const List<Map<String, dynamic>> _searchResults = [
+  static const List<Map<String, dynamic>> _fallbackSearchResults = [
     {
       'name': 'Hanoi Grand Palace Hotel',
       'location': '123 Láng Hạ, Ba Đình, Hà Nội',
@@ -75,6 +81,10 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _searchController = TextEditingController();
+    _suggestedHotels =
+        List<Map<String, dynamic>>.from(_fallbackSuggestedHotels);
+    _searchResults = const [];
+    _loadSuggestedHotels();
   }
 
   @override
@@ -83,15 +93,67 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  void _performSearch(String query) {
+  Future<void> _loadSuggestedHotels() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final hotels = await ApiService().fetchHotels(pageSize: 10);
+      if (!mounted) return;
+      setState(() {
+        _suggestedHotels = hotels.isEmpty
+            ? List<Map<String, dynamic>>.from(_fallbackSuggestedHotels)
+            : hotels;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _performSearch(String query) async {
+    final keyword = query.trim();
+    if (keyword.isEmpty) {
+      _clearSearch();
+      await _loadSuggestedHotels();
+      return;
+    }
+
     setState(() {
       _hasSearched = true;
+      _isLoading = true;
+      _errorMessage = null;
     });
+
+    try {
+      final hotels = await ApiService().fetchHotels(keyword: keyword);
+      if (!mounted) return;
+      setState(() {
+        _searchResults = hotels;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _searchResults = List<Map<String, dynamic>>.from(
+          _fallbackSearchResults,
+        );
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   void _clearSearch() {
     setState(() {
       _hasSearched = false;
+      _errorMessage = null;
       _searchController.clear();
     });
   }
@@ -272,7 +334,18 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          if (_hasSearched)
+          if (_isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 28),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_errorMessage != null)
+            _buildStateMessage(_errorMessage!)
+          else if (_hasSearched && _searchResults.isEmpty)
+            _buildStateMessage('Khong tim thay khach san phu hop')
+          else if (_hasSearched)
             Column(
               children: [
                 for (var index = 0; index < _searchResults.length; index++) ...[
@@ -304,7 +377,17 @@ class _SearchScreenState extends State<SearchScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: _buildSortRow(),
         ),
-        if (!_hasSearched) ...[
+        if (_isLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 28),
+            child: CircularProgressIndicator(),
+          )
+        else if (_errorMessage != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _buildStateMessage(_errorMessage!),
+          )
+        else if (!_hasSearched) ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: _buildTagWrap(),
@@ -318,6 +401,11 @@ class _SearchScreenState extends State<SearchScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: _buildSuggestedList(),
+          ),
+        ] else if (_searchResults.isEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _buildStateMessage('Khong tim thay khach san phu hop'),
           ),
         ] else ...[
           Padding(
@@ -550,6 +638,27 @@ class _SearchScreenState extends State<SearchScreen> {
             SizedBox(height: wide ? 12 : 14),
         ],
       ],
+    );
+  }
+
+  Widget _buildStateMessage(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+      decoration: BoxDecoration(
+        color: AppColors.colorBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textSecondary,
+        ),
+      ),
     );
   }
 

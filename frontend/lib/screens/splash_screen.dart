@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../utils/colors.dart';
 import '../utils/strings.dart';
-import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -38,7 +37,7 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // HHBN Logo Circle
+            // StaySmart Logo Circle
             Container(
               width: 120,
               height: 120,

@@ -1,14 +1,37 @@
+import 'package:flutter/foundation.dart';
+
 class AppConstants {
   // App info
-  static const String appName = 'HHBN Booking';
+  static const String appName = 'StaySmart';
   static const String appVersion = '1.0.0';
-  static const String apiBaseUrl =
-      'http://localhost:3000/api'; // Change to your API URL
+  static const String _apiBaseUrlOverride =
+      String.fromEnvironment('API_BASE_URL');
+
+  static String get backendBaseUrl {
+    if (_apiBaseUrlOverride.isNotEmpty) {
+      return _apiBaseUrlOverride.replaceFirst(RegExp(r'/api/?$'), '');
+    }
+
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8080';
+    }
+
+    return 'http://localhost:8080';
+  }
+
+  static String get apiBaseUrl {
+    if (_apiBaseUrlOverride.isNotEmpty) {
+      return _apiBaseUrlOverride;
+    }
+
+    return '$backendBaseUrl/api';
+  }
 
   // Durations
   static const Duration splashScreenDuration = Duration(seconds: 3);
   static const Duration animationDuration = Duration(milliseconds: 300);
   static const Duration snackBarDuration = Duration(seconds: 3);
+  static const Duration apiTimeout = Duration(seconds: 30);
 
   // Padding and margins
   static const double defaultPadding = 16.0;
@@ -31,7 +54,7 @@ class AppConstants {
 
   // API endpoints
   static const String loginEndpoint = '/auth/login';
-  static const String signupEndpoint = '/auth/signup';
+  static const String signupEndpoint = '/auth/register';
   static const String googleLoginEndpoint = '/auth/google';
   static const String forgotPasswordEndpoint = '/auth/forgot-password';
   static const String resetPasswordEndpoint = '/auth/reset-password';

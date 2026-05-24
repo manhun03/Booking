@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 import 'widgets/responsive_page.dart';
 
 class WelcomeScreen extends StatefulWidget {
-  const WelcomeScreen({Key? key}) : super(key: key);
+  const WelcomeScreen({super.key});
 
   @override
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
-  final List<Map<String, dynamic>> hotels = const [
+  late List<Map<String, dynamic>> hotels;
+
+  static const List<Map<String, dynamic>> _fallbackHotels = [
     {
       'name': 'Ocean Breeze Hotel',
       'location': 'Đường Trần Hưng Đạo, Nha Trang',
@@ -58,6 +61,33 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       'description': 'Thông tin đặt phòng được bảo vệ.',
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    hotels = List<Map<String, dynamic>>.from(_fallbackHotels);
+    _loadHotels();
+  }
+
+  Future<void> _loadHotels() async {
+    try {
+      final loadedHotels = await ApiService().fetchHotels(pageSize: 3);
+      if (!mounted || loadedHotels.isEmpty) return;
+      setState(() {
+        hotels = loadedHotels;
+      });
+    } catch (_) {
+      // Keep bundled demo data when the backend is not reachable.
+    }
+  }
+
+  void _handleSignIn() {
+    Navigator.pushNamed(context, '/login');
+  }
+
+  void _handleContinueToHome() {
+    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -119,7 +149,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               ),
               const SizedBox(width: 8),
               const Text(
-                'EasyStay',
+                'StaySmart',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
@@ -136,7 +166,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               _buildTopButton(
                 label: 'Sign In',
                 filled: true,
-                onPressed: () => Navigator.pushNamed(context, '/login'),
+                onPressed: _handleSignIn,
               ),
             ],
           ),
@@ -264,7 +294,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'EasyStay giúp bạn tìm khách sạn, xem phòng trống, đặt phòng và theo dõi lịch sử trong một trải nghiệm thống nhất.',
+                  'StaySmart giúp bạn tìm khách sạn, xem phòng trống, đặt phòng và theo dõi lịch sử trong một trải nghiệm thống nhất.',
                   style: TextStyle(
                     fontSize: 13,
                     height: 1.45,
@@ -275,7 +305,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 SizedBox(
                   height: 40,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.pushNamed(context, '/login'),
+                    onPressed: _handleContinueToHome,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.colorPrimary,
                       foregroundColor: AppColors.white,
@@ -402,7 +432,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        _textValue(hotel, 'name', 'EasyStay Hotel'),
+                        _textValue(hotel, 'name', 'StaySmart Hotel'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -467,7 +497,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Vì sao chọn EasyStay',
+            'Vì sao chọn StaySmart',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
@@ -566,7 +596,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             width: double.infinity,
             height: 40,
             child: ElevatedButton(
-              onPressed: () => Navigator.pushNamed(context, '/login'),
+              onPressed: () => Navigator.pushNamed(context, '/signup'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.colorPrimary,
                 foregroundColor: AppColors.white,
@@ -600,7 +630,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       child: const Column(
         children: [
           Text(
-            'EasyStay',
+            'StaySmart',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
@@ -609,7 +639,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           ),
           SizedBox(height: 10),
           Text(
-            'Copyright © 2026 EasyStay',
+            'Copyright © 2026 StaySmart',
             style: TextStyle(
               fontSize: 12,
               color: Colors.white70,

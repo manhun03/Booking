@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../utils/colors.dart';
+import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
 
 class PromotionScreen extends StatefulWidget {
-  const PromotionScreen({Key? key}) : super(key: key);
+  const PromotionScreen({super.key});
 
   @override
   State<PromotionScreen> createState() => _PromotionScreenState();
@@ -41,7 +42,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
     {
       'title': 'Đặt phòng khách sạn siêu tiết kiệm',
       'description':
-          'Voucher độc quyền cho chỗ nghỉ trong tháng này, áp dụng khi thanh toán qua EasyStay.',
+          'Voucher độc quyền cho chỗ nghỉ trong tháng này, áp dụng khi thanh toán qua StaySmart.',
       'colors': [Color(0xFF0B5574), Color(0xFF8AC6D8)],
       'icon': Icons.hotel,
       'code': 'SMARTSTAY',
@@ -301,7 +302,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
           ),
           const SizedBox(width: 6),
           const Text(
-            'EasyStay',
+            'StaySmart',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,
@@ -740,27 +741,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
   }
 
   static Widget _buildAvatar({required double size}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 2),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF6D4C41),
-            Color(0xFFD7A86E),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Icon(
-        Icons.person,
-        size: size * 0.58,
-        color: AppColors.white,
-      ),
-    );
+    return CurrentUserAvatar(size: size);
   }
 
   String _textValue(Map<String, dynamic> data, String key) {

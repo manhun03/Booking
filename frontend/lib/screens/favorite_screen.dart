@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
+import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
 
 class FavoriteScreen extends StatefulWidget {
-  const FavoriteScreen({Key? key}) : super(key: key);
+  const FavoriteScreen({super.key});
 
   @override
   State<FavoriteScreen> createState() => _FavoriteScreenState();
@@ -13,6 +15,9 @@ class FavoriteScreen extends StatefulWidget {
 class _FavoriteScreenState extends State<FavoriteScreen> {
   int _selectedIndex = 4;
   bool _showSaved = false;
+  bool _isLoading = false;
+  String? _errorMessage;
+  late List<Map<String, dynamic>> _savedHotels;
 
   static const List<Map<String, dynamic>> _favoriteLists = [
     {
@@ -41,7 +46,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     },
   ];
 
-  static const List<Map<String, dynamic>> _savedHotels = [
+  static const List<Map<String, dynamic>> _fallbackSavedHotels = [
     {
       'name': 'Ocean Breeze Hotel',
       'location': '36 Lý Thường Kiệt, Hoàn Kiếm',
@@ -70,6 +75,37 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
       'colors': [Color(0xFF9B927C), Color(0xFFE4DED1)],
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _savedHotels = List<Map<String, dynamic>>.from(_fallbackSavedHotels);
+    _loadFavoriteHotels();
+  }
+
+  Future<void> _loadFavoriteHotels() async {
+    if (!ApiService().isAuthenticated) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final hotels = await ApiService().fetchFavoriteHotels();
+      if (!mounted) return;
+      setState(() {
+        _savedHotels = hotels;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
   void _onBottomNavTapped(int index) {
     setState(() {
@@ -161,10 +197,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
         const Divider(height: 1, color: AppColors.divider),
         const SizedBox(height: 4),
         if (_showSaved)
-          for (var index = 0; index < _savedHotels.length; index++) ...[
-            const SizedBox(height: 14),
-            _buildHotelCard(_savedHotels[index]),
-          ]
+          _buildSavedHotels()
         else
           for (final item in _favoriteLists) _buildFavoriteListItem(item),
       ],
@@ -240,15 +273,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
           ),
           const SizedBox(height: 18),
           if (_showSaved)
-            Column(
-              children: [
-                for (var index = 0; index < _savedHotels.length; index++) ...[
-                  _buildHotelCard(_savedHotels[index], wide: true),
-                  if (index < _savedHotels.length - 1)
-                    const SizedBox(height: 14),
-                ],
-              ],
-            )
+            _buildSavedHotels(wide: true)
           else
             LayoutBuilder(
               builder: (context, constraints) {
@@ -336,7 +361,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
           ),
           const SizedBox(width: 6),
           const Text(
-            'EasyStay',
+            'StaySmart',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,
@@ -495,6 +520,53 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
             fontSize: 11,
             fontWeight: FontWeight.w700,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSavedHotels({bool wide = false}) {
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return _buildStateMessage(_errorMessage!);
+    }
+
+    if (_savedHotels.isEmpty) {
+      return _buildStateMessage('Chua co khach san da luu');
+    }
+
+    return Column(
+      children: [
+        for (var index = 0; index < _savedHotels.length; index++) ...[
+          if (!wide || index > 0) const SizedBox(height: 14),
+          _buildHotelCard(_savedHotels[index], wide: wide),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildStateMessage(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textSecondary,
         ),
       ),
     );
@@ -818,27 +890,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
   }
 
   static Widget _buildAvatar({required double size}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 2),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF6D4C41),
-            Color(0xFFD7A86E),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Icon(
-        Icons.person,
-        size: size * 0.58,
-        color: AppColors.white,
-      ),
-    );
+    return CurrentUserAvatar(size: size);
   }
 
   String _textValue(Map<String, dynamic> data, String key) {
