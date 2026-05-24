@@ -14,12 +14,12 @@ public abstract class CrudController<T> {
     }
 
     @GetMapping
-    public ApiResponse<List<T>> getAll() {
+    public ApiResponse<?> getAll() {
         return ApiResponse.ok(repository.findAll());
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<T> getById(@PathVariable Integer id) {
+    public ApiResponse<?> getById(@PathVariable Integer id) {
         return ApiResponse.ok(repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Resource not found")));
     }

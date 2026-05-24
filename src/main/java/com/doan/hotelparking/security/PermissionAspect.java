@@ -32,6 +32,9 @@ public class PermissionAspect {
         if (authentication == null || !(authentication.getPrincipal() instanceof JwtService.JwtPrincipal principal)) {
             throw new AccessDeniedException("Unauthorized");
         }
+        if (principal.roles().stream().anyMatch(role -> "Admin".equalsIgnoreCase(role))) {
+            return;
+        }
         if (!permissions.userHasPermission(principal.userId(), permissionKey)) {
             throw new AccessDeniedException("Forbidden. Missing permission '" + permissionKey + "'.");
         }

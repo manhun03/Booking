@@ -51,3 +51,7 @@ jacoco.exec
 minio-data/
 data/
 
+# Database exports/backups
+exports/*.bak
+exports/*.bacpac
+exports/*.sql

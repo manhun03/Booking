@@ -25,12 +25,16 @@ public class User {
     private String firstName;
     @Column(name = "Email")
     private String email;
+    @Column(name = "Username")
+    private String username;
     @Column(name = "Phone")
     private String phone;
     @Column(name = "Password")
     private String password;
     @Column(name = "AvatarUrl")
     private String avatarUrl;
+    @Column(name = "EmailVerified")
+    private boolean emailVerified;
 
     @Enumerated(EnumType.ORDINAL)
     @Column(name = "Status")

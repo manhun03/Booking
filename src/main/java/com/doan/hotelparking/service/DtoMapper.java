@@ -1,15 +1,31 @@
 package com.doan.hotelparking.service;
 
 import com.doan.hotelparking.domain.entity.Booking;
+import com.doan.hotelparking.domain.entity.ChatMessage;
 import com.doan.hotelparking.domain.entity.FavoriteHotel;
 import com.doan.hotelparking.domain.entity.Hotel;
 import com.doan.hotelparking.domain.entity.HotelImage;
+import com.doan.hotelparking.domain.entity.Notification;
 import com.doan.hotelparking.domain.entity.OwnerSetting;
+import com.doan.hotelparking.domain.entity.Payment;
+import com.doan.hotelparking.domain.entity.Permission;
 import com.doan.hotelparking.domain.entity.Province;
+import com.doan.hotelparking.domain.entity.Review;
+import com.doan.hotelparking.domain.entity.Role;
 import com.doan.hotelparking.domain.entity.Room;
+import com.doan.hotelparking.domain.entity.RoomType;
+import com.doan.hotelparking.domain.entity.TimeSlot;
 import com.doan.hotelparking.domain.entity.User;
 import com.doan.hotelparking.domain.entity.Ward;
 import com.doan.hotelparking.dto.booking.BookingDto;
+import com.doan.hotelparking.dto.common.SimpleDtos.ChatMessageDto;
+import com.doan.hotelparking.dto.common.SimpleDtos.NotificationDto;
+import com.doan.hotelparking.dto.common.SimpleDtos.PaymentDto;
+import com.doan.hotelparking.dto.common.SimpleDtos.PermissionDto;
+import com.doan.hotelparking.dto.common.SimpleDtos.ReviewDto;
+import com.doan.hotelparking.dto.common.SimpleDtos.RoleDto;
+import com.doan.hotelparking.dto.common.SimpleDtos.RoomTypeDto;
+import com.doan.hotelparking.dto.common.SimpleDtos.TimeSlotDto;
 import com.doan.hotelparking.dto.hotel.FavoriteHotelDto;
 import com.doan.hotelparking.dto.hotel.HotelDto;
 import com.doan.hotelparking.dto.hotel.HotelImageDto;
@@ -136,5 +152,105 @@ public class DtoMapper {
                 user.getAvatarUrl(),
                 user.getStatus() == null ? null : user.getStatus().name(),
                 user.getCreatedAt());
+    }
+
+    public NotificationDto toNotificationDto(Notification notification) {
+        return new NotificationDto(
+                notification.getId(),
+                notification.getUser() == null ? null : notification.getUser().getId(),
+                notification.getSender() == null ? null : notification.getSender().getId(),
+                notification.getTitle(),
+                notification.getMessage(),
+                notification.getType() == null ? null : notification.getType().name(),
+                notification.getRelatedTable(),
+                notification.getRelatedId(),
+                notification.isRead(),
+                notification.getCreatedAt(),
+                notification.getReadAt());
+    }
+
+    public ChatMessageDto toChatMessageDto(ChatMessage message) {
+        return new ChatMessageDto(
+                message.getId(),
+                message.getSender() == null ? null : message.getSender().getId(),
+                message.getReceiver() == null ? null : message.getReceiver().getId(),
+                message.getBooking() == null ? null : message.getBooking().getId(),
+                message.getContent(),
+                message.isRead(),
+                message.getCreatedAt(),
+                message.getReadAt());
+    }
+
+    public PaymentDto toPaymentDto(Payment payment) {
+        return new PaymentDto(
+                payment.getId(),
+                payment.getBooking() == null ? null : payment.getBooking().getId(),
+                payment.getAmount(),
+                payment.getMethod(),
+                payment.getProvider(),
+                payment.getStatus() == null ? null : payment.getStatus().name(),
+                payment.getTransactionCode(),
+                payment.getGatewayTransactionId(),
+                payment.getCheckoutUrl(),
+                payment.getFailureReason(),
+                payment.getRefundedAmount(),
+                payment.getNote(),
+                payment.getPaidAt(),
+                payment.getRefundedAt(),
+                payment.getCreatedAt(),
+                payment.getUpdatedAt());
+    }
+
+    public RoleDto toRoleDto(Role role) {
+        return new RoleDto(
+                role.getId(),
+                role.getName(),
+                role.getDescription(),
+                role.isActive(),
+                role.getCreatedAt(),
+                role.getUpdatedAt());
+    }
+
+    public PermissionDto toPermissionDto(Permission permission) {
+        return new PermissionDto(
+                permission.getId(),
+                permission.getPermissionKey(),
+                permission.getDescription(),
+                permission.getModule(),
+                permission.getCreatedAt(),
+                permission.getUpdatedAt());
+    }
+
+    public ReviewDto toReviewDto(Review review) {
+        return new ReviewDto(
+                review.getId(),
+                review.getBooking() == null ? null : review.getBooking().getId(),
+                review.getCustomer() == null ? null : review.getCustomer().getId(),
+                review.getRoom() == null ? null : review.getRoom().getId(),
+                review.getRating(),
+                review.getComment(),
+                review.getOwnerReply(),
+                review.getOwnerRepliedAt(),
+                review.isReported(),
+                review.getReportReason(),
+                review.isVisible(),
+                review.getModeratedAt(),
+                review.getCreatedAt());
+    }
+
+    public RoomTypeDto toRoomTypeDto(RoomType roomType) {
+        return new RoomTypeDto(roomType.getId(), roomType.getName(), roomType.getDescription());
+    }
+
+    public TimeSlotDto toTimeSlotDto(TimeSlot timeSlot) {
+        return new TimeSlotDto(
+                timeSlot.getId(),
+                timeSlot.getRoom() == null ? null : timeSlot.getRoom().getId(),
+                timeSlot.getStartDate(),
+                timeSlot.getEndDate(),
+                timeSlot.getPrice(),
+                timeSlot.isActive(),
+                timeSlot.getCreatedAt(),
+                timeSlot.getUpdatedAt());
     }
 }

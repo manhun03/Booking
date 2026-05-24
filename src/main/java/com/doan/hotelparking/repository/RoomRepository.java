@@ -9,6 +9,7 @@ import java.util.Optional;
 
 public interface RoomRepository extends JpaRepository<Room, Integer> {
     List<Room> findByHotelId(Integer hotelId);
+    List<Room> findByHotelOwnerId(Integer ownerId);
     List<Room> findByRoomTypeId(Integer roomTypeId);
 
     @EntityGraph(attributePaths = {"hotel", "hotel.owner", "roomType"})

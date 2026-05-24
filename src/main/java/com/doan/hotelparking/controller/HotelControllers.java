@@ -12,12 +12,16 @@ import com.doan.hotelparking.dto.hotel.HotelImageDto;
 import com.doan.hotelparking.repository.FavoriteHotelRepository;
 import com.doan.hotelparking.repository.HotelImageRepository;
 import com.doan.hotelparking.repository.HotelRepository;
+import com.doan.hotelparking.security.HasPermission;
 import com.doan.hotelparking.service.CurrentUserService;
 import com.doan.hotelparking.service.DtoMapper;
 import com.doan.hotelparking.service.ObjectStorageService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -41,6 +45,7 @@ class HotelController {
     }
 
     @GetMapping
+    @Transactional(readOnly = true)
     ApiPagedResponse<HotelDto> getAll(@RequestParam(defaultValue = "1") int pageIndex,
                                       @RequestParam(defaultValue = "20") int pageSize) {
         var page = hotels.findAll(PageRequest.of(Math.max(pageIndex, 1) - 1, Math.min(Math.max(pageSize, 1), 100)));
@@ -49,17 +54,21 @@ class HotelController {
     }
 
     @GetMapping("/{id}")
+    @Transactional(readOnly = true)
     ApiResponse<HotelDto> getById(@PathVariable Integer id) {
         return ApiResponse.ok(hotels.findById(id).map(mapper::toHotelDto)
                 .orElseThrow(() -> new IllegalArgumentException("Hotel not found")));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('Admin')")
+    @HasPermission("hotel.manage")
     ApiResponse<HotelDto> create(@RequestBody Hotel hotel) {
         return ApiResponse.ok("Created", mapper.toHotelDto(hotels.save(hotel)));
     }
 
     @PostMapping("/owner")
+    @PreAuthorize("hasRole('Owner')")
     ApiResponse<HotelDto> createOwnerHotel(@RequestBody Hotel hotel) {
         var owner = new User();
         owner.setId(currentUser.requireUserId());
@@ -68,18 +77,20 @@ class HotelController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('Admin')")
+    @HasPermission("hotel.manage")
     ApiResponse<HotelDto> update(@PathVariable Integer id, @RequestBody Hotel request) {
         var hotel = hotels.findById(id).orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
         hotel.setName(request.getName());
         hotel.setStreet(request.getStreet());
         hotel.setPhone(request.getPhone());
         hotel.setDescription(request.getDescription());
-        hotel.setStatus(request.getStatus());
         hotel.setUpdatedAt(Instant.now());
         return ApiResponse.ok("Updated", mapper.toHotelDto(hotels.save(hotel)));
     }
 
     @PutMapping("/owner/{id}")
+    @PreAuthorize("hasRole('Owner')")
     ApiResponse<HotelDto> updateOwnerHotel(@PathVariable Integer id, @RequestBody Hotel request) {
         var hotel = hotels.findById(id).orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
         if (hotel.getOwner() == null || !hotel.getOwner().getId().equals(currentUser.requireUserId())) {
@@ -95,12 +106,15 @@ class HotelController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('Admin')")
+    @HasPermission("hotel.manage")
     ApiResponse<Void> delete(@PathVariable Integer id) {
         hotels.deleteById(id);
         return ApiResponse.ok("Deleted", null);
     }
 
     @GetMapping("/all-with-province")
+    @Transactional(readOnly = true)
     ApiPagedResponse<HotelDto> allWithProvince(@RequestParam(defaultValue = "1") int pageIndex,
                                                @RequestParam(defaultValue = "20") int pageSize) {
         var page = hotels.findAll(PageRequest.of(Math.max(pageIndex, 1) - 1, Math.min(Math.max(pageSize, 1), 100)));
@@ -115,6 +129,7 @@ class HotelController {
     }
 
     @GetMapping("/search")
+    @Transactional(readOnly = true)
     ApiResponse<List<HotelDto>> search(@RequestParam(required = false) String hotelName,
                                        @RequestParam(required = false) String keyword) {
         var resolved = hotelName == null || hotelName.isBlank() ? keyword : hotelName;
@@ -134,18 +149,27 @@ class HotelController {
 @RequestMapping("/api/hotels/{hotelId}/images")
 class HotelImageController {
     private final HotelImageRepository images;
+    private final HotelRepository hotels;
     private final ObjectStorageService storage;
     private final DtoMapper mapper;
+    private final CurrentUserService currentUser;
 
-    HotelImageController(HotelImageRepository repository, ObjectStorageService storage, DtoMapper mapper) {
+    HotelImageController(HotelImageRepository repository, HotelRepository hotels, ObjectStorageService storage, DtoMapper mapper, CurrentUserService currentUser) {
         this.images = repository;
+        this.hotels = hotels;
         this.storage = storage;
         this.mapper = mapper;
+        this.currentUser = currentUser;
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('Admin','Owner')")
     ApiResponse<HotelImageDto> update(@PathVariable Integer hotelId, @PathVariable Integer id, @RequestBody HotelImage request) {
+        requireOwnedHotel(hotelId);
         var image = images.findById(id).orElseThrow(() -> new IllegalArgumentException("Hotel image not found"));
+        if (image.getHotel() == null || !hotelId.equals(image.getHotel().getId())) {
+            throw new IllegalArgumentException("Hotel image not found");
+        }
         image.setImageUrl(request.getImageUrl());
         image.setObjectKey(request.getObjectKey());
         image.setPrimaryImage(request.isPrimaryImage());
@@ -154,8 +178,13 @@ class HotelImageController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('Admin','Owner')")
     ApiResponse<Void> delete(@PathVariable Integer hotelId, @PathVariable Integer id) {
+        requireOwnedHotel(hotelId);
         var image = images.findById(id).orElseThrow(() -> new IllegalArgumentException("Hotel image not found"));
+        if (image.getHotel() == null || !hotelId.equals(image.getHotel().getId())) {
+            throw new IllegalArgumentException("Hotel image not found");
+        }
         if (image.getObjectKey() != null && !image.getObjectKey().isBlank()) {
             storage.delete(image.getObjectKey());
         }
@@ -178,10 +207,12 @@ class HotelImageController {
     }
 
     @PostMapping("/upload")
+    @PreAuthorize("hasAnyRole('Admin','Owner')")
     ApiResponse<HotelImageDto> upload(@PathVariable Integer hotelId,
                                    @RequestParam("file") MultipartFile file,
                                    @RequestParam(defaultValue = "false") boolean primaryImage,
                                    @RequestParam(defaultValue = "0") int sortOrder) {
+        requireOwnedHotel(hotelId);
         var uploaded = storage.upload(file, "hotels/" + hotelId);
         var hotel = new Hotel();
         hotel.setId(hotelId);
@@ -193,6 +224,19 @@ class HotelImageController {
         image.setSortOrder(sortOrder);
         image.setCreatedAt(Instant.now());
         return ApiResponse.ok("Uploaded", mapper.toHotelImageDto(images.save(image)));
+    }
+
+    private void requireOwnedHotel(Integer hotelId) {
+        var hotel = hotels.findById(hotelId).orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
+        if (!isAdmin() && (hotel.getOwner() == null || !hotel.getOwner().getId().equals(currentUser.requireUserId()))) {
+            throw new IllegalArgumentException("Hotel not found");
+        }
+    }
+
+    private boolean isAdmin() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_Admin".equals(authority.getAuthority()));
     }
 }
 

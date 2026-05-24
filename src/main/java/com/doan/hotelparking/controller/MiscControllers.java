@@ -7,6 +7,7 @@ import com.doan.hotelparking.domain.entity.SystemConfig;
 import com.doan.hotelparking.domain.entity.User;
 import com.doan.hotelparking.dto.ownersetting.UpdateBankInfoRequest;
 import com.doan.hotelparking.dto.ownersetting.OwnerSettingDto;
+import com.doan.hotelparking.dto.common.SimpleDtos.NotificationDto;
 import com.doan.hotelparking.repository.NotificationRepository;
 import com.doan.hotelparking.repository.OwnerSettingRepository;
 import com.doan.hotelparking.repository.SystemConfigRepository;
@@ -26,8 +27,63 @@ final class MiscControllers {
 @RestController
 @RequestMapping("/api/notifications")
 class NotificationController extends CrudController<Notification> {
-    NotificationController(NotificationRepository repository) {
+    private final NotificationRepository notifications;
+    private final CurrentUserService currentUser;
+    private final DtoMapper mapper;
+
+    NotificationController(NotificationRepository repository, CurrentUserService currentUser, DtoMapper mapper) {
         super(repository);
+        this.notifications = repository;
+        this.currentUser = currentUser;
+        this.mapper = mapper;
+    }
+
+    @GetMapping("/my")
+    ApiResponse<java.util.List<NotificationDto>> myNotifications() {
+        return ApiResponse.ok(notifications.findByUserIdOrderByCreatedAtDesc(currentUser.requireUserId()).stream()
+                .map(mapper::toNotificationDto)
+                .toList());
+    }
+
+    @Override
+    @GetMapping
+    public ApiResponse<java.util.List<NotificationDto>> getAll() {
+        return ApiResponse.ok(notifications.findAll().stream()
+                .map(mapper::toNotificationDto)
+                .toList());
+    }
+
+    @Override
+    @GetMapping("/{id}")
+    public ApiResponse<NotificationDto> getById(@PathVariable Integer id) {
+        return ApiResponse.ok(notifications.findById(id)
+                .map(mapper::toNotificationDto)
+                .orElseThrow(() -> new IllegalArgumentException("Notification not found")));
+    }
+
+    @PostMapping("/{id}/read")
+    ApiResponse<NotificationDto> markRead(@PathVariable Integer id) {
+        var notification = notifications.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
+        if (!notification.getUser().getId().equals(currentUser.requireUserId())) {
+            throw new IllegalArgumentException("Notification not found");
+        }
+        notification.setRead(true);
+        notification.setReadAt(Instant.now());
+        return ApiResponse.ok("Marked as read", mapper.toNotificationDto(notifications.save(notification)));
+    }
+
+    @PostMapping("/read-all")
+    ApiResponse<Integer> markAllRead() {
+        var items = notifications.findByUserIdOrderByCreatedAtDesc(currentUser.requireUserId());
+        for (var item : items) {
+            if (!item.isRead()) {
+                item.setRead(true);
+                item.setReadAt(Instant.now());
+            }
+        }
+        notifications.saveAll(items);
+        return ApiResponse.ok("Marked all as read", items.size());
     }
 }
 

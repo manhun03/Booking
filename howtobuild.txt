@@ -1,0 +1,140 @@
+HOW TO BUILD - JAVA BACKEND
+===========================
+
+Backend folder:
+
+F:\Downloads\AI-integrated-hotel-booking-app-main\AI-integrated-hotel-booking-app-main\java-hotel-booking-api
+
+
+1. Required tools
+-----------------
+
+- Java 17
+- Maven
+- SQL Server
+- Docker Desktop, if you want to run MinIO locally
+
+Check tools:
+
+powershell
+---------
+java -version
+mvn -version
+---------
+
+
+2. Prepare SQL Server database
+------------------------------
+
+The backend uses this default connection:
+
+Database: DoAnHotelParkingDb
+Username: sa
+Password: 123456
+JDBC: jdbc:sqlserver://localhost:1433;databaseName=DoAnHotelParkingDb;encrypt=true;trustServerCertificate=true
+
+Create database in SQL Server if it does not exist:
+
+sql
+---
+CREATE DATABASE DoAnHotelParkingDb;
+---
+
+Flyway migrations are enabled. When the app starts, it will apply migration scripts from:
+
+java-hotel-booking-api\src\main\resources\db\migration
+
+
+3. Optional environment variables
+---------------------------------
+
+SMTP email, optional:
+
+powershell
+---------
+$env:MAIL_HOST="smtp.gmail.com"
+$env:MAIL_PORT="587"
+$env:MAIL_USERNAME="your-email@gmail.com"
+$env:MAIL_PASSWORD="your-app-password"
+$env:MAIL_HEALTH_ENABLED="true"
+---------
+
+Google login, optional because a default client id is already configured:
+
+powershell
+---------
+$env:GOOGLE_CLIENT_ID="883824205385-182f65ondho5qnima9ladd5j7qk2b40h.apps.googleusercontent.com"
+---------
+
+VNPay real payment:
+
+powershell
+---------
+$env:VNPAY_PAY_URL="https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+$env:VNPAY_RETURN_URL="http://localhost:8080/api/payments/vnpay-return"
+$env:VNPAY_TMN_CODE="your-vnpay-tmn-code"
+$env:VNPAY_HASH_SECRET="your-vnpay-hash-secret"
+---------
+
+
+4. Build backend
+----------------
+
+Open PowerShell in the backend folder:
+
+powershell
+---------
+cd F:\Downloads\AI-integrated-hotel-booking-app-main\AI-integrated-hotel-booking-app-main\java-hotel-booking-api
+---------
+
+Build without tests:
+
+powershell
+---------
+mvn clean package -DskipTests
+---------
+
+Build only compile step:
+
+powershell
+---------
+mvn compile
+---------
+
+Generated jar:
+
+java-hotel-booking-api\target\hotel-booking-api-0.1.0.jar
+
+
+5. Common build error
+---------------------
+
+If Maven fails with this error:
+
+Unable to rename 'target\hotel-booking-api-0.1.0.jar'
+
+It means the backend is already running and the jar file is locked.
+
+Fix:
+
+powershell
+---------
+$p = (Get-NetTCPConnection -LocalPort 8080 -State Listen).OwningProcess
+Stop-Process -Id $p -Force
+mvn clean package -DskipTests
+---------
+
+
+6. Verify build output
+----------------------
+
+Check jar file:
+
+powershell
+---------
+Test-Path .\target\hotel-booking-api-0.1.0.jar
+---------
+
+Expected output:
+
+True
