@@ -23,66 +23,11 @@ class _SearchScreenState extends State<SearchScreen> {
   late List<Map<String, dynamic>> _suggestedHotels;
   late List<Map<String, dynamic>> _searchResults;
 
-  static const List<Map<String, dynamic>> _fallbackSuggestedHotels = [
-    {
-      'icon': Icons.apartment_outlined,
-      'name': 'Mường Thanh Grand Hotel',
-      'location': 'Hoàn Kiếm, Hà Nội',
-      'color': AppColors.colorPrimary,
-    },
-    {
-      'icon': Icons.hotel_outlined,
-      'name': 'Golden Lotus Hotel',
-      'location': 'Hoàn Kiếm, Hà Nội',
-      'color': Color(0xFFD97706),
-    },
-    {
-      'icon': Icons.water_outlined,
-      'name': 'West Lake Hotel',
-      'location': 'Tây Hồ, Hà Nội',
-      'color': Color(0xFF0891B2),
-    },
-  ];
-
-  static const List<Map<String, dynamic>> _fallbackSearchResults = [
-    {
-      'name': 'Hanoi Grand Palace Hotel',
-      'location': '123 Láng Hạ, Ba Đình, Hà Nội',
-      'rating': 4.7,
-      'price': '2.500.000 VND / đêm',
-      'date': 'Ngày 12 - 14, Tháng 11 2024',
-      'rooms': '2 người lớn, 1 phòng',
-      'reviews': '412 đánh giá',
-      'palette': [Color(0xFF9FB5C8), Color(0xFFECE6DD)],
-    },
-    {
-      'name': 'Lakeside Harmony Hotel',
-      'location': '5 Đinh Tiên Hoàng, Hoàn Kiếm, Hà Nội',
-      'rating': 4.5,
-      'price': '2.300.000 VND / đêm',
-      'date': 'Ngày 20 - 24, Tháng 10 2024',
-      'rooms': '2 người lớn, 1 phòng',
-      'reviews': '523 đánh giá',
-      'palette': [Color(0xFF6A8D73), Color(0xFFE7F1E8)],
-    },
-    {
-      'name': 'Royal Orchid Hotel',
-      'location': '45 Nguyễn Chí Thanh, Đống Đa, Hà Nội',
-      'rating': 4.2,
-      'price': '1.800.000 VND / đêm',
-      'date': 'Ngày 15 - 18, Tháng 9 2024',
-      'rooms': '2 người lớn, 1 phòng',
-      'reviews': '657 đánh giá',
-      'palette': [Color(0xFFB56576), Color(0xFFF6E4E8)],
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
-    _suggestedHotels =
-        List<Map<String, dynamic>>.from(_fallbackSuggestedHotels);
+    _suggestedHotels = [];
     _searchResults = const [];
     _loadSuggestedHotels();
   }
@@ -103,9 +48,7 @@ class _SearchScreenState extends State<SearchScreen> {
       final hotels = await ApiService().fetchHotels(pageSize: 10);
       if (!mounted) return;
       setState(() {
-        _suggestedHotels = hotels.isEmpty
-            ? List<Map<String, dynamic>>.from(_fallbackSuggestedHotels)
-            : hotels;
+        _suggestedHotels = hotels;
         _isLoading = false;
       });
     } catch (error) {
@@ -141,9 +84,7 @@ class _SearchScreenState extends State<SearchScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _searchResults = List<Map<String, dynamic>>.from(
-          _fallbackSearchResults,
-        );
+        _searchResults = [];
         _errorMessage = error.toString();
         _isLoading = false;
       });

@@ -12,8 +12,11 @@ import com.doan.hotelparking.repository.UserRepository;
 import com.doan.hotelparking.service.CurrentUserService;
 import com.doan.hotelparking.service.DtoMapper;
 import com.doan.hotelparking.service.ObjectStorageService;
+import com.doan.hotelparking.security.HasPermission;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,6 +56,8 @@ public class UserController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('Admin')")
+    @HasPermission("user.read")
     public ApiPagedResponse<UserDto> getAll(@RequestParam(defaultValue = "1") int pageIndex,
                                             @RequestParam(defaultValue = "20") int pageSize) {
         var page = users.findAll(PageRequest.of(Math.max(pageIndex, 1) - 1, Math.min(Math.max(pageSize, 1), 100)));
@@ -60,19 +65,35 @@ public class UserController {
                 pageIndex, pageSize, page.getTotalElements());
     }
 
+    @GetMapping("/me")
+    public ApiResponse<UserDto> me() {
+        var user = users.findById(currentUser.requireUserId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        return ApiResponse.ok(mapper.toUserDto(user));
+    }
+
+    @PutMapping("/me")
+    public ApiResponse<UserDto> updateMe(@RequestBody UpdateProfileRequest request) {
+        var user = users.findById(currentUser.requireUserId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        user.setFirstName(clean(request.firstName()));
+        user.setLastName(clean(request.lastName()));
+        user.setPhone(clean(request.phone()));
+        user.setAvatarUrl(clean(request.avatarUrl()));
+        user.setUpdatedAt(Instant.now());
+        return ApiResponse.ok("Updated", mapper.toUserDto(users.save(user)));
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<UserDto> getById(@PathVariable Integer id) {
+        requireSelfOrAdmin(id);
         return ApiResponse.ok(users.findById(id).map(mapper::toUserDto)
                 .orElseThrow(() -> new IllegalArgumentException("User not found")));
     }
 
-    @GetMapping("/me")
-    public ApiResponse<UserDto> me() {
-        return ApiResponse.ok(users.findById(currentUser.requireUserId()).map(mapper::toUserDto)
-                .orElseThrow(() -> new IllegalArgumentException("User not found")));
-    }
-
     @PostMapping
+    @PreAuthorize("hasRole('Admin')")
+    @HasPermission("user.manage")
     public ApiResponse<UserDto> create(@RequestBody User request) {
         var user = new User();
         user.setFirstName(request.getFirstName());
@@ -88,29 +109,25 @@ public class UserController {
 
     @PutMapping("/{id}")
     public ApiResponse<UserDto> update(@PathVariable Integer id, @RequestBody User request) {
+        var admin = isAdmin();
+        if (!admin) {
+            requireSelfOrAdmin(id);
+        }
         var user = users.findById(id).orElseThrow(() -> new IllegalArgumentException("User not found"));
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setPhone(request.getPhone());
         user.setAvatarUrl(request.getAvatarUrl());
-        user.setStatus(request.getStatus());
-        user.setUpdatedAt(Instant.now());
-        return ApiResponse.ok("Updated", mapper.toUserDto(users.save(user)));
-    }
-
-    @PutMapping("/me")
-    public ApiResponse<UserDto> updateMe(@RequestBody UpdateProfileRequest request) {
-        var user = users.findById(currentUser.requireUserId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        user.setFirstName(clean(request.firstName()));
-        user.setLastName(clean(request.lastName()));
-        user.setPhone(clean(request.phone()));
-        user.setAvatarUrl(clean(request.avatarUrl()));
+        if (admin) {
+            user.setStatus(request.getStatus());
+        }
         user.setUpdatedAt(Instant.now());
         return ApiResponse.ok("Updated", mapper.toUserDto(users.save(user)));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('Admin')")
+    @HasPermission("user.manage")
     public ApiResponse<Void> delete(@PathVariable Integer id) {
         users.deleteById(id);
         return ApiResponse.ok("Deleted", null);
@@ -145,11 +162,23 @@ public class UserController {
         return ApiResponse.ok("Avatar updated", mapper.toUserDto(users.save(user)));
     }
 
+    private void requireSelfOrAdmin(Integer id) {
+        if (!id.equals(currentUser.requireUserId()) && !isAdmin()) {
+            throw new IllegalArgumentException("User not found");
+        }
+    }
+
+    private boolean isAdmin() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_Admin".equals(authority.getAuthority()));
+    }
+
     private String clean(String value) {
         if (value == null) {
             return null;
         }
-        var trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
+        var cleaned = value.trim();
+        return cleaned.isEmpty() ? null : cleaned;
     }
 }

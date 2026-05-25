@@ -16,8 +16,10 @@ class AppStrings {
   static const String signUp = 'Sign Up';
   static const String signUpSubtitle = 'Create your new account';
   static const String nameLabel = 'Name*';
+  static const String usernameLabel = 'Username*';
   static const String signUpWithGoogle = 'Sign up with Google';
   static const String nameSubtitle = 'Enter your name';
+  static const String usernameHint = '4-20 letters, numbers, or underscores';
 
   // Password
   static const String passwordLabel = 'Password*';

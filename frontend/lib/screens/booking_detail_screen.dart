@@ -7,9 +7,9 @@ import 'widgets/responsive_page.dart';
 
 class BookingDetailScreen extends StatefulWidget {
   const BookingDetailScreen({
-    Key? key,
+    super.key,
     this.booking,
-  }) : super(key: key);
+  });
 
   final Map<String, dynamic>? booking;
 
@@ -19,6 +19,13 @@ class BookingDetailScreen extends StatefulWidget {
 
 class _BookingDetailScreenState extends State<BookingDetailScreen> {
   int _selectedIndex = 2;
+  late Map<String, dynamic>? _booking;
+
+  @override
+  void initState() {
+    super.initState();
+    _booking = widget.booking;
+  }
 
   void _onBottomNavTapped(int index) {
     setState(() {
@@ -226,11 +233,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   Widget _buildRoomTitle() {
-    return const Text(
-      'Suite Có Giường Cỡ King',
+    return Text(
+      _titleText,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: TextStyle(
+      style: const TextStyle(
         fontSize: 17,
         fontWeight: FontWeight.w800,
         color: Color(0xFF0D87FF),
@@ -334,6 +341,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   Widget _buildActionsSection() {
+    final canModify = _canModifyBooking;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -348,38 +356,45 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         const SizedBox(height: 12),
         _buildActionLink(
           'Thay đổi ngày đặt phòng',
-          onTap: () {
-            Navigator.of(context).pushNamed(
-              '/change-booking-date',
-              arguments: widget.booking,
-            );
-          },
+          enabled: canModify,
+          onTap: _openChangeBookingDate,
         ),
         const SizedBox(height: 9),
         _buildActionLink(
           'Hủy đặt phòng',
-          onTap: () {
-            Navigator.of(context).pushNamed(
-              '/cancel-booking',
-              arguments: widget.booking,
-            );
-          },
+          enabled: canModify,
+          onTap: _openCancelBooking,
         ),
+        if (!canModify) ...[
+          const SizedBox(height: 10),
+          const Text(
+            'Booking này không thể hủy hoặc đổi ngày.',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _buildActionLink(String label, {required VoidCallback onTap}) {
+  Widget _buildActionLink(
+    String label, {
+    required VoidCallback onTap,
+    bool enabled = true,
+  }) {
     return InkWell(
-      onTap: onTap,
+      onTap: enabled ? onTap : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 1),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF0D87FF),
+            color: enabled ? const Color(0xFF0D87FF) : AppColors.textSecondary,
           ),
         ),
       ),
@@ -499,21 +514,83 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   String get _dateText {
-    final date = widget.booking?['detailDate'];
+    final date = _booking?['detailDate'];
     if (date is String && date.trim().isNotEmpty) return date.trim();
     return '28 - 30 Thg 10 2025';
   }
 
   String get _guestText {
-    final guests = widget.booking?['detailGuests'] ?? widget.booking?['guests'];
+    final guests = _booking?['detailGuests'] ?? _booking?['guests'];
     if (guests is String && guests.trim().isNotEmpty) return guests.trim();
     return '2 Người (1 Phòng)';
   }
 
   String get _statusText {
-    final status = widget.booking?['status'];
+    final status = _booking?['status'];
     if (status is String && status.trim().isNotEmpty) return status.trim();
     return 'Đang đặt phòng';
+  }
+
+  String get _titleText {
+    final name = _booking?['name'];
+    if (name is String && name.trim().isNotEmpty) return name.trim();
+    return 'Chi tiết phòng đặt';
+  }
+
+  bool get _canModifyBooking {
+    if (_bookingId == null) return false;
+    final status = _statusCode;
+    return status != 'CANCELLED' &&
+        status != 'COMPLETED' &&
+        status != 'CHECKED_OUT' &&
+        status != 'REJECTED';
+  }
+
+  String get _statusCode {
+    final code = _booking?['statusCode'] ?? _backendField('status');
+    if (code is String && code.trim().isNotEmpty) {
+      return code.trim().toUpperCase();
+    }
+    return '';
+  }
+
+  int? get _bookingId => _intValue(_booking?['id'] ?? _backendField('id'));
+
+  Future<void> _openChangeBookingDate() async {
+    final result = await Navigator.of(context).pushNamed(
+      '/change-booking-date',
+      arguments: _booking,
+    );
+    _syncReturnedBooking(result);
+  }
+
+  Future<void> _openCancelBooking() async {
+    final result = await Navigator.of(context).pushNamed(
+      '/cancel-booking',
+      arguments: _booking,
+    );
+    _syncReturnedBooking(result);
+  }
+
+  void _syncReturnedBooking(Object? result) {
+    if (!mounted || result is! Map<String, dynamic>) return;
+    setState(() {
+      _booking = result;
+    });
+  }
+
+  dynamic _backendField(String key) {
+    final backend = _booking?['backend'];
+    if (backend is Map<String, dynamic>) return backend[key];
+    if (backend is Map) return backend[key];
+    return null;
+  }
+
+  int? _intValue(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
   }
 }
 

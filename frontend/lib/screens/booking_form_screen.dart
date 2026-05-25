@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
+import 'widgets/responsive_page.dart';
 
 class BookingFormScreen extends StatefulWidget {
   const BookingFormScreen({
-    Key? key,
+    super.key,
     this.room,
     this.hotel,
     this.roomCount = 1,
-  }) : super(key: key);
+  });
 
   final Map<String, dynamic>? room;
   final Map<String, dynamic>? hotel;
@@ -24,6 +26,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  late DateTime _checkInDate;
+  late DateTime _checkOutDate;
+  int? _resolvedUnitPrice;
+  bool _isRefreshingPrice = false;
 
   bool _saveInfo = false;
   String? _selectedCountry;
@@ -38,6 +44,17 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _checkInDate = DateTime(now.year, now.month, now.day + 1);
+    _checkOutDate = DateTime(now.year, now.month, now.day + 2);
+    _resolvedUnitPrice = _asInt(widget.room?['price']);
+    _prefillCurrentUser();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshRoomPrice());
+  }
+
+  @override
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
@@ -46,87 +63,208 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     super.dispose();
   }
 
+  void _prefillCurrentUser() {
+    final session = ApiService().currentSession;
+    final cachedUser = ApiService().cachedUser;
+    final fullName =
+        (cachedUser?['fullName'] ?? session?.fullName)?.toString().trim();
+
+    if (fullName != null && fullName.isNotEmpty) {
+      final parts = fullName.split(RegExp(r'\s+'));
+      if (parts.length == 1) {
+        _firstNameController.text = parts.first;
+      } else {
+        _firstNameController.text = parts.last;
+        _lastNameController.text = parts.take(parts.length - 1).join(' ');
+      }
+    }
+
+    final email = (cachedUser?['email'] ?? session?.email)?.toString().trim();
+    if (email != null && email.isNotEmpty) {
+      _emailController.text = email;
+    }
+
+    final phone = cachedUser?['phone']?.toString().trim();
+    if (phone != null && phone.isNotEmpty) {
+      _phoneController.text = phone;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ResponsivePageScaffold(
       backgroundColor: AppColors.colorBg,
-      body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(context),
-                    const SizedBox(height: 14),
-                    _buildTextField(
-                      label: 'Tên',
-                      controller: _firstNameController,
-                      validator: (value) => _required(value, 'tên'),
-                    ),
-                    _buildTextField(
-                      label: 'Họ',
-                      controller: _lastNameController,
-                      validator: (value) => _required(value, 'họ'),
-                    ),
-                    _buildTextField(
-                      label: 'Địa chỉ email',
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: _validateEmail,
-                    ),
-                    _buildCountryField(),
-                    _buildTextField(
-                      label: 'Điện thoại',
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      validator: _validatePhone,
-                    ),
-                    const SizedBox(height: 4),
-                    _buildSaveInfoToggle(),
-                    const SizedBox(height: 18),
-                    const Divider(height: 1, color: AppColors.divider),
-                    const SizedBox(height: 14),
-                    _buildTripPurpose(),
-                    const SizedBox(height: 18),
-                    const Divider(height: 1, color: AppColors.divider),
-                    const SizedBox(height: 14),
-                    _buildPriceSummary(),
-                    const SizedBox(height: 30),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 18),
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: 44,
-                        child: ElevatedButton(
-                          onPressed: _submit,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.colorPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Bước tiếp theo',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+      mobileBody: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
+        child: _buildMobileForm(context),
+      ),
+      desktopBody: WebAppShell(
+        title: 'Booking Information',
+        subtitle:
+            'Nhap thong tin khach hang, xac nhan muc dich chuyen di va kiem tra tong tien truoc khi thanh toan.',
+        selectedIndex: 2,
+        child: _buildDesktopLayout(),
+      ),
+    );
+  }
+
+  Widget _buildMobileForm(BuildContext context) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(context),
+          const SizedBox(height: 14),
+          _buildFormFields(),
+          const SizedBox(height: 18),
+          const Divider(height: 1, color: AppColors.divider),
+          const SizedBox(height: 14),
+          _buildPriceSummary(),
+          const SizedBox(height: 30),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: _buildSubmitButton(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout() {
+    return Form(
+      key: _formKey,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 7,
+            child: WebPanel(child: _buildFormFields()),
+          ),
+          const SizedBox(width: 24),
+          SizedBox(
+            width: 360,
+            child: Column(
+              children: [
+                WebPanel(child: _buildDesktopSummary()),
+                const SizedBox(height: 16),
+                _buildSubmitButton(height: 46),
+              ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormFields() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTextField(
+          label: 'Ten',
+          controller: _firstNameController,
+          validator: (value) => _required(value, 'ten'),
+        ),
+        _buildTextField(
+          label: 'Ho',
+          controller: _lastNameController,
+          validator: (value) => _required(value, 'ho'),
+        ),
+        _buildTextField(
+          label: 'Dia chi email',
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          validator: _validateEmail,
+        ),
+        _buildCountryField(),
+        _buildTextField(
+          label: 'Dien thoai',
+          controller: _phoneController,
+          keyboardType: TextInputType.phone,
+          validator: _validatePhone,
+        ),
+        _buildDateFields(),
+        const SizedBox(height: 4),
+        _buildSaveInfoToggle(),
+        const SizedBox(height: 18),
+        const Divider(height: 1, color: AppColors.divider),
+        const SizedBox(height: 14),
+        _buildTripPurpose(),
+      ],
+    );
+  }
+
+  Widget _buildDesktopSummary() {
+    final hotelName = _stringValue(widget.hotel?['name'], 'Khach san');
+    final roomName = _stringValue(widget.room?['name'], 'Phong da chon');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Tom tat dat phong',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildSummaryLine(Icons.apartment_outlined, hotelName),
+        const SizedBox(height: 12),
+        _buildSummaryLine(Icons.king_bed_outlined, roomName),
+        const SizedBox(height: 12),
+        _buildSummaryLine(Icons.meeting_room_outlined, '1 phong'),
+        const SizedBox(height: 12),
+        _buildSummaryLine(Icons.calendar_month_outlined, '$_nightCount dem'),
+        const SizedBox(height: 18),
+        const Divider(height: 1, color: AppColors.divider),
+        const SizedBox(height: 16),
+        _buildPriceSummary(),
+      ],
+    );
+  }
+
+  Widget _buildSummaryLine(IconData icon, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 19, color: AppColors.colorPrimary),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.35,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubmitButton({double height = 44}) {
+    return SizedBox(
+      width: double.infinity,
+      height: height,
+      child: ElevatedButton(
+        onPressed: _submit,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.colorPrimary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
+          elevation: 0,
+        ),
+        child: const Text(
+          'Buoc tiep theo',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppColors.white,
           ),
         ),
       ),
@@ -235,6 +373,72 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDateFields() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildDateButton(
+              label: 'Ngay nhan phong',
+              value: _formatDate(_checkInDate),
+              onTap: _pickCheckInDate,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _buildDateButton(
+              label: 'Ngay tra phong',
+              value: _formatDate(_checkOutDate),
+              onTap: _pickCheckOutDate,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateButton({
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildRequiredLabel(label),
+        const SizedBox(height: 4),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(2),
+          child: InputDecorator(
+            decoration: _inputDecoration(),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.calendar_today_outlined,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -369,6 +573,13 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
             color: AppColors.textPrimary,
           ),
         ),
+        if (_isRefreshingPrice) ...[
+          const SizedBox(height: 8),
+          const Text(
+            'Dang cap nhat gia theo ngay da chon...',
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          ),
+        ],
       ],
     );
   }
@@ -425,9 +636,14 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   }
 
   int get _totalPrice {
-    final price = _asInt(widget.room?['price']) ?? 179000;
+    final price = _resolvedUnitPrice ?? _asInt(widget.room?['price']) ?? 179000;
     final taxAndFee = _asInt(widget.room?['taxAndFee']) ?? 0;
-    return (price * widget.roomCount) + taxAndFee;
+    return (price + taxAndFee) * _nightCount;
+  }
+
+  int get _nightCount {
+    final days = _checkOutDate.difference(_checkInDate).inDays;
+    return days < 1 ? 1 : days;
   }
 
   int? _asInt(dynamic value) {
@@ -444,6 +660,17 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (match) => '${match[1]}.',
         );
+  }
+
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
+  }
+
+  String _stringValue(dynamic value, String fallback) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    return fallback;
   }
 
   String? _required(String? value, String fieldName) {
@@ -477,6 +704,67 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     return null;
   }
 
+  Future<void> _refreshRoomPrice() async {
+    final roomId = _asInt(widget.room?['id']);
+    if (roomId == null || !mounted) return;
+    setState(() {
+      _isRefreshingPrice = true;
+    });
+    try {
+      final price = await ApiService().fetchRoomPriceForDates(
+        roomId: roomId,
+        checkInDate: _checkInDate,
+        checkOutDate: _checkOutDate,
+      );
+      if (!mounted) return;
+      setState(() {
+        _resolvedUnitPrice = price ?? _asInt(widget.room?['price']);
+        _isRefreshingPrice = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _resolvedUnitPrice = _asInt(widget.room?['price']);
+        _isRefreshingPrice = false;
+      });
+    }
+  }
+
+  Future<void> _pickCheckInDate() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _checkInDate.isBefore(today) ? today : _checkInDate,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 365)),
+    );
+    if (selected == null) return;
+    setState(() {
+      _checkInDate = DateTime(selected.year, selected.month, selected.day);
+      if (!_checkOutDate.isAfter(_checkInDate)) {
+        _checkOutDate = _checkInDate.add(const Duration(days: 1));
+      }
+    });
+    await _refreshRoomPrice();
+  }
+
+  Future<void> _pickCheckOutDate() async {
+    final firstDate = _checkInDate.add(const Duration(days: 1));
+    final selected = await showDatePicker(
+      context: context,
+      initialDate:
+          _checkOutDate.isBefore(firstDate) ? firstDate : _checkOutDate,
+      firstDate: firstDate,
+      lastDate: firstDate.add(const Duration(days: 365)),
+    );
+    if (selected == null) return;
+    setState(() {
+      _checkOutDate = DateTime(selected.year, selected.month, selected.day);
+    });
+    await _refreshRoomPrice();
+  }
+
   void _submit() {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
@@ -485,9 +773,14 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       context,
       '/payment-information',
       arguments: {
-        'room': widget.room,
+        'room': {
+          ...?widget.room,
+          if (_resolvedUnitPrice != null) 'price': _resolvedUnitPrice,
+        },
         'hotel': widget.hotel,
         'roomCount': widget.roomCount,
+        'checkInDate': _checkInDate,
+        'checkOutDate': _checkOutDate,
         'customer': {
           'firstName': _firstNameController.text.trim(),
           'lastName': _lastNameController.text.trim(),

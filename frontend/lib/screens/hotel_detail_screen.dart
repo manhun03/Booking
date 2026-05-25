@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 import 'widgets/responsive_page.dart';
 
 class HotelDetailScreen extends StatefulWidget {
-  const HotelDetailScreen({Key? key, this.hotel}) : super(key: key);
+  const HotelDetailScreen({super.key, this.hotel});
 
   final Map<String, dynamic>? hotel;
 
@@ -14,34 +15,82 @@ class HotelDetailScreen extends StatefulWidget {
 
 class _HotelDetailScreenState extends State<HotelDetailScreen> {
   static const Map<String, dynamic> _fallbackHotel = {
-    'name': 'Grand Palais Hotel',
-    'location': 'Rond-Point Carpe d\'As, 34300 LE CAP D\'AGDE, Pháp',
-    'rating': 4.5,
-    'reviews': 10,
-    'price': 734235,
-    'description':
-        'Tọa lạc tại trung tâm Hà Nội, Grand Palais là khách sạn mang phong cách kiến trúc thanh lịch và chiều sâu cổ điển. Đây là điểm đến lý tưởng cho du khách đang tìm kiếm không gian nghỉ dưỡng sang trọng nhưng vẫn giữ được sự riêng tư và yên bình giữa lòng thành phố.',
+    'name': 'Khách sạn StaySmart',
+    'location': 'Đang cập nhật địa chỉ',
+    'rating': 4.7,
+    'reviews': 0,
+    'price': 0,
+    'description': 'Khách sạn đang cập nhật mô tả chi tiết.',
   };
 
   static const List<Map<String, dynamic>> _amenities = [
-    {'icon': Icons.king_bed_outlined, 'label': '2 giường đôi'},
-    {'icon': Icons.ac_unit, 'label': 'Điều hòa 2 chiều'},
-    {'icon': Icons.bathtub_outlined, 'label': 'Phòng tắm riêng'},
-    {'icon': Icons.window_outlined, 'label': 'Nhìn xuống phố'},
-    {'icon': Icons.kitchen_outlined, 'label': 'Nhà bếp nhỏ'},
-    {'icon': Icons.tv_outlined, 'label': 'TV 4k sắc nét'},
-    {'icon': Icons.volume_off_outlined, 'label': 'Hệ thống cách âm'},
+    {'icon': Icons.info_outline, 'label': 'Tiện nghi đang cập nhật'},
+    {'icon': Icons.support_agent_outlined, 'label': 'Liên hệ để biết chi tiết'},
   ];
 
   int _selectedDetailTab = 0;
+  List<Map<String, dynamic>> _rooms = [];
+  List<Map<String, dynamic>> _images = [];
+  List<Map<String, dynamic>> _reviews = [];
+  bool _loadingRelatedData = false;
+  bool _reviewsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRelatedData();
+  }
+
+  Future<void> _loadRelatedData() async {
+    final hotelId = _hotelId(widget.hotel ?? const <String, dynamic>{});
+    if (hotelId == null) return;
+
+    setState(() {
+      _loadingRelatedData = true;
+    });
+
+    try {
+      final rooms = await ApiService().fetchRoomsByHotel(hotelId);
+      if (mounted) setState(() => _rooms = rooms);
+    } catch (_) {
+      // The hotel summary can still render when room data is unavailable.
+    }
+
+    try {
+      final images = await ApiService().fetchHotelImages(hotelId);
+      if (mounted) setState(() => _images = images);
+    } catch (_) {
+      // Keep the generated preview when the hotel has no accessible image.
+    }
+
+    try {
+      final reviews = await ApiService().fetchReviewsByHotel(hotelId);
+      if (mounted) {
+        setState(() {
+          _reviews = reviews;
+          _reviewsLoaded = true;
+        });
+      }
+    } catch (_) {
+      // Reviews are optional supporting content for the detail page.
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _loadingRelatedData = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final data = widget.hotel ?? const <String, dynamic>{};
     final hotelName = _hotelName(data);
     final address = _stringValue(data, 'location', _fallbackHotel['location']);
-    final rating = _doubleValue(data, 'rating', _fallbackHotel['rating']);
-    final reviews = _reviewCount(data['reviews']);
+    final rating = _reviewsLoaded
+        ? _averageRating
+        : _doubleValue(data, 'rating', _fallbackHotel['rating']);
+    final reviews =
+        _reviewsLoaded ? _reviews.length : _reviewCount(data['reviews']);
     final price = _priceValue(data['price']);
 
     final mergedHotel = {
@@ -110,9 +159,9 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
             flex: 5,
             child: Column(
               children: [
-                const WebPanel(
-                  padding: EdgeInsets.all(14),
-                  child: _HotelRoomPreview(),
+                WebPanel(
+                  padding: const EdgeInsets.all(14),
+                  child: _buildHotelMedia(),
                 ),
                 const SizedBox(height: 20),
                 WebPanel(
@@ -174,7 +223,7 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (!compactMedia) ...[
-          const _HotelRoomPreview(),
+          _buildHotelMedia(),
           const SizedBox(height: 14),
         ],
         Text(
@@ -200,16 +249,9 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
         const SizedBox(height: 18),
         _buildLinkTabs(),
         const SizedBox(height: 12),
-        _buildSelectedTabContent(rating, reviews),
+        _buildSelectedTabContent(mergedHotel, rating, reviews),
         const SizedBox(height: 16),
-        Text(
-          '${_formatPrice(price)} VND',
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
+        _buildPriceText(price),
         const SizedBox(height: 3),
         const Text(
           'Đã bao gồm thuế và phí',
@@ -274,23 +316,13 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Row(
         children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: const BoxDecoration(
-              color: Color(0xFF0B6AA8),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.apartment,
-              color: AppColors.white,
-              size: 15,
-            ),
-          ),
-          const SizedBox(width: 4),
-          const Text(
-            'StaySmart',
-            style: TextStyle(
+          const StaySmartBrandButton(
+            icon: Icons.apartment,
+            circleSize: 28,
+            iconSize: 15,
+            spacing: 4,
+            circleColor: Color(0xFF0B6AA8),
+            textStyle: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w800,
@@ -489,7 +521,11 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
     );
   }
 
-  Widget _buildSelectedTabContent(double rating, int reviews) {
+  Widget _buildSelectedTabContent(
+    Map<String, dynamic> hotel,
+    double rating,
+    int reviews,
+  ) {
     switch (_selectedDetailTab) {
       case 1:
         return _buildReviewsContent(rating, reviews);
@@ -497,9 +533,9 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
         return _buildRefundPolicyContent();
       case 0:
       default:
-        return const Text(
-          'Các phòng nghỉ tại Grand Palais được thiết kế với nội thất cao cấp, giường ngủ êm ái chuẩn quốc tế, phòng tắm lát đá cẩm thạch và trang thiết bị hiện đại như TV thông minh, minibar và Wi-Fi tốc độ cao. Khách sạn còn cung cấp đầy đủ tiện ích như nhà hàng ẩm thực quốc tế, spa thư giãn, phòng gym hiện đại và dịch vụ đưa đón sân bay. Đội ngũ nhân viên chuyên nghiệp, tận tâm luôn sẵn sàng phục vụ 24/7, mang đến cho bạn trải nghiệm lưu trú hoàn hảo.',
-          style: TextStyle(
+        return Text(
+          _detailDescription(hotel),
+          style: const TextStyle(
             color: AppColors.textPrimary,
             fontSize: 12,
             height: 1.42,
@@ -509,6 +545,27 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
   }
 
   Widget _buildReviewsContent(double rating, int reviews) {
+    if (!_reviewsLoaded) {
+      return const Text(
+        'Đang tải đánh giá...',
+        style: TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 12,
+        ),
+      );
+    }
+
+    if (reviews == 0) {
+      return const Text(
+        'Khách sạn này chưa có đánh giá từ người dùng.',
+        style: TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 12,
+          height: 1.42,
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -528,9 +585,9 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
               children: [
                 _buildRatingRow(rating, reviews),
                 const SizedBox(height: 3),
-                const Text(
-                  'Khách đánh giá cao vị trí, phòng sạch và nhân viên hỗ trợ tốt.',
-                  style: TextStyle(
+                Text(
+                  '$reviews đánh giá từ khách hàng đã lưu trú.',
+                  style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 11,
                   ),
@@ -540,22 +597,17 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        _buildReviewItem(
-          'Nguyễn Minh Anh',
-          'Phòng rộng, sạch và yên tĩnh. Vị trí rất tiện để di chuyển vào trung tâm.',
-          5,
-        ),
-        const SizedBox(height: 10),
-        _buildReviewItem(
-          'Trần Quốc Bảo',
-          'Nhân viên thân thiện, thủ tục nhận phòng nhanh. Bữa sáng ổn và đầy đủ.',
-          4,
-        ),
+        for (var index = 0; index < _reviews.length; index++) ...[
+          _buildReviewItem(_reviews[index]),
+          if (index < _reviews.length - 1) const SizedBox(height: 10),
+        ],
       ],
     );
   }
 
-  Widget _buildReviewItem(String name, String comment, int stars) {
+  Widget _buildReviewItem(Map<String, dynamic> review) {
+    final rating = _intValue(review['rating'], 0);
+    final comment = review['comment']?.toString().trim();
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -569,10 +621,10 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
         children: [
           Row(
             children: [
-              Expanded(
+              const Expanded(
                 child: Text(
-                  name,
-                  style: const TextStyle(
+                  'Khách hàng StaySmart',
+                  style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
@@ -583,7 +635,7 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
                 children: List.generate(
                   5,
                   (index) => Icon(
-                    index < stars ? Icons.star : Icons.star_border,
+                    index < rating ? Icons.star : Icons.star_border,
                     size: 13,
                     color: const Color(0xFFFFC247),
                   ),
@@ -591,15 +643,17 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            comment,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 11,
-              height: 1.35,
+          if (comment != null && comment.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              comment,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+                height: 1.35,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -610,20 +664,20 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildPolicyLine(
-          'Miễn phí hủy trước 18:00, 27 tháng 9 2025',
-          'Bạn có thể hủy phòng trong thời hạn miễn phí và không bị tính phí.',
+          'Chính sách hủy theo từng phòng',
+          'Vui lòng xem điều kiện hủy ở danh sách phòng trước khi đặt.',
           true,
         ),
         const SizedBox(height: 10),
         _buildPolicyLine(
-          'Không cần thanh toán trước',
-          'Bạn sẽ thanh toán trực tiếp khi đến chỗ nghỉ theo chính sách đặt phòng.',
+          'Thanh toán linh hoạt',
+          'Một số phòng cho phép thanh toán sau hoặc thanh toán theo yêu cầu của khách sạn.',
           true,
         ),
         const SizedBox(height: 10),
         _buildPolicyLine(
-          'Sau thời hạn miễn phí',
-          'Nếu hủy muộn hoặc không đến nhận phòng, chỗ nghỉ có thể tính phí theo giá phòng đã đặt.',
+          'Cập nhật theo dữ liệu phòng',
+          'Giá và chính sách có thể thay đổi theo phòng, ngày lưu trú và trạng thái còn trống.',
           false,
         ),
       ],
@@ -683,7 +737,7 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            Icons.credit_card_off_outlined,
+            Icons.payments_outlined,
             color: AppColors.textPrimary,
             size: 20,
           ),
@@ -693,7 +747,7 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Không cần thẻ tín dụng',
+                  'Thông tin thanh toán',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 12,
@@ -702,7 +756,7 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
                 ),
                 SizedBox(height: 7),
                 Text(
-                  'Bạn sẽ thanh toán khi đến chỗ nghỉ',
+                  'Điều kiện thanh toán được xác nhận theo phòng đã chọn',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 11,
@@ -712,6 +766,58 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildHotelMedia() {
+    final imageUrl = _primaryImageUrl;
+    if (imageUrl != null) {
+      return AspectRatio(
+        aspectRatio: 1.24,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const _HotelRoomPreview(),
+          ),
+        ),
+      );
+    }
+
+    return const _HotelRoomPreview();
+  }
+
+  Widget _buildPriceText(int price) {
+    if (_loadingRelatedData && price <= 0) {
+      return const Text(
+        'Đang tải giá phòng...',
+        style: TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 17,
+          fontWeight: FontWeight.w800,
+        ),
+      );
+    }
+
+    if (price <= 0) {
+      return const Text(
+        'Xem giá phòng',
+        style: TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 17,
+          fontWeight: FontWeight.w800,
+        ),
+      );
+    }
+
+    return Text(
+      'Từ ${_formatPrice(price)} VND',
+      style: const TextStyle(
+        color: AppColors.textPrimary,
+        fontSize: 17,
+        fontWeight: FontWeight.w800,
       ),
     );
   }
@@ -764,13 +870,14 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
   }
 
   Widget _buildAmenitiesGrid() {
+    final amenities = _dynamicAmenities;
     return LayoutBuilder(
       builder: (context, constraints) {
         final columnWidth = (constraints.maxWidth - 18) / 2;
         return Wrap(
           spacing: 18,
           runSpacing: 10,
-          children: _amenities.map((amenity) {
+          children: amenities.map((amenity) {
             return SizedBox(
               width: columnWidth,
               child: Row(
@@ -803,18 +910,20 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
   }
 
   Widget _buildFoodInfo() {
-    return const Row(
+    return Row(
       children: [
-        Icon(
+        const Icon(
           Icons.restaurant_outlined,
           size: 17,
           color: AppColors.textPrimary,
         ),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
-            'Có bữa sáng (đã bao gồm trong tiền phòng)',
-            style: TextStyle(
+            _rooms.isEmpty
+                ? 'Thông tin ăn uống đang được khách sạn cập nhật'
+                : 'Kiểm tra bữa sáng và phụ phí trong từng loại phòng',
+            style: const TextStyle(
               color: AppColors.textPrimary,
               fontSize: 11,
               fontWeight: FontWeight.w500,
@@ -825,13 +934,62 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
     );
   }
 
-  String _hotelName(Map<String, dynamic> data) {
-    final name = _stringValue(data, 'name', _fallbackHotel['name']);
-    final normalized = name.toLowerCase();
-    if (!normalized.contains('hotel') && !normalized.contains('palais')) {
-      return _fallbackHotel['name'] as String;
+  String? get _primaryImageUrl {
+    for (final image in _images) {
+      final value = image['imageUrl'];
+      if (value is String && value.trim().isNotEmpty) return value.trim();
     }
-    return name;
+    final value = widget.hotel?['imageUrl'];
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    return null;
+  }
+
+  List<Map<String, dynamic>> get _dynamicAmenities {
+    if (_rooms.isEmpty) return _amenities;
+
+    final maxCapacity = _rooms
+        .map((room) => _intValue(room['capacity'], 0))
+        .fold<int>(0, (max, capacity) => capacity > max ? capacity : max);
+    final availableRooms = _rooms
+        .where((room) => '${room['status'] ?? ''}'.toUpperCase() == 'AVAILABLE')
+        .length;
+
+    return [
+      {'icon': Icons.king_bed_outlined, 'label': '${_rooms.length} loại phòng'},
+      {
+        'icon': Icons.groups_outlined,
+        'label': maxCapacity > 0
+            ? 'Tối đa $maxCapacity khách/phòng'
+            : 'Sức chứa linh hoạt'
+      },
+      {
+        'icon': Icons.event_available_outlined,
+        'label': '$availableRooms phòng đang sẵn sàng'
+      },
+      {'icon': Icons.payments_outlined, 'label': 'Thanh toán theo đặt phòng'},
+      {'icon': Icons.wifi_outlined, 'label': 'Thông tin tiện nghi theo phòng'},
+      {'icon': Icons.support_agent_outlined, 'label': 'Hỗ trợ từ khách sạn'},
+    ];
+  }
+
+  String _detailDescription(Map<String, dynamic> hotel) {
+    final description = _stringValue(
+      hotel,
+      'description',
+      _fallbackHotel['description'],
+    );
+    final roomText = _rooms.isEmpty
+        ? ''
+        : ' Khách sạn hiện có ${_rooms.length} loại phòng đang được hiển thị trên StaySmart.';
+    return '$description$roomText';
+  }
+
+  int? _hotelId(Map<String, dynamic> data) {
+    return _intValue(data['id'], 0) == 0 ? null : _intValue(data['id'], 0);
+  }
+
+  String _hotelName(Map<String, dynamic> data) {
+    return _stringValue(data, 'name', _fallbackHotel['name']);
   }
 
   String _stringValue(Map<String, dynamic> data, String key, dynamic fallback) {
@@ -854,6 +1012,13 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
     return (fallback as num).toDouble();
   }
 
+  int _intValue(dynamic value, int fallback) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim()) ?? fallback;
+    return fallback;
+  }
+
   int _reviewCount(dynamic value) {
     if (value is int) {
       return value;
@@ -868,7 +1033,25 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
     return _fallbackHotel['reviews'] as int;
   }
 
+  double get _averageRating {
+    if (_reviews.isEmpty) return 0;
+    final total = _reviews.fold<int>(
+      0,
+      (sum, review) => sum + _intValue(review['rating'], 0),
+    );
+    return double.parse((total / _reviews.length).toStringAsFixed(1));
+  }
+
   int _priceValue(dynamic value) {
+    final roomPrices = _rooms
+        .map((room) => _intValue(room['price'], 0))
+        .where((price) => price > 0)
+        .toList();
+    if (roomPrices.isNotEmpty) {
+      roomPrices.sort();
+      return roomPrices.first;
+    }
+
     if (value is int) {
       return value;
     }
@@ -877,7 +1060,7 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
     }
     if (value is String) {
       final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-      return int.tryParse(digits) ?? (_fallbackHotel['price'] as int);
+      return int.tryParse(digits) ?? 0;
     }
     return _fallbackHotel['price'] as int;
   }

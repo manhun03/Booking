@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+
 import '../utils/colors.dart';
 import 'widgets/responsive_page.dart';
 
 class RoomDetailScreen extends StatefulWidget {
-  const RoomDetailScreen({Key? key, this.room, this.hotel}) : super(key: key);
+  const RoomDetailScreen({super.key, this.room, this.hotel});
 
   final Map<String, dynamic>? room;
   final Map<String, dynamic>? hotel;
@@ -23,33 +24,66 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
   }
 
   Map<String, dynamic> _mergeRoomData(Map<String, dynamic> room) {
+    final capacity = _intValue(room['capacity'], 1);
+    final price = _intValue(room['price'], 0);
+    final roomNumber = _stringValue(room['roomNumber']);
+    final name = _stringValue(room['name']) ??
+        (roomNumber == null ? 'Phòng đang cập nhật' : 'Phòng $roomNumber');
+    final amenities = _listValue(room['amenities']).isEmpty
+        ? [
+            {'name': '$capacity người lớn', 'icon': '👥'},
+            {'name': 'Phòng tắm riêng', 'icon': '🚿'},
+            {'name': 'WiFi miễn phí', 'icon': '📶'},
+          ]
+        : _listValue(room['amenities']);
+    final policies = _listValue(room['policies'])
+        .map((item) => item.toString())
+        .where((item) => item.trim().isNotEmpty)
+        .toList();
+
     return {
       ...defaultRoom,
       ...room,
+      'name': name,
+      'type': _stringValue(room['type']) ?? '$capacity người lớn',
+      'capacity': capacity,
+      'guests': _stringValue(room['guests']) ?? '$capacity người lớn',
+      'amenities': amenities,
+      'policies': policies,
+      'price': price,
+      'taxAndFee': _intValue(room['taxAndFee'], 0),
+      'extraFee': _intValue(room['extraFee'], 0),
+      'description': _stringValue(room['description']) ??
+          (capacity >= 3
+              ? 'Phù hợp cho gia đình hoặc nhóm nhỏ'
+              : 'Phù hợp cho chuyến đi cá nhân hoặc cặp đôi'),
+      'cancellationPolicy': _stringValue(room['cancellationPolicy']) ??
+          (policies.isEmpty ? 'Theo chính sách của khách sạn' : policies.first),
+      'paymentNote': _stringValue(room['paymentNote']) ??
+          (policies.length > 1
+              ? policies[1]
+              : 'Thanh toán và xác nhận theo yêu cầu đặt phòng'),
     };
   }
 
   final Map<String, dynamic> defaultRoom = {
-    'name': 'Phòng Superior Có Giường Cỏ King',
-    'type': '2 giường đôi',
+    'name': 'Phòng đang cập nhật',
+    'type': 'Đang cập nhật sức chứa',
     'image': '🏨',
-    'area': '22m²',
+    'area': null,
     'amenities': [
-      {'name': '2 giường đôi', 'icon': '🛏️'},
-      {'name': 'Diện tích: 22m²', 'icon': '📐'},
       {'name': 'Phòng tắm riêng', 'icon': '🚿'},
-      {'name': 'TV 4k sắc nét', 'icon': '📺'},
-      {'name': 'Nhìn xuống phố', 'icon': '👀'},
-      {'name': 'Hệ thống cách âm', 'icon': '🔇'},
+      {'name': 'WiFi miễn phí', 'icon': '📶'},
     ],
-    'guests': '3 người lớn',
-    'cancellationPolicy': 'Toàn bộ tiền phòng',
-    'paymentNote': 'Khứng cần thanh toán trước - thanh toán tại khách sạn',
-    'earlyCheckout': 'Có báo sáng (thank toàn tại chỗ ngủ)',
-    'extraFee': 1000564,
-    'price': 11934235,
-    'taxAndFee': 601545,
-    'description': 'Phù hợp cho có gia đình',
+    'policies': [],
+    'guests': 'Đang cập nhật',
+    'cancellationPolicy': 'Theo chính sách của khách sạn',
+    'paymentNote': 'Thanh toán và xác nhận theo yêu cầu đặt phòng',
+    'earlyCheckout': null,
+    'extraFee': 0,
+    'price': 0,
+    'taxAndFee': 0,
+    'description': 'Thông tin phòng đang được cập nhật',
   };
 
   @override
@@ -137,17 +171,19 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
-            '27 thg 9 - 30 thg 9',
-            style: TextStyle(
+          Text(
+            _hotelName,
+            style: const TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Giá đã được đối với một VND ⓘ',
-            style: TextStyle(
+          Text(
+            _hotelLocation,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
               fontSize: 11,
               color: AppColors.textMuted,
             ),
@@ -314,47 +350,14 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
               '🚫', 'Phí hủy: ${roomData['cancellationPolicy'] ?? ''}'),
           const SizedBox(height: 8),
           _buildInfoRow('💳', roomData['paymentNote'] ?? ''),
-          const SizedBox(height: 8),
-          _buildInfoRow('🔔', roomData['earlyCheckout'] ?? ''),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.colorBg,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Row(
-              children: [
-                const Text(
-                  '🍽️',
-                  style: TextStyle(fontSize: 14),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Có báo sáng (thanh toán tại chỗ ngủ)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '(${_formatPrice(roomData['extraFee'] as int? ?? 0)} VND)',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          if (_stringValue(roomData['earlyCheckout']) != null) ...[
+            const SizedBox(height: 8),
+            _buildInfoRow('🔔', roomData['earlyCheckout'] ?? ''),
+          ],
+          if (_intValue(roomData['extraFee'], 0) > 0) ...[
+            const SizedBox(height: 12),
+            _buildExtraFeeBox(),
+          ],
           const SizedBox(height: 16),
           const Divider(height: 1, color: AppColors.divider),
           const SizedBox(height: 12),
@@ -372,7 +375,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                '${_formatPrice((roomData['price'] as int?) ?? 0)} VNĐ',
+                '${_formatPrice(_intValue(roomData['price'], 0))} VNĐ',
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -381,7 +384,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                '+ ${_formatPrice((roomData['taxAndFee'] as int?) ?? 0)} VNĐ thuế và phí',
+                _taxAndFeeText,
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textMuted,
@@ -408,7 +411,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${_formatPrice((roomData['price'] as int?) ?? 0)} VND',
+                            '${_formatPrice(_intValue(roomData['price'], 0))} VND',
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -431,9 +434,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                               color: const Color(0xFFE8F5E9),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text(
-                              'Phù hợp cho có gia đình',
-                              style: TextStyle(
+                            child: Text(
+                              _statusBadgeText,
+                              style: const TextStyle(
                                 fontSize: 9,
                                 color: Color(0xFF2E7D32),
                                 fontWeight: FontWeight.w600,
@@ -449,7 +452,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${_formatPrice((roomData['price'] as int?) ?? 0)} VND · $roomCount phòng',
+                                '${_formatPrice(_intValue(roomData['price'], 0))} VND · $roomCount phòng',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -473,9 +476,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                               color: const Color(0xFFE8F5E9),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text(
-                              'Phù hợp cho có gia đình',
-                              style: TextStyle(
+                            child: Text(
+                              _statusBadgeText,
+                              style: const TextStyle(
                                 fontSize: 10,
                                 color: Color(0xFF2E7D32),
                                 fontWeight: FontWeight.w600,
@@ -494,24 +497,27 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.colorPrimary,
+                disabledBackgroundColor: const Color(0xFFB8C0CC),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(6),
                 ),
               ),
-              onPressed: () {
-                Navigator.pushNamed(
-                  context,
-                  '/booking-form',
-                  arguments: {
-                    'room': roomData,
-                    'hotel': widget.hotel,
-                    'roomCount': roomCount,
-                  },
-                );
-              },
-              child: const Text(
-                'Đặt phòng',
-                style: TextStyle(
+              onPressed: !_canBook
+                  ? null
+                  : () {
+                      Navigator.pushNamed(
+                        context,
+                        '/booking-form',
+                        arguments: {
+                          'room': roomData,
+                          'hotel': widget.hotel,
+                          'roomCount': roomCount,
+                        },
+                      );
+                    },
+              child: Text(
+                _canBook ? 'Đặt phòng' : 'Phòng hiện không khả dụng',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: AppColors.white,
@@ -544,6 +550,80 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildExtraFeeBox() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.colorBg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.receipt_long_outlined,
+            color: AppColors.textSecondary,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Phụ phí: ${_formatPrice(_intValue(roomData['extraFee'], 0))} VND',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String get _hotelName {
+    final name = _stringValue(widget.hotel?['name']);
+    return name ?? 'Khách sạn đang cập nhật';
+  }
+
+  String get _hotelLocation {
+    final location = _stringValue(widget.hotel?['location']);
+    return location ?? 'Đang cập nhật địa chỉ khách sạn';
+  }
+
+  String get _taxAndFeeText {
+    final amount = _intValue(roomData['taxAndFee'], 0);
+    return amount > 0
+        ? '+ ${_formatPrice(amount)} VNĐ thuế và phí'
+        : 'Thuế và phí sẽ được xác nhận khi đặt phòng';
+  }
+
+  String get _statusBadgeText {
+    final status = _stringValue(roomData['status'])?.toUpperCase();
+    return status == 'AVAILABLE' ? 'Còn phòng' : 'Theo tình trạng phòng';
+  }
+
+  bool get _canBook {
+    final status = _stringValue(roomData['status'])?.toUpperCase();
+    return status == null || status.isEmpty || status == 'AVAILABLE';
+  }
+
+  List<dynamic> _listValue(dynamic value) {
+    return value is List ? value : const [];
+  }
+
+  String? _stringValue(dynamic value) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
+  }
+
+  int _intValue(dynamic value, int fallback) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) {
+      return int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? fallback;
+    }
+    return fallback;
   }
 
   String _formatPrice(int price) {

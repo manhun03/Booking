@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import '../utils/colors.dart';
+import 'widgets/responsive_page.dart';
 
 class PaymentNoCardScreen extends StatelessWidget {
   const PaymentNoCardScreen({
@@ -12,17 +13,30 @@ class PaymentNoCardScreen extends StatelessWidget {
     this.hotel,
     this.customer,
     this.roomCount = 1,
+    this.checkInDate,
+    this.checkOutDate,
   });
 
   final Map<String, dynamic>? room;
   final Map<String, dynamic>? hotel;
   final Map<String, dynamic>? customer;
   final int roomCount;
+  final DateTime? checkInDate;
+  final DateTime? checkOutDate;
 
   Future<void> _confirmBooking(BuildContext context) async {
     final roomId = _asInt(room?['id']);
-    if (!ApiService().isAuthenticated || roomId == null) {
-      _openSuccess(context, paymentMethod: 'no-card');
+    if (!ApiService().isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui long dang nhap de dat phong.')),
+      );
+      unawaited(Navigator.of(context).pushNamed('/login'));
+      return;
+    }
+    if (roomId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Khong tim thay phong de dat.')),
+      );
       return;
     }
 
@@ -39,8 +53,10 @@ class PaymentNoCardScreen extends StatelessWidget {
         roomId: roomId,
         guestCount: _guestCount,
         paidAmount: 0,
+        checkInDate: _effectiveCheckInDate,
+        checkOutDate: _effectiveCheckOutDate,
         paymentMethod: 'NO_CARD',
-        note: customer?['email']?.toString(),
+        note: _bookingNote,
       );
       if (!context.mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
@@ -68,6 +84,8 @@ class PaymentNoCardScreen extends StatelessWidget {
         'customer': customer,
         'paymentMethod': paymentMethod,
         'roomCount': roomCount,
+        'checkInDate': checkInDate,
+        'checkOutDate': checkOutDate,
         'booking': booking,
       },
     );
@@ -75,69 +93,113 @@ class PaymentNoCardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ResponsivePageScaffold(
       backgroundColor: AppColors.colorBg,
-      body: SafeArea(
-        bottom: false,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(child: _buildHeader(context)),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate(
-                      [
-                        _buildNoCardNotice(),
-                        const SizedBox(height: 12),
-                        _buildHotelCard(),
-                        const SizedBox(height: 12),
-                        _buildPriceCard(),
-                        const SizedBox(height: 18),
-                        InkWell(
-                          onTap: () =>
-                              Navigator.of(context).pushNamed('/add-promotion'),
-                          borderRadius: BorderRadius.circular(4),
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 4),
-                            child: Text(
-                              'Thêm mã khuyến mãi',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.colorPrimary,
-                              ),
-                            ),
-                          ),
+      mobileBody: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(child: _buildHeader(context)),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate(
+                [
+                  _buildNoCardNotice(),
+                  const SizedBox(height: 12),
+                  _buildHotelCard(),
+                  const SizedBox(height: 12),
+                  _buildPriceCard(),
+                  const SizedBox(height: 18),
+                  InkWell(
+                    onTap: () =>
+                        Navigator.of(context).pushNamed('/add-promotion'),
+                    borderRadius: BorderRadius.circular(4),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        'Them ma khuyen mai',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.colorPrimary,
                         ),
-                        const SizedBox(height: 20),
-                        const Divider(height: 1, color: AppColors.divider),
-                        const SizedBox(height: 16),
-                        _buildCancellationPolicy(),
-                        const SizedBox(height: 18),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  const Divider(height: 1, color: AppColors.divider),
+                  const SizedBox(height: 16),
+                  _buildCancellationPolicy(),
+                  const SizedBox(height: 18),
+                ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          heightFactor: 1,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: _buildBottomBar(context),
+      mobileBottomNavigationBar: _buildBottomBar(context),
+      desktopBody: WebAppShell(
+        title: 'Pay At Property',
+        subtitle:
+            'Xac nhan thong tin dat phong khong can the tin dung va thanh toan tai cho nghi.',
+        selectedIndex: 2,
+        child: _buildDesktopLayout(context),
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 6,
+          child: Column(
+            children: [
+              _buildNoCardNotice(),
+              const SizedBox(height: 18),
+              _buildHotelCard(),
+              const SizedBox(height: 18),
+              _buildCancellationPolicy(),
+            ],
           ),
         ),
-      ),
+        const SizedBox(width: 24),
+        SizedBox(
+          width: 380,
+          child: Column(
+            children: [
+              _buildPriceCard(),
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: () => Navigator.of(context).pushNamed('/add-promotion'),
+                borderRadius: BorderRadius.circular(4),
+                child: const WebPanel(
+                  child: Row(
+                    children: [
+                      Icon(Icons.local_offer_outlined,
+                          color: AppColors.colorPrimary),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Them ma khuyen mai',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.colorPrimary,
+                          ),
+                        ),
+                      ),
+                      Icon(Icons.chevron_right, color: AppColors.textSecondary),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildBottomBar(context),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -318,7 +380,7 @@ class PaymentNoCardScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '1 đêm, $safeRoomCount phòng cho $_guestText',
+                      '$_nightCount dem, 1 phong cho $_guestText',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -663,11 +725,19 @@ class PaymentNoCardScreen extends StatelessWidget {
     return '10 lượt đánh giá';
   }
 
-  String get _checkInDate =>
-      _stringValue(hotel?['checkIn'], 'Th 7, 27 Thg 9, 2025');
+  DateTime get _effectiveCheckInDate {
+    return checkInDate ?? DateTime.now().add(const Duration(days: 1));
+  }
 
-  String get _checkOutDate =>
-      _stringValue(hotel?['checkOut'], 'Cn, 28 Thg 9, 2025');
+  DateTime get _effectiveCheckOutDate {
+    final fallback = _effectiveCheckInDate.add(const Duration(days: 1));
+    final selected = checkOutDate ?? fallback;
+    return selected.isAfter(_effectiveCheckInDate) ? selected : fallback;
+  }
+
+  String get _checkInDate => _formatDate(_effectiveCheckInDate);
+
+  String get _checkOutDate => _formatDate(_effectiveCheckOutDate);
 
   String get _guestText {
     final guests = room?['guests'];
@@ -675,22 +745,37 @@ class PaymentNoCardScreen extends StatelessWidget {
     return '2 người lớn';
   }
 
-  int get safeRoomCount => roomCount < 1 ? 1 : roomCount;
-
   int get _guestCount {
     final capacity = _asInt(room?['capacity']);
     if (capacity != null && capacity > 0) return capacity;
-    return safeRoomCount;
+    return 1;
+  }
+
+  String get _bookingNote {
+    final email = customer?['email']?.toString().trim();
+    final tripPurpose = customer?['tripPurpose']?.toString().trim();
+    final parts = <String>[
+      if (email != null && email.isNotEmpty) 'Customer email: $email',
+      if (tripPurpose != null && tripPurpose.isNotEmpty)
+        'Trip purpose: $tripPurpose',
+      'Payment method: no-card',
+    ];
+    return parts.join(' | ');
+  }
+
+  int get _nightCount {
+    final days =
+        _effectiveCheckOutDate.difference(_effectiveCheckInDate).inDays;
+    return days < 1 ? 1 : days;
   }
 
   int get _finalPrice {
     final price = _asInt(room?['price']) ?? 179000;
-    return price * safeRoomCount;
+    return price * _nightCount;
   }
 
   int get _taxAndFee {
-    return _asInt(room?['taxAndFee']) ??
-        ((_finalPrice * 9576) / 179000).round();
+    return (_asInt(room?['taxAndFee']) ?? 0) * _nightCount;
   }
 
   int? _asInt(dynamic value) {
@@ -712,5 +797,11 @@ class PaymentNoCardScreen extends StatelessWidget {
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (match) => '${match[1]}.',
         );
+  }
+
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
   }
 }

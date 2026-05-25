@@ -163,27 +163,34 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return ResponsivePageScaffold(
-      mobileBody: Column(
-        children: [
-          _buildTopBar(context),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(28, 14, 28, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildTitleRow(context, 'Information'),
-                  const SizedBox(height: 18),
-                  _buildUserInfoCard(),
-                  const SizedBox(height: 28),
-                  _buildMenuCard(context),
-                  const SizedBox(height: 18),
-                  _buildLogoutButton(),
-                ],
+      backgroundColor: AppColors.colorBg,
+      mobileBody: ColoredBox(
+        color: AppColors.colorBg,
+        child: Column(
+          children: [
+            _buildTopBar(context),
+            Expanded(
+              child: ColoredBox(
+                color: AppColors.colorBg,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(28, 14, 28, 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTitleRow(context, 'Information'),
+                      const SizedBox(height: 18),
+                      _buildUserInfoCard(),
+                      const SizedBox(height: 28),
+                      _buildMenuCard(context),
+                      const SizedBox(height: 18),
+                      _buildLogoutButton(),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       desktopBody: _buildDesktopPage(context),
       mobileBottomNavigationBar: _buildBottomNav(),
@@ -402,28 +409,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: const BoxDecoration(
-              color: Color(0xFF1D6C96),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.local_hotel,
-              color: AppColors.white,
-              size: 17,
-            ),
-          ),
-          const SizedBox(width: 6),
-          const Text(
-            'StaySmart',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          const StaySmartBrandButton(),
           const Spacer(),
           _buildBellButton(context),
           const SizedBox(width: 18),
@@ -502,9 +488,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         ),
         Container(
           decoration: BoxDecoration(
-            color: compact ? AppColors.white : AppColors.colorBg,
+            color: AppColors.white,
             borderRadius: BorderRadius.circular(8),
-            border: compact ? null : Border.all(color: AppColors.divider),
+            border: Border.all(color: AppColors.divider),
           ),
           child: Column(
             children: [
@@ -585,6 +571,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.divider),
       ),
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(

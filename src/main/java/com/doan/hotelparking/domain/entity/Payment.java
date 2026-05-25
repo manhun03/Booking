@@ -26,6 +26,8 @@ public class Payment {
     private BigDecimal amount = BigDecimal.ZERO;
     @Column(name = "Method")
     private String method;
+    @Column(name = "Provider")
+    private String provider;
 
     @Enumerated(EnumType.ORDINAL)
     @Column(name = "Status")
@@ -33,10 +35,36 @@ public class Payment {
 
     @Column(name = "TransactionCode")
     private String transactionCode;
+    @Column(name = "GatewayTransactionId")
+    private String gatewayTransactionId;
+    @Column(name = "CheckoutUrl")
+    private String checkoutUrl;
+    @Column(name = "FailureReason")
+    private String failureReason;
+    @Column(name = "RefundedAmount")
+    private BigDecimal refundedAmount = BigDecimal.ZERO;
     @Column(name = "Note")
     private String note;
     @Column(name = "PaidAt")
     private Instant paidAt;
+    @Column(name = "RefundedAt")
+    private Instant refundedAt;
     @Column(name = "CreatedAt")
     private Instant createdAt;
+    @Column(name = "UpdatedAt")
+    private Instant updatedAt;
+
+    @PrePersist
+    void prePersist() {
+        var now = Instant.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    void preUpdate() {
+        updatedAt = Instant.now();
+    }
 }

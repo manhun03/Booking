@@ -1,65 +1,87 @@
 import 'package:flutter/material.dart';
 
 import '../utils/colors.dart';
+import 'widgets/responsive_page.dart';
 
 class PaymentInformationScreen extends StatelessWidget {
   const PaymentInformationScreen({
-    Key? key,
+    super.key,
     this.room,
     this.hotel,
     this.customer,
     this.roomCount = 1,
-  }) : super(key: key);
+    this.checkInDate,
+    this.checkOutDate,
+  });
 
   final Map<String, dynamic>? room;
   final Map<String, dynamic>? hotel;
   final Map<String, dynamic>? customer;
   final int roomCount;
+  final DateTime? checkInDate;
+  final DateTime? checkOutDate;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ResponsivePageScaffold(
       backgroundColor: AppColors.colorBg,
-      body: SafeArea(
-        bottom: false,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(child: _buildHeader(context)),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 16),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate(
-                      [
-                        _buildHotelCard(),
-                        const SizedBox(height: 12),
-                        _buildPriceCard(),
-                        const SizedBox(height: 14),
-                        _buildCancellationPolicy(),
-                        const SizedBox(height: 18),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+      mobileBody: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(child: _buildHeader(context)),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 16),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate(
+                [
+                  _buildHotelCard(),
+                  const SizedBox(height: 12),
+                  _buildPriceCard(),
+                  const SizedBox(height: 14),
+                  _buildCancellationPolicy(),
+                  const SizedBox(height: 18),
+                ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          heightFactor: 1,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: _buildBottomBar(context),
+      mobileBottomNavigationBar: _buildBottomBar(context),
+      desktopBody: WebAppShell(
+        title: 'Booking Details',
+        subtitle:
+            'Kiem tra phong, gia, chinh sach huy va hoan tat buoc cuoi cung tren man hinh rong.',
+        selectedIndex: 2,
+        child: _buildDesktopLayout(context),
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 7,
+          child: Column(
+            children: [
+              _buildHotelCard(),
+              const SizedBox(height: 18),
+              _buildCancellationPolicy(),
+            ],
           ),
         ),
-      ),
+        const SizedBox(width: 24),
+        SizedBox(
+          width: 380,
+          child: Column(
+            children: [
+              _buildPriceCard(),
+              const SizedBox(height: 16),
+              _buildBottomBar(context),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -200,7 +222,7 @@ class PaymentInformationScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '1 đêm, $safeRoomCount phòng cho $_guestText',
+                      '$_nightCount dem, 1 phong cho $_guestText',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -291,17 +313,7 @@ class PaymentInformationScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildPriceLine('Giá gốc', _basePrice),
-          const SizedBox(height: 9),
-          _buildPriceLine('Giảm giá VIP', _vipDiscount, isDiscount: true),
-          const SizedBox(height: 9),
-          _buildPriceLine(
-            'Giá chỉ có trên điện thoại',
-            _mobileDiscount,
-            isDiscount: true,
-          ),
-          const SizedBox(height: 9),
-          _buildPriceLine('Mã khuyến mãi', _promoDiscount, isDiscount: true),
+          _buildPriceLine('Gia phong x $_nightCount dem', _finalPrice),
           const SizedBox(height: 14),
           const Divider(height: 1, color: AppColors.divider),
           const SizedBox(height: 12),
@@ -317,20 +329,6 @@ class PaymentInformationScreen extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 5),
-                child: Text(
-                  '${_formatPrice(_basePrice)} VND',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.red,
-                    decoration: TextDecoration.lineThrough,
-                    decorationColor: Colors.red,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
               Text(
                 '${_formatPrice(_finalPrice)} VND',
                 style: const TextStyle(
@@ -534,17 +532,6 @@ class PaymentInformationScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${_formatPrice(_basePrice)} VND',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.red,
-                  decoration: TextDecoration.lineThrough,
-                  decorationColor: Colors.red,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
                 '${_formatPrice(_finalPrice)} VND',
                 style: const TextStyle(
                   fontSize: 16,
@@ -576,6 +563,8 @@ class PaymentInformationScreen extends StatelessWidget {
                     'hotel': hotel,
                     'customer': customer,
                     'roomCount': roomCount,
+                    'checkInDate': checkInDate,
+                    'checkOutDate': checkOutDate,
                   },
                 );
               },
@@ -638,10 +627,10 @@ class PaymentInformationScreen extends StatelessWidget {
   }
 
   String get _checkInDate =>
-      _stringValue(hotel?['checkIn'], 'Th 6, 10 Thg 10, 2025');
+      _formatDate(checkInDate ?? DateTime.now().add(const Duration(days: 1)));
 
   String get _checkOutDate =>
-      _stringValue(hotel?['checkOut'], 'Sun, 28 Sept 2025');
+      _formatDate(checkOutDate ?? DateTime.now().add(const Duration(days: 2)));
 
   String get _guestText {
     final guests = room?['guests'];
@@ -649,35 +638,20 @@ class PaymentInformationScreen extends StatelessWidget {
     return '1 người lớn';
   }
 
-  int get safeRoomCount => roomCount < 1 ? 1 : roomCount;
-
-  int get _basePrice {
-    final price = _asInt(room?['price']) ?? 128000;
-    return price * safeRoomCount;
+  int get _nightCount {
+    final days = (checkOutDate ?? DateTime.now().add(const Duration(days: 2)))
+        .difference(checkInDate ?? DateTime.now().add(const Duration(days: 1)))
+        .inDays;
+    return days < 1 ? 1 : days;
   }
-
-  int get _vipDiscount => _scaledFromDesign(20000);
-
-  int get _mobileDiscount => _scaledFromDesign(10000);
-
-  int get _promoDiscount {
-    final discount = _basePrice - _vipDiscount - _mobileDiscount - _targetPrice;
-    return discount > 0 ? discount : 0;
-  }
-
-  int get _targetPrice => _scaledFromDesign(36000);
 
   int get _finalPrice {
-    final value = _basePrice - _vipDiscount - _mobileDiscount - _promoDiscount;
-    return value > 0 ? value : _targetPrice;
+    final price = _asInt(room?['price']) ?? 128000;
+    return price * _nightCount;
   }
 
   int get _taxAndFee {
-    return _asInt(room?['taxAndFee']) ?? ((_finalPrice * 7878) / 36000).round();
-  }
-
-  int _scaledFromDesign(int value) {
-    return ((_basePrice * value) / 128000).round();
+    return (_asInt(room?['taxAndFee']) ?? 0) * _nightCount;
   }
 
   int? _asInt(dynamic value) {
@@ -699,5 +673,11 @@ class PaymentInformationScreen extends StatelessWidget {
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (match) => '${match[1]}.',
         );
+  }
+
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
   }
 }

@@ -34,6 +34,12 @@ public class Room {
     private int capacity;
     @Column(name = "Price")
     private BigDecimal price = BigDecimal.ZERO;
+    @Column(name = "Amenities", length = 2000)
+    private String amenities;
+    @Column(name = "SeasonalPrice")
+    private BigDecimal seasonalPrice;
+    @Column(name = "PromotionPrice")
+    private BigDecimal promotionPrice;
 
     @Enumerated(EnumType.ORDINAL)
     @Column(name = "Status")

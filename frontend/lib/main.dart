@@ -35,9 +35,14 @@ import 'screens/credit_card_screen.dart';
 import 'screens/add_card_screen.dart';
 import 'screens/language_screen.dart';
 import 'screens/legal_policies_screen.dart';
+import 'screens/hotel_management_screen.dart';
+import 'services/api_service.dart';
 import 'utils/theme.dart';
+import 'widgets/ai_chat_floating_button.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ApiService().restoreSession();
   runApp(const StaySmartApp());
 }
 
@@ -50,6 +55,20 @@ class StaySmartApp extends StatelessWidget {
       title: 'StaySmart',
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            Overlay(
+              initialEntries: [
+                OverlayEntry(
+                  builder: (context) => const AiChatFloatingButton(),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
       initialRoute: '/',
       routes: {
         '/': (context) => const SplashScreen(),
@@ -94,7 +113,7 @@ class StaySmartApp extends StatelessWidget {
         '/add-card': (context) => const AddCardScreen(),
         '/language': (context) => const LanguageScreen(),
         '/legal-policies': (context) => const LegalPoliciesScreen(),
-        '/room-list': (context) => const RoomListScreen(),
+        '/hotel-management': (context) => const HotelManagementScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/hotel-detail') {
@@ -147,12 +166,16 @@ class StaySmartApp extends StatelessWidget {
           final hotel = args?['hotel'] as Map<String, dynamic>?;
           final customer = args?['customer'] as Map<String, dynamic>?;
           final roomCount = args?['roomCount'] as int? ?? 1;
+          final checkInDate = args?['checkInDate'] as DateTime?;
+          final checkOutDate = args?['checkOutDate'] as DateTime?;
           return MaterialPageRoute(
             builder: (context) => PaymentInformationScreen(
               room: room,
               hotel: hotel,
               customer: customer,
               roomCount: roomCount,
+              checkInDate: checkInDate,
+              checkOutDate: checkOutDate,
             ),
             settings: settings,
           );
@@ -163,12 +186,16 @@ class StaySmartApp extends StatelessWidget {
           final hotel = args?['hotel'] as Map<String, dynamic>?;
           final customer = args?['customer'] as Map<String, dynamic>?;
           final roomCount = args?['roomCount'] as int? ?? 1;
+          final checkInDate = args?['checkInDate'] as DateTime?;
+          final checkOutDate = args?['checkOutDate'] as DateTime?;
           return MaterialPageRoute(
             builder: (context) => PaymentCardScreen(
               room: room,
               hotel: hotel,
               customer: customer,
               roomCount: roomCount,
+              checkInDate: checkInDate,
+              checkOutDate: checkOutDate,
             ),
             settings: settings,
           );
@@ -179,12 +206,16 @@ class StaySmartApp extends StatelessWidget {
           final hotel = args?['hotel'] as Map<String, dynamic>?;
           final customer = args?['customer'] as Map<String, dynamic>?;
           final roomCount = args?['roomCount'] as int? ?? 1;
+          final checkInDate = args?['checkInDate'] as DateTime?;
+          final checkOutDate = args?['checkOutDate'] as DateTime?;
           return MaterialPageRoute(
             builder: (context) => PaymentNoCardScreen(
               room: room,
               hotel: hotel,
               customer: customer,
               roomCount: roomCount,
+              checkInDate: checkInDate,
+              checkOutDate: checkOutDate,
             ),
             settings: settings,
           );
@@ -196,6 +227,10 @@ class StaySmartApp extends StatelessWidget {
           final customer = args?['customer'] as Map<String, dynamic>?;
           final paymentMethod = args?['paymentMethod'] as String?;
           final roomCount = args?['roomCount'] as int? ?? 1;
+          final checkInDate = args?['checkInDate'] as DateTime?;
+          final checkOutDate = args?['checkOutDate'] as DateTime?;
+          final booking = args?['booking'] as Map<String, dynamic>?;
+          final payment = args?['payment'] as Map<String, dynamic>?;
           return MaterialPageRoute(
             builder: (context) => BookingSuccessScreen(
               room: room,
@@ -203,6 +238,10 @@ class StaySmartApp extends StatelessWidget {
               customer: customer,
               paymentMethod: paymentMethod,
               roomCount: roomCount,
+              checkInDate: checkInDate,
+              checkOutDate: checkOutDate,
+              booking: booking,
+              payment: payment,
             ),
             settings: settings,
           );
@@ -214,6 +253,10 @@ class StaySmartApp extends StatelessWidget {
           final customer = args?['customer'] as Map<String, dynamic>?;
           final paymentMethod = args?['paymentMethod'] as String?;
           final roomCount = args?['roomCount'] as int? ?? 1;
+          final checkInDate = args?['checkInDate'] as DateTime?;
+          final checkOutDate = args?['checkOutDate'] as DateTime?;
+          final booking = args?['booking'] as Map<String, dynamic>?;
+          final payment = args?['payment'] as Map<String, dynamic>?;
           return MaterialPageRoute(
             builder: (context) => BillScreen(
               room: room,
@@ -221,6 +264,10 @@ class StaySmartApp extends StatelessWidget {
               customer: customer,
               paymentMethod: paymentMethod,
               roomCount: roomCount,
+              checkInDate: checkInDate,
+              checkOutDate: checkOutDate,
+              booking: booking,
+              payment: payment,
             ),
             settings: settings,
           );

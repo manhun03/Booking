@@ -1,54 +1,109 @@
 import 'package:flutter/material.dart';
 
 import '../utils/colors.dart';
+import 'widgets/responsive_page.dart';
 
 class BillScreen extends StatelessWidget {
   const BillScreen({
-    Key? key,
+    super.key,
     this.room,
     this.hotel,
     this.customer,
     this.paymentMethod,
     this.roomCount = 1,
-  }) : super(key: key);
+    this.checkInDate,
+    this.checkOutDate,
+    this.booking,
+    this.payment,
+  });
 
   final Map<String, dynamic>? room;
   final Map<String, dynamic>? hotel;
   final Map<String, dynamic>? customer;
   final String? paymentMethod;
   final int roomCount;
+  final DateTime? checkInDate;
+  final DateTime? checkOutDate;
+  final Map<String, dynamic>? booking;
+  final Map<String, dynamic>? payment;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ResponsivePageScaffold(
       backgroundColor: AppColors.colorBg,
-      body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(child: _buildHeader(context)),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate(
-                      [
-                        _buildHotelCard(),
-                        const SizedBox(height: 26),
-                        _buildMessageCard(),
-                        const SizedBox(height: 28),
-                        _buildRatingCard(),
-                      ],
+      mobileBody: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(child: _buildHeader(context)),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate(
+                [
+                  _buildHotelCard(),
+                  const SizedBox(height: 26),
+                  _buildMessageCard(),
+                  const SizedBox(height: 28),
+                  _buildRatingCard(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      desktopBody: WebAppShell(
+        title: 'Booking Confirmed',
+        subtitle:
+            'Xem tom tat dat phong, thong bao xac nhan va danh gia trai nghiem sau khi hoan tat.',
+        selectedIndex: 2,
+        child: _buildDesktopLayout(context),
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 6,
+          child: _buildHotelCard(),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          flex: 5,
+          child: Column(
+            children: [
+              _buildMessageCard(),
+              const SizedBox(height: 18),
+              _buildRatingCard(),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/booking',
+                      (route) => false,
+                    );
+                  },
+                  icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                  label: const Text('Xem booking cua toi'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.colorPrimary,
+                    foregroundColor: AppColors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -196,7 +251,7 @@ class BillScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '1 đêm, $safeRoomCount phòng cho $_guestText',
+                      '$_nightCount dem, 1 phong cho $_guestText',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -283,10 +338,15 @@ class BillScreen extends StatelessWidget {
   }
 
   Widget _buildMessageCard() {
+    final bookingId = booking?['id'];
+    final bookingStatus = _stringValue(booking?['status'], 'Dang cho xac nhan');
+    final paymentStatus = _stringValue(payment?['status'], '');
+    final paymentText =
+        paymentStatus.isEmpty ? '' : ' Trang thai thanh toan: $paymentStatus.';
     return _buildSection(
-      child: const Text(
-        'Bạn đã đặt phòng thành công, đơn xác nhận đã được gửi đến email của bạn. Vui lòng check gmail của bạn thật cẩn thận. ✉',
-        style: TextStyle(
+      child: Text(
+        "Dat phong thanh cong${bookingId == null ? '' : ' #$bookingId'}. Trang thai booking: $bookingStatus.$paymentText",
+        style: const TextStyle(
           fontSize: 12,
           height: 1.35,
           color: AppColors.textPrimary,
@@ -375,10 +435,10 @@ class BillScreen extends StatelessWidget {
   }
 
   String get _checkInDate =>
-      _stringValue(hotel?['checkIn'], 'Th 7, 27 Thg 9, 2025');
+      _formatDate(checkInDate ?? DateTime.now().add(const Duration(days: 1)));
 
   String get _checkOutDate =>
-      _stringValue(hotel?['checkOut'], 'Cn, 28 Thg 9, 2025');
+      _formatDate(checkOutDate ?? DateTime.now().add(const Duration(days: 2)));
 
   String get _guestText {
     final guests = room?['guests'];
@@ -386,10 +446,21 @@ class BillScreen extends StatelessWidget {
     return '2 người lớn';
   }
 
-  int get safeRoomCount => roomCount < 1 ? 1 : roomCount;
+  int get _nightCount {
+    final start = checkInDate ?? DateTime.now().add(const Duration(days: 1));
+    final end = checkOutDate ?? start.add(const Duration(days: 1));
+    final days = end.difference(start).inDays;
+    return days < 1 ? 1 : days;
+  }
 
   String _stringValue(dynamic value, String fallback) {
     if (value is String && value.trim().isNotEmpty) return value.trim();
     return fallback;
+  }
+
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
   }
 }

@@ -24,78 +24,21 @@ class _BookingScreenState extends State<BookingScreen> {
   late List<Map<String, dynamic>> _currentBookings;
   late List<Map<String, dynamic>> _historyBookings;
 
-  static const List<Map<String, dynamic>> _fallbackCurrentBookings = [
-    {
-      'name': 'Sunset Pearl Resort',
-      'location': '75 Trần Phú, Nha Trang',
-      'price': '3.000.000 VND / đêm',
-      'date': 'Ngày  12 - 14, Thg 03, 2024',
-      'detailDate': '28 - 30 Thg 10 2025',
-      'guests': 'Khách  2 Người (1 Phòng)',
-      'detailGuests': '2 Người (1 Phòng)',
-      'rating': '4.9',
-      'status': 'Đang đặt phòng',
-      'statusColor': AppColors.colorPrimary,
-      'statusAlignment': 'start',
-      'palette': [Color(0xFFD8A969), Color(0xFFF8E6C8), Color(0xFF7B4A2A)],
-      'variant': 0,
-    },
-  ];
-
-  static const List<Map<String, dynamic>> _fallbackHistoryBookings = [
-    {
-      'name': 'Ocean Breeze Hotel',
-      'location': '36 Lý Thường Kiệt, Hoàn Kiếm',
-      'price': '2.400.000 VND / đêm',
-      'date': 'Ngày  12 - 14, Thg 11, 2024',
-      'guests': 'Khách  2 Người lớn(1 Phòng)',
-      'rating': '4.7',
-      'status': 'Đã hủy',
-      'statusColor': Color(0xFFFF3B30),
-      'statusAlignment': 'end',
-      'palette': [Color(0xFF7E9277), Color(0xFFF3EFE2), Color(0xFF313A36)],
-      'variant': 1,
-    },
-    {
-      'name': 'Horizon Sky Hotel',
-      'location': '45 Bà Triệu, Hoàn Kiếm, Hà Nội',
-      'price': '2.700.000 VND / đêm',
-      'date': 'Ngày  08 - 10, Thg 09, 2024',
-      'guests': 'Khách  2 Người lớn(1 Phòng)',
-      'rating': '4.7',
-      'status': 'Hoàn thành',
-      'statusColor': Color(0xFF22C55E),
-      'statusAlignment': 'end',
-      'palette': [Color(0xFFB5653C), Color(0xFFF0C28A), Color(0xFF6A3F2D)],
-      'variant': 2,
-    },
-    {
-      'name': 'Velora Boutique Hotel',
-      'location': '92 Kim Mã, Ba Đình, Hà Nội',
-      'price': '3.600.000 VND / đêm',
-      'date': 'Ngày  15 - 17, Thg 05, 2025',
-      'guests': 'Khách  3 Người lớn(1 Phòng)',
-      'rating': '4.8',
-      'status': 'Hoàn thành',
-      'statusColor': Color(0xFF22C55E),
-      'statusAlignment': 'end',
-      'palette': [Color(0xFF9D947F), Color(0xFFF2EEE4), Color(0xFF6D675D)],
-      'variant': 3,
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
-    _currentBookings =
-        List<Map<String, dynamic>>.from(_fallbackCurrentBookings);
-    _historyBookings =
-        List<Map<String, dynamic>>.from(_fallbackHistoryBookings);
+    _currentBookings = [];
+    _historyBookings = [];
     _loadBookings();
   }
 
   Future<void> _loadBookings() async {
-    if (!ApiService().isAuthenticated) return;
+    if (!ApiService().isAuthenticated) {
+      setState(() {
+        _errorMessage = 'Vui long dang nhap de xem booking cua ban.';
+      });
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -479,28 +422,7 @@ class _BookingScreenState extends State<BookingScreen> {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: const BoxDecoration(
-              color: Color(0xFF1D6C96),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.local_hotel,
-              color: AppColors.white,
-              size: 17,
-            ),
-          ),
-          const SizedBox(width: 6),
-          const Text(
-            'StaySmart',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          const StaySmartBrandButton(),
           const Spacer(),
           _buildBellButton(context),
           const SizedBox(width: 18),

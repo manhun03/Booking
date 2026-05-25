@@ -51,8 +51,18 @@ public class Booking {
     private Integer cancelledBy;
     @Column(name = "CancelReason")
     private String cancelReason;
+    @Column(name = "CancellationFee")
+    private BigDecimal cancellationFee = BigDecimal.ZERO;
     @Column(name = "CancelledAt")
     private Instant cancelledAt;
+    @Column(name = "RejectedReason")
+    private String rejectedReason;
+    @Column(name = "RejectedAt")
+    private Instant rejectedAt;
+    @Column(name = "CheckedInAt")
+    private Instant checkedInAt;
+    @Column(name = "CheckedOutAt")
+    private Instant checkedOutAt;
     @Column(name = "CreatedAt")
     private Instant createdAt;
     @Column(name = "UpdatedAt")

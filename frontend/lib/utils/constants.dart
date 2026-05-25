@@ -13,10 +13,10 @@ class AppConstants {
     }
 
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080';
+      return 'http://10.0.2.2:8085';
     }
 
-    return 'http://localhost:8080';
+    return 'http://localhost:8085';
   }
 
   static String get apiBaseUrl {
@@ -25,6 +25,17 @@ class AppConstants {
     }
 
     return '$backendBaseUrl/api';
+  }
+
+  static String get chatWebSocketUrl {
+    final baseUrl = backendBaseUrl.replaceFirst(RegExp(r'/$'), '');
+    if (baseUrl.startsWith('https://')) {
+      return 'wss://${baseUrl.substring('https://'.length)}/ws';
+    }
+    if (baseUrl.startsWith('http://')) {
+      return 'ws://${baseUrl.substring('http://'.length)}/ws';
+    }
+    return '$baseUrl/ws';
   }
 
   // Durations

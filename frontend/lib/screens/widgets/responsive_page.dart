@@ -147,6 +147,92 @@ class WebPanel extends StatelessWidget {
   }
 }
 
+class StaySmartBrandButton extends StatelessWidget {
+  const StaySmartBrandButton({
+    super.key,
+    this.showLogo = true,
+    this.icon = Icons.local_hotel,
+    this.logoText,
+    this.circleSize = 34,
+    this.iconSize = 17,
+    this.spacing = 6,
+    this.circleColor = const Color(0xFF1D6C96),
+    this.iconColor = AppColors.white,
+    this.textStyle = const TextStyle(
+      color: AppColors.textPrimary,
+      fontSize: 13,
+      fontWeight: FontWeight.w800,
+    ),
+  });
+
+  final bool showLogo;
+  final IconData icon;
+  final String? logoText;
+  final double circleSize;
+  final double iconSize;
+  final double spacing;
+  final Color circleColor;
+  final Color iconColor;
+  final TextStyle textStyle;
+
+  static void goHome(BuildContext context) {
+    if (ModalRoute.of(context)?.settings.name == '/home') {
+      return;
+    }
+    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Home',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => goHome(context),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (showLogo) ...[
+                  Container(
+                    width: circleSize,
+                    height: circleSize,
+                    decoration: BoxDecoration(
+                      color: circleColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: logoText == null
+                          ? Icon(
+                              icon,
+                              color: iconColor,
+                              size: iconSize,
+                            )
+                          : Text(
+                              logoText!,
+                              style: TextStyle(
+                                color: iconColor,
+                                fontSize: iconSize,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                    ),
+                  ),
+                  SizedBox(width: spacing),
+                ],
+                Text('StaySmart', style: textStyle),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _WebBrandBar extends StatelessWidget {
   const _WebBrandBar();
 
@@ -162,23 +248,11 @@ class _WebBrandBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Row(
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1D6C96),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.local_hotel,
-                    color: AppColors.white,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'StaySmart',
-                  style: TextStyle(
+                const StaySmartBrandButton(
+                  circleSize: 36,
+                  iconSize: 18,
+                  spacing: 8,
+                  textStyle: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,

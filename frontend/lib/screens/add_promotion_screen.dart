@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../utils/colors.dart';
 import 'widgets/current_user_avatar.dart';
+import 'widgets/responsive_page.dart';
 
 class AddPromotionScreen extends StatefulWidget {
   const AddPromotionScreen({super.key});
@@ -80,9 +81,15 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ResponsivePageScaffold(
       backgroundColor: AppColors.colorBg,
-      body: SafeArea(
+      desktopBody: WebAppShell(
+        title: 'Promotion Code',
+        subtitle: 'Apply a voucher or enter a promo code for this booking.',
+        selectedIndex: 2,
+        child: _buildDesktopLayout(),
+      ),
+      mobileBody: SafeArea(
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
@@ -154,39 +161,110 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
     );
   }
 
+  Widget _buildDesktopLayout() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 380,
+          child: WebPanel(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Promo code',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Choose a voucher or enter a code manually.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Code',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildCodeField(),
+                const SizedBox(height: 24),
+                _buildSubmitButton(),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: WebPanel(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Available vouchers',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                for (var index = 0; index < _vouchers.length; index++)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: index == _vouchers.length - 1 ? 0 : 18,
+                    ),
+                    child: _buildVoucherCard(index),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubmitButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton(
+        onPressed: _submitPromotion,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.colorPrimary,
+          foregroundColor: AppColors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+        child: const Text(
+          'ThÃªm',
+          style: TextStyle(
+            color: AppColors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTopBar(BuildContext context) {
     return Container(
       color: AppColors.white,
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: const BoxDecoration(
-              color: Color(0xFF1D6C96),
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Text(
-                'E',
-                style: TextStyle(
-                  color: AppColors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          const Text(
-            'StaySmart',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          const StaySmartBrandButton(),
           const Spacer(),
           _buildBellButton(context),
           const SizedBox(width: 18),

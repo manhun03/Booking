@@ -5,7 +5,7 @@ import '../utils/strings.dart';
 import 'widgets/custom_text_field.dart';
 
 class SignUpScreen extends StatefulWidget {
-  const SignUpScreen({Key? key}) : super(key: key);
+  const SignUpScreen({super.key});
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
@@ -13,6 +13,7 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   late TextEditingController _nameController;
+  late TextEditingController _usernameController;
   late TextEditingController _emailController;
   late TextEditingController _passwordController;
   bool _obscurePassword = true;
@@ -22,6 +23,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController();
+    _usernameController = TextEditingController();
     _emailController = TextEditingController();
     _passwordController = TextEditingController();
   }
@@ -29,6 +31,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -42,11 +45,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Future<void> _handleSignUp() async {
     final name = _nameController.text.trim();
+    final username = _usernameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+    if (name.isEmpty || username.isEmpty || email.isEmpty || password.isEmpty) {
       _showMessage('Please fill in all fields');
+      return;
+    }
+
+    if (!_isValidUsername(username)) {
+      _showMessage(
+        'Username must be 4-20 characters and use only letters, numbers, or underscores.',
+      );
+      return;
+    }
+
+    if (!_isStrongPassword(password)) {
+      _showMessage(
+        'Password must be at least 8 characters and include uppercase, lowercase, number, and special character.',
+      );
       return;
     }
 
@@ -57,6 +75,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     try {
       await ApiService().register(
         fullName: name,
+        username: username,
         email: email,
         password: password,
       );
@@ -83,6 +102,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   void _goToHome() {
     Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+  }
+
+  bool _isValidUsername(String value) {
+    return RegExp(r'^[A-Za-z0-9_]{4,20}$').hasMatch(value);
+  }
+
+  bool _isStrongPassword(String value) {
+    return RegExp(
+      r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$',
+    ).hasMatch(value);
   }
 
   void _showMessage(String message) {
@@ -158,6 +187,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             icon: Icons.person_outline,
                             controller: _nameController,
                             keyboardType: TextInputType.name,
+                          ),
+                          const SizedBox(height: 20),
+
+                          CustomTextField(
+                            label: AppStrings.usernameLabel,
+                            hint: AppStrings.usernameHint,
+                            icon: Icons.alternate_email,
+                            controller: _usernameController,
+                            keyboardType: TextInputType.text,
                           ),
                           const SizedBox(height: 20),
 

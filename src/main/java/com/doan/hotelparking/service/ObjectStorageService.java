@@ -46,7 +46,7 @@ public class ObjectStorageService {
                     .object(objectKey)
                     .build());
         } catch (Exception ex) {
-            deleteLocal(objectKey);
+            deleteLocally(objectKey);
         }
     }
 
@@ -79,16 +79,14 @@ public class ObjectStorageService {
                 throw new IllegalArgumentException("Invalid upload path");
             }
             Files.createDirectories(target.getParent());
-            try (var input = file.getInputStream()) {
-                Files.copy(input, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            }
+            file.transferTo(target);
             return new UploadedObject(objectKey, "/uploads/" + objectKey.replace("\\", "/"));
         } catch (Exception ex) {
             throw new IllegalArgumentException("Unable to upload file: " + ex.getMessage(), ex);
         }
     }
 
-    private void deleteLocal(String objectKey) {
+    private void deleteLocally(String objectKey) {
         try {
             var uploadRoot = Path.of("uploads").toAbsolutePath().normalize();
             var target = uploadRoot.resolve(objectKey).normalize();

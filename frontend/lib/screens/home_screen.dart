@@ -17,30 +17,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   late List<Map<String, dynamic>> destinations;
 
-  static const List<Map<String, dynamic>> _fallbackDestinations = [
-    {
-      'name': 'Hà Nội',
-      'price': '5,450,000 VND',
-      'nights': '2 đêm',
-      'image': '🏛️',
-      'subtitle': 'Phố cổ, ẩm thực và khách sạn trung tâm',
-    },
-    {
-      'name': 'Nha Trang',
-      'price': '2,200,000 VND',
-      'nights': '1 đêm',
-      'image': '🏖️',
-      'subtitle': 'Biển xanh, resort và tour nghỉ dưỡng',
-    },
-    {
-      'name': 'Huế',
-      'price': '3,650,000 VND',
-      'nights': '2 đêm',
-      'image': '🏰',
-      'subtitle': 'Di sản, kiến trúc và không gian yên tĩnh',
-    },
-  ];
-
   final List<Map<String, dynamic>> festivals = const [
     {
       'title': 'Festival Nghỉ Dưỡng Biển 2026',
@@ -63,19 +39,22 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    destinations = List<Map<String, dynamic>>.from(_fallbackDestinations);
+    destinations = [];
     _loadDestinations();
   }
 
   Future<void> _loadDestinations() async {
     try {
       final hotels = await ApiService().fetchHotels(pageSize: 6);
-      if (!mounted || hotels.isEmpty) return;
+      if (!mounted) return;
       setState(() {
         destinations = hotels;
       });
     } catch (_) {
-      // Keep bundled demo data when the backend is not reachable.
+      if (!mounted) return;
+      setState(() {
+        destinations = [];
+      });
     }
   }
 
@@ -131,9 +110,9 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            'StaySmart',
-            style: TextStyle(
+          const StaySmartBrandButton(
+            showLogo: false,
+            textStyle: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: AppColors.colorPrimary,

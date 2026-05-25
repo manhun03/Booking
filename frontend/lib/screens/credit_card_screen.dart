@@ -344,28 +344,7 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: const BoxDecoration(
-              color: Color(0xFF1D6C96),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.local_hotel,
-              color: AppColors.white,
-              size: 17,
-            ),
-          ),
-          const SizedBox(width: 6),
-          const Text(
-            'StaySmart',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          const StaySmartBrandButton(),
           const Spacer(),
           _buildBellButton(context),
           const SizedBox(width: 18),

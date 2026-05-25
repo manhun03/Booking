@@ -27,7 +27,12 @@ class _RoomListScreenState extends State<RoomListScreen> {
 
   Future<void> _loadRooms() async {
     final hotelId = _hotelId;
-    if (hotelId == null) return;
+    if (hotelId == null) {
+      setState(() {
+        _errorMessage = 'Khong tim thay khach san de tai danh sach phong.';
+      });
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -51,70 +56,19 @@ class _RoomListScreenState extends State<RoomListScreen> {
   }
 
   int? get _hotelId {
-    final value = widget.hotel?['id'];
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value);
+    // Try from hotel parameter first
+    final hotelValue = widget.hotel?['id'];
+    if (hotelValue != null) {
+      if (hotelValue is int) return hotelValue;
+      if (hotelValue is num) return hotelValue.toInt();
+      if (hotelValue is String) return int.tryParse(hotelValue);
+    }
+
     return null;
   }
 
   void _initializeRooms() {
-    rooms = [
-      {
-        'name': 'Phòng Superieur với Giường Cỏ King',
-        'type': '1 giường đơn',
-        'image': '🏨',
-        'amenities': [
-          {'name': 'Đặt giường đôi', 'icon': '🛏️'},
-          {'name': 'Phòng tắm riêng', 'icon': '🚿'},
-          {'name': 'Phòng tắm công cộng', 'icon': '🚪'},
-          {'name': 'WiFi miễn phí', 'icon': '📶'},
-        ],
-        'policies': [
-          '🚫 Không được hủy miễn phí - Thanh toán khi đặt phòng',
-          '✓ Có thể hủy (hoàn tiền toàn bộ nếu hủy trước 14:00)',
-        ],
-        'price': 11934235,
-        'oldPrice': 13241450,
-        'selected': false,
-      },
-      {
-        'name': 'Suite Có Giường Cỡ King',
-        'type': '1 giường đôi',
-        'image': '🏨',
-        'amenities': [
-          {'name': 'Đặt giường đôi', 'icon': '🛏️'},
-          {'name': 'Phòng tắm riêng', 'icon': '🚿'},
-          {'name': 'TV Có Cáp vệ tinh', 'icon': '📺'},
-          {'name': 'WiFi miễn phí', 'icon': '📶'},
-        ],
-        'policies': [
-          '🚫 Không được hủy miễn phí - Thanh toán khi đặt phòng',
-          '✓ Có thể hủy (hoàn tiền toàn bộ nếu hủy trước 14:00)',
-        ],
-        'price': 7034235,
-        'oldPrice': 7260450,
-        'selected': false,
-      },
-      {
-        'name': 'Phòng Deluxe với Giường Cỡ King',
-        'type': '1 giường đôi',
-        'image': '🏨',
-        'amenities': [
-          {'name': 'Đặt giường đôi', 'icon': '🛏️'},
-          {'name': 'Phòng tắm riêng', 'icon': '🚿'},
-          {'name': 'TV Có Cáp vệ tinh', 'icon': '📺'},
-          {'name': 'WiFi miễn phí', 'icon': '📶'},
-        ],
-        'policies': [
-          '🚫 Không được hủy miễn phí - Thanh toán khi đặt phòng',
-          '✓ Có thể hủy (hoàn tiền toàn bộ nếu hủy trước 14:00)',
-        ],
-        'price': 7034235,
-        'oldPrice': 7260450,
-        'selected': false,
-      },
-    ];
+    rooms = [];
   }
 
   @override
@@ -245,28 +199,34 @@ class _RoomListScreenState extends State<RoomListScreen> {
                 onPressed: () => Navigator.pop(context),
               ),
               const SizedBox(width: 8),
-              const Text(
-                'Ch\u1ECDn ch\u1ED7 c\u1EE7a b\u1EA1n',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+              Expanded(
+                child: Text(
+                  _hotelName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
-            '27 thg 9 - 30 thg 9',
-            style: TextStyle(
+          Text(
+            _hotelLocation,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Gi\u00E1 \u0111\u00E3 \u0111\u01B0\u1EE3c \u0111\u1ED5i v\u1EDBi m\u1ED9t VND \u24D8',
-            style: TextStyle(
+          Text(
+            _priceHint,
+            style: const TextStyle(
               fontSize: 11,
               color: AppColors.textMuted,
             ),
@@ -335,7 +295,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
     }
 
     if (_errorMessage != null) {
-      return [_buildStateMessage(_errorMessage!)];
+      return [_buildErrorMessage(_errorMessage!)];
     }
 
     if (rooms.isEmpty) {
@@ -345,6 +305,62 @@ class _RoomListScreenState extends State<RoomListScreen> {
     return List.generate(
       rooms.length,
       _buildRoomCard,
+    );
+  }
+
+  Widget _buildErrorMessage(String message) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.red.shade900,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Builder(
+                builder: (context) => ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Quay lại'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.colorPrimary,
+                    foregroundColor: AppColors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Builder(
+                builder: (context) => ElevatedButton.icon(
+                  onPressed: () => Navigator.pushNamed(context, '/search'),
+                  icon: const Icon(Icons.search),
+                  label: const Text('Tìm khách sạn'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.colorSecondary,
+                    foregroundColor: AppColors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -372,6 +388,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
 
   Widget _buildRoomCard(int index) {
     final room = rooms[index];
+    final available = _isAvailable(room);
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -441,6 +458,27 @@ class _RoomListScreenState extends State<RoomListScreen> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: (available
+                            ? const Color(0xFF22C55E)
+                            : const Color(0xFFD97706))
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    available ? 'Còn phòng' : 'Không khả dụng',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: available
+                          ? const Color(0xFF16A34A)
+                          : const Color(0xFFD97706),
+                    ),
                   ),
                 ),
               ],
@@ -569,22 +607,26 @@ class _RoomListScreenState extends State<RoomListScreen> {
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.colorPrimary,
+                      disabledBackgroundColor: const Color(0xFFB8C0CC),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                    onPressed: () {
-                      // Navigate to room detail screen
-                      Navigator.pushNamed(
-                        context,
-                        '/room-detail',
-                        arguments: {
-                          'room': room,
-                          'hotel': widget.hotel,
-                        },
-                      );
-                    },
+                    onPressed: !available
+                        ? null
+                        : () {
+                            // Navigate to room detail screen
+                            Navigator.pushNamed(
+                              context,
+                              '/room-detail',
+                              arguments: {
+                                'room': room,
+                                'hotel': widget.hotel,
+                                'availableRooms': rooms.length,
+                              },
+                            );
+                          },
                     child: const Text(
                       'Chọn',
                       style: TextStyle(
@@ -596,10 +638,11 @@ class _RoomListScreenState extends State<RoomListScreen> {
                 ),
                 const SizedBox(height: 8),
                 // StaySmart Link
-                const Center(
+                Center(
                   child: Text(
-                    'Chi tiết 2 phòng trên StaySmart.com',
-                    style: TextStyle(
+                    'Chi tiết ${rooms.length} loại phòng tại $_hotelName',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
                       fontSize: 11,
                       color: AppColors.colorPrimary,
                       decoration: TextDecoration.underline,
@@ -619,5 +662,27 @@ class _RoomListScreenState extends State<RoomListScreen> {
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]}.',
         );
+  }
+
+  String get _hotelName {
+    final name = widget.hotel?['name']?.toString().trim();
+    return name == null || name.isEmpty ? 'Chọn chỗ của bạn' : name;
+  }
+
+  String get _hotelLocation {
+    final location = widget.hotel?['location']?.toString().trim();
+    return location == null || location.isEmpty
+        ? 'Đang cập nhật địa chỉ khách sạn'
+        : location;
+  }
+
+  String get _priceHint {
+    if (_isLoading) return 'Đang tải giá phòng mới nhất';
+    if (rooms.isEmpty) return 'Chưa có giá phòng khả dụng';
+    return 'Giá được lấy trực tiếp từ dữ liệu phòng hiện tại';
+  }
+
+  bool _isAvailable(Map<String, dynamic> room) {
+    return '${room['status'] ?? ''}'.toUpperCase() == 'AVAILABLE';
   }
 }

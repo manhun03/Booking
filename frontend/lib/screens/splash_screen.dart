@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 import '../utils/strings.dart';
 
@@ -19,10 +20,18 @@ class _SplashScreenState extends State<SplashScreen> {
 
   void _navigateToWelcome() {
     Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/welcome');
-      }
+      unawaited(_finishSplash());
     });
+  }
+
+  Future<void> _finishSplash() async {
+    final hasSession = await ApiService().restoreSession();
+    if (!mounted) return;
+    unawaited(
+      Navigator.of(context).pushReplacementNamed(
+        hasSession ? '/home' : '/welcome',
+      ),
+    );
   }
 
   @override
@@ -31,7 +40,7 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: AppColors.colorPrimary,
         ),
         child: Column(
@@ -48,7 +57,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   width: 3,
                 ),
               ),
-              child: Center(
+              child: const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -63,9 +72,9 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 24),
             // App Name
-            Text(
+            const Text(
               AppStrings.appName,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
@@ -74,10 +83,10 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 12),
             // Tagline
-            Text(
+            const Text(
               AppStrings.appTagline,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,

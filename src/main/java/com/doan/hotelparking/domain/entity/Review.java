@@ -32,6 +32,18 @@ public class Review {
     private byte rating;
     @Column(name = "Comment")
     private String comment;
+    @Column(name = "OwnerReply")
+    private String ownerReply;
+    @Column(name = "OwnerRepliedAt")
+    private Instant ownerRepliedAt;
+    @Column(name = "IsReported")
+    private boolean reported;
+    @Column(name = "ReportReason")
+    private String reportReason;
+    @Column(name = "IsVisible")
+    private boolean visible = true;
+    @Column(name = "ModeratedAt")
+    private Instant moderatedAt;
     @Column(name = "CreatedAt")
     private Instant createdAt;
 }

@@ -134,23 +134,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           constraints: const BoxConstraints(maxWidth: 1180),
           child: Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF1D6C96),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.local_hotel,
-                  color: AppColors.white,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'StaySmart',
-                style: TextStyle(
+              const StaySmartBrandButton(
+                circleSize: 36,
+                iconSize: 18,
+                spacing: 8,
+                textStyle: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,

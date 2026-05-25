@@ -25,9 +25,10 @@ public class FirebaseHealthIndicator implements HealthIndicator {
                     .withDetail("credentialsPath", path.toString())
                     .build();
         }
-        return Health.down()
+        return Health.up()
                 .withDetail("projectId", properties.projectId())
                 .withDetail("credentialsPath", path.toString())
+                .withDetail("available", false)
                 .withDetail("reason", "Firebase credentials file not found")
                 .build();
     }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../utils/constants.dart';
+import 'session_store.dart';
 
 class ApiException implements Exception {
   const ApiException(this.message);
@@ -36,6 +37,18 @@ class AuthSession {
       refreshToken: _stringValue(json['refreshToken']) ?? '',
       accessTokenExpiresAt: _dateTimeValue(json['accessTokenExpiresAt']),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'userId': userId,
+      'fullName': fullName,
+      'email': email,
+      'roles': roles,
+      'accessToken': accessToken,
+      'refreshToken': refreshToken,
+      'accessTokenExpiresAt': accessTokenExpiresAt?.toIso8601String(),
+    };
   }
 
   final int? userId;
@@ -86,6 +99,7 @@ class ApiService {
   AuthSession? _session;
   Map<String, dynamic>? _cachedUser;
   final ValueNotifier<int> _profileVersion = ValueNotifier<int>(0);
+  bool _restoreAttempted = false;
 
   AuthSession? get currentSession => _session;
   Map<String, dynamic>? get cachedUser => _cachedUser;
@@ -93,6 +107,49 @@ class ApiService {
 
   bool get isAuthenticated =>
       _session != null && _session!.accessToken.trim().isNotEmpty;
+
+  Future<bool> restoreSession({bool force = false}) async {
+    if (_session != null && !force) {
+      return true;
+    }
+    if (_restoreAttempted && !force) {
+      return isAuthenticated;
+    }
+
+    _restoreAttempted = true;
+    final stored = readStoredSession();
+    if (stored == null || stored.trim().isEmpty) {
+      return false;
+    }
+
+    try {
+      final decoded = jsonDecode(stored);
+      if (decoded is! Map<String, dynamic>) {
+        clearStoredSession();
+        return false;
+      }
+
+      final session = AuthSession.fromJson(decoded);
+      if (session.accessToken.isEmpty) {
+        clearStoredSession();
+        return false;
+      }
+
+      _session = session;
+      if (_shouldRefreshSession(session)) {
+        await refreshSession();
+      }
+
+      return isAuthenticated;
+    } on ApiException {
+      _session = null;
+      _cachedUser = null;
+      clearStoredSession();
+      return false;
+    } catch (_) {
+      return isAuthenticated;
+    }
+  }
 
   Future<AuthSession> login({
     required String email,
@@ -111,6 +168,7 @@ class ApiService {
 
   Future<AuthSession> register({
     required String fullName,
+    required String username,
     required String email,
     required String password,
   }) async {
@@ -120,6 +178,7 @@ class ApiService {
       body: {
         'lastName': nameParts.lastName,
         'firstName': nameParts.firstName,
+        'username': username.trim(),
         'email': email,
         'password': password,
         'role': 'Customer',
@@ -127,6 +186,82 @@ class ApiService {
     );
 
     return _setSession(data);
+  }
+
+  Future<AuthSession> refreshSession() async {
+    final refreshToken = _session?.refreshToken.trim();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      throw const ApiException('Refresh token was not found.');
+    }
+
+    final data = await _post(
+      '/auth/refresh-token',
+      body: {'refreshToken': refreshToken},
+    );
+    return _setSession(data);
+  }
+
+  Future<List<Map<String, dynamic>>> fetchChatConversations() async {
+    final data = await _get('/messages/conversations');
+    return _listFromData(data).map(_mapChatConversation).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> fetchChatContacts() async {
+    final data = await _get('/messages/contacts');
+    return _listFromData(data).map(_mapChatConversation).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> fetchChatMessages(int otherUserId) async {
+    final data = await _get('/messages/conversation/$otherUserId');
+    return _listFromData(data).map(_mapChatMessage).toList();
+  }
+
+  Future<Map<String, dynamic>> sendChatMessage({
+    required int receiverId,
+    required String content,
+    int? bookingId,
+  }) async {
+    final data = await _post(
+      '/messages',
+      body: {
+        'receiverId': receiverId,
+        'bookingId': bookingId,
+        'content': content,
+      },
+    );
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid chat message response.');
+    }
+    return _mapChatMessage(data);
+  }
+
+  Future<Map<String, dynamic>> markChatMessageRead(int id) async {
+    final data = await _post('/messages/$id/read');
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid chat message response.');
+    }
+    return _mapChatMessage(data);
+  }
+
+  Future<Map<String, dynamic>> sendAiChatMessage({
+    required String message,
+    String? threadId,
+  }) async {
+    final trimmedMessage = message.trim();
+    if (trimmedMessage.isEmpty) {
+      throw const ApiException('Message cannot be empty.');
+    }
+
+    final data = await _postRaw(
+      '/ai-chat/chat',
+      body: {
+        'message': trimmedMessage,
+        if (threadId != null && threadId.trim().isNotEmpty)
+          'threadId': threadId.trim(),
+      },
+    );
+
+    return _mapAiChatResponse(data);
   }
 
   Future<List<Map<String, dynamic>>> fetchHotels({
@@ -159,6 +294,69 @@ class ApiService {
     return _mapHotel(data);
   }
 
+  Future<List<Map<String, dynamic>>> fetchHotelImages(int hotelId) async {
+    final data = await _get('/hotels/$hotelId/images/ordered');
+    return _listFromData(data).map(_mapHotelImage).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> fetchReviewsByHotel(int hotelId) async {
+    final data = await _get('/reviews/by-hotel/$hotelId');
+    return _listFromData(data);
+  }
+
+  Future<Map<String, dynamic>> createHotel({
+    required String name,
+    required String street,
+    required String phone,
+    required String description,
+    int? wardId,
+    String status = 'ACTIVE',
+  }) async {
+    final data = await _post(
+      '/hotels',
+      body: {
+        'name': name,
+        'street': street,
+        'phone': phone,
+        'description': description,
+        'wardId': wardId,
+        'status': status,
+      },
+    );
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid hotel response.');
+    }
+    return _mapHotel(data['data'] ?? data);
+  }
+
+  Future<Map<String, dynamic>> updateHotel({
+    required int id,
+    required String name,
+    required String street,
+    required String phone,
+    required String description,
+    String status = 'ACTIVE',
+  }) async {
+    final data = await _put(
+      '/hotels/$id',
+      body: {
+        'name': name,
+        'street': street,
+        'phone': phone,
+        'description': description,
+        'status': status,
+      },
+    );
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid hotel response.');
+    }
+    return _mapHotel(data['data'] ?? data);
+  }
+
+  Future<void> deleteHotel(int id) async {
+    await _delete('/hotels/$id');
+  }
+
   Future<List<Map<String, dynamic>>> fetchRoomsByHotel(int hotelId) async {
     final data = await _get(
       '/rooms/by-hotel',
@@ -166,6 +364,27 @@ class ApiService {
     );
 
     return _listFromData(data).map(_mapRoom).toList();
+  }
+
+  Future<int?> fetchRoomPriceForDates({
+    required int roomId,
+    required DateTime checkInDate,
+    required DateTime checkOutDate,
+  }) async {
+    final data = await _get('/time-slots/room/$roomId');
+    final checkIn = _dateOnlyUtc(checkInDate);
+    final checkOut = _dateOnlyUtc(checkOutDate);
+
+    for (final slot in _listFromData(data)) {
+      if (slot['active'] != true) continue;
+      final start = _dateTimeValue(slot['startDate']);
+      final end = _dateTimeValue(slot['endDate']);
+      if (start == null || end == null) continue;
+      if (!start.toUtc().isAfter(checkIn) && !end.toUtc().isBefore(checkOut)) {
+        return _numValue(slot['price'])?.round();
+      }
+    }
+    return null;
   }
 
   Future<List<Map<String, dynamic>>> fetchMyBookings({
@@ -192,14 +411,17 @@ class ApiService {
     String? note,
     String? paymentMethod,
   }) async {
-    final checkIn = checkInDate ?? DateTime.now().add(const Duration(days: 1));
-    final checkOut = checkOutDate ?? checkIn.add(const Duration(days: 1));
+    final checkIn = _dateOnlyUtc(
+      checkInDate ?? DateTime.now().add(const Duration(days: 1)),
+    );
+    final checkOut =
+        _dateOnlyUtc(checkOutDate ?? checkIn.add(const Duration(days: 1)));
     final data = await _post(
       '/bookings/request',
       body: {
         'roomId': roomId,
-        'checkInDate': checkIn.toUtc().toIso8601String(),
-        'checkOutDate': checkOut.toUtc().toIso8601String(),
+        'checkInDate': checkIn.toIso8601String(),
+        'checkOutDate': checkOut.toIso8601String(),
         'guestCount': guestCount < 1 ? 1 : guestCount,
         'paidAmount': paidAmount < 0 ? 0 : paidAmount,
         'paymentMethod': paymentMethod,
@@ -211,6 +433,95 @@ class ApiService {
       throw const ApiException('Invalid booking response.');
     }
     return _mapBooking(data);
+  }
+
+  Future<Map<String, dynamic>> cancelBooking({
+    required int id,
+    String? reason,
+  }) async {
+    final trimmedReason = reason?.trim();
+    final data = await _post(
+      '/bookings/$id/cancel',
+      body: {
+        if (trimmedReason != null && trimmedReason.isNotEmpty)
+          'reason': trimmedReason,
+      },
+    );
+
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid booking cancellation response.');
+    }
+    return _mapBooking(data);
+  }
+
+  Future<Map<String, dynamic>> changeBooking({
+    required int id,
+    int? roomId,
+    DateTime? checkInDate,
+    DateTime? checkOutDate,
+    int? guestCount,
+    String? note,
+  }) async {
+    final trimmedNote = note?.trim();
+    final data = await _put(
+      '/bookings/$id/change',
+      body: {
+        if (roomId != null) 'roomId': roomId,
+        if (checkInDate != null)
+          'checkInDate': _dateOnlyUtc(checkInDate).toIso8601String(),
+        if (checkOutDate != null)
+          'checkOutDate': _dateOnlyUtc(checkOutDate).toIso8601String(),
+        if (guestCount != null) 'guestCount': guestCount < 1 ? 1 : guestCount,
+        if (trimmedNote != null && trimmedNote.isNotEmpty) 'note': trimmedNote,
+      },
+    );
+
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid booking change response.');
+    }
+    return _mapBooking(data);
+  }
+
+  Future<Map<String, dynamic>> initiatePayment({
+    required int bookingId,
+    int? amount,
+    String provider = 'MOCK',
+    String method = 'CARD',
+  }) async {
+    final data = await _post(
+      '/payments/initiate',
+      body: {
+        'bookingId': bookingId,
+        'amount': amount,
+        'provider': provider,
+        'method': method,
+      },
+    );
+
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid payment response.');
+    }
+    return _mapPayment(data);
+  }
+
+  Future<Map<String, dynamic>> completePayment({
+    required String transactionCode,
+    String? gatewayTransactionId,
+    String status = 'COMPLETED',
+  }) async {
+    final data = await _post(
+      '/payments/webhook',
+      body: {
+        'transactionCode': transactionCode,
+        'gatewayTransactionId': gatewayTransactionId,
+        'status': status,
+      },
+    );
+
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid payment completion response.');
+    }
+    return _mapPayment(data);
   }
 
   Future<List<Map<String, dynamic>>> fetchFavoriteHotels() async {
@@ -286,6 +597,7 @@ class ApiService {
     required List<int> bytes,
     required String fileName,
   }) async {
+    await _ensureActiveSession('/users/me/avatar');
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('${AppConstants.apiBaseUrl}/users/me/avatar'),
@@ -323,6 +635,7 @@ class ApiService {
   void logout() {
     _session = null;
     _cachedUser = null;
+    clearStoredSession();
     _notifyProfileChanged();
   }
 
@@ -330,6 +643,7 @@ class ApiService {
     String endpoint, {
     Map<String, dynamic>? body,
   }) async {
+    await _ensureActiveSession(endpoint);
     final response = await _client
         .post(
           Uri.parse('${AppConstants.apiBaseUrl}$endpoint'),
@@ -341,10 +655,47 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  Future<dynamic> _postRaw(
+    String endpoint, {
+    Map<String, dynamic>? body,
+  }) async {
+    await _ensureActiveSession(endpoint);
+    final response = await _client
+        .post(
+          Uri.parse('${AppConstants.apiBaseUrl}$endpoint'),
+          headers: _headers,
+          body: body == null ? null : jsonEncode(body),
+        )
+        .timeout(AppConstants.apiTimeout);
+
+    final decoded = _decodeResponse(response);
+    final isSuccessStatus =
+        response.statusCode >= 200 && response.statusCode < 300;
+    if (isSuccessStatus) {
+      return decoded;
+    }
+
+    if (decoded is Map<String, dynamic>) {
+      final message = _stringValue(decoded['message']) ??
+          _stringValue(decoded['error']) ??
+          _stringValue(decoded['detail']);
+      if (message != null) {
+        throw ApiException(message);
+      }
+    }
+
+    if (decoded is String && decoded.trim().isNotEmpty) {
+      throw ApiException(decoded.trim());
+    }
+
+    throw ApiException(_defaultErrorMessage(response.statusCode));
+  }
+
   Future<dynamic> _get(
     String endpoint, {
     Map<String, Object?>? queryParameters,
   }) async {
+    await _ensureActiveSession(endpoint);
     final uri = Uri.parse('${AppConstants.apiBaseUrl}$endpoint').replace(
       queryParameters: _queryParameters(queryParameters),
     );
@@ -362,11 +713,24 @@ class ApiService {
     String endpoint, {
     required Map<String, dynamic> body,
   }) async {
+    await _ensureActiveSession(endpoint);
     final response = await _client
         .put(
           Uri.parse('${AppConstants.apiBaseUrl}$endpoint'),
           headers: _headers,
           body: jsonEncode(body),
+        )
+        .timeout(AppConstants.apiTimeout);
+
+    return _handleResponse(response);
+  }
+
+  Future<dynamic> _delete(String endpoint) async {
+    await _ensureActiveSession(endpoint);
+    final response = await _client
+        .delete(
+          Uri.parse('${AppConstants.apiBaseUrl}$endpoint'),
+          headers: _headers,
         )
         .timeout(AppConstants.apiTimeout);
 
@@ -431,10 +795,23 @@ class ApiService {
       'guests': '2 nguoi lon (1 phong)',
       'nights': '1 dem',
       'image': '\u{1F3E8}',
+      'imageUrl': _resourceUrl(raw['imageUrl']),
       'icon': Icons.apartment_outlined,
       'color': palette.first,
       'palette': palette,
       'colors': [palette.first, palette.last],
+      'backend': raw,
+    };
+  }
+
+  Map<String, dynamic> _mapHotelImage(Map<String, dynamic> raw) {
+    return {
+      'id': _intValue(raw['id']),
+      'hotelId': _intValue(raw['hotelId']),
+      'imageUrl': _resourceUrl(raw['imageUrl']) ?? '',
+      'objectKey': _stringValue(raw['objectKey']),
+      'isPrimary': raw['isPrimary'] == true || raw['primary'] == true,
+      'sortOrder': _intValue(raw['sortOrder']) ?? 0,
       'backend': raw,
     };
   }
@@ -453,6 +830,7 @@ class ApiService {
       'name': 'Phong $roomNumber',
       'type': '$capacity nguoi lon',
       'capacity': capacity,
+      'guests': '$capacity nguoi lon',
       'image': '\u{1F3E8}',
       'amenities': const [
         {'name': 'Giuong doi', 'icon': '-'},
@@ -465,6 +843,13 @@ class ApiService {
       ],
       'price': price,
       'oldPrice': price > 0 ? (price * 1.08).round() : null,
+      'taxAndFee': 0,
+      'extraFee': 0,
+      'description': capacity >= 3
+          ? 'Phu hop cho gia dinh hoac nhom nho'
+          : 'Phu hop cho chuyen di ca nhan hoac cap doi',
+      'cancellationPolicy': 'Theo chinh sach cua khach san',
+      'paymentNote': 'Thanh toan va xac nhan theo yeu cau dat phong',
       'status': _stringValue(raw['status']),
       'selected': false,
       'backend': raw,
@@ -510,6 +895,24 @@ class ApiService {
     };
   }
 
+  Map<String, dynamic> _mapPayment(Map<String, dynamic> raw) {
+    return {
+      'id': _intValue(raw['id'] ?? raw['paymentId']),
+      'bookingId': _intValue(raw['bookingId']),
+      'amount': _numValue(raw['amount']),
+      'method': _stringValue(raw['method']),
+      'provider': _stringValue(raw['provider']),
+      'status': _stringValue(raw['status']),
+      'transactionCode': _stringValue(raw['transactionCode']),
+      'gatewayTransactionId': _stringValue(raw['gatewayTransactionId']),
+      'checkoutUrl': _stringValue(raw['checkoutUrl']),
+      'failureReason': _stringValue(raw['failureReason']),
+      'paidAt': _stringValue(raw['paidAt']),
+      'createdAt': _stringValue(raw['createdAt']),
+      'backend': raw,
+    };
+  }
+
   Map<String, dynamic> _mapFavoriteHotel(Map<String, dynamic> raw) {
     final hotelId = _intValue(raw['hotelId']) ?? 0;
     final palette = _hotelPalette(hotelId);
@@ -551,12 +954,59 @@ class ApiService {
     };
   }
 
+  Map<String, dynamic> _mapChatConversation(Map<String, dynamic> raw) {
+    final userId = _intValue(raw['userId']) ?? 0;
+    final lastMessageAt = _dateTimeValue(raw['lastMessageAt']);
+    return {
+      'id': userId,
+      'userId': userId,
+      'name': _stringValue(raw['displayName']) ??
+          _stringValue(raw['email']) ??
+          'User #$userId',
+      'email': _stringValue(raw['email']) ?? '',
+      'message': _stringValue(raw['lastMessage']) ?? 'Bat dau tro chuyen',
+      'time': _formatChatTime(lastMessageAt),
+      'lastMessageAt': lastMessageAt,
+      'unread': _intValue(raw['unreadCount']) ?? 0,
+      'online': false,
+      'tag': 'Chat',
+      'backend': raw,
+    };
+  }
+
+  Map<String, dynamic> _mapChatMessage(Map<String, dynamic> raw) {
+    final createdAt = _dateTimeValue(raw['createdAt']);
+    return {
+      'id': _intValue(raw['id']) ?? 0,
+      'senderId': _intValue(raw['senderId']),
+      'receiverId': _intValue(raw['receiverId']),
+      'bookingId': _intValue(raw['bookingId']),
+      'content': _stringValue(raw['content']) ?? '',
+      'read': raw['read'] == true,
+      'createdAt': createdAt,
+      'readAt': _dateTimeValue(raw['readAt']),
+      'time': _formatChatTime(createdAt),
+      'backend': raw,
+    };
+  }
+
+  Map<String, dynamic> _mapAiChatResponse(dynamic raw) {
+    final threadId = _aiThreadId(raw);
+    final content = _aiText(raw) ?? 'AI chua tra ve noi dung phu hop.';
+
+    return {
+      'threadId': threadId,
+      'content': content,
+      'backend': raw,
+    };
+  }
+
   void _refreshSessionUser(Map<String, dynamic> user) {
     final session = _session;
     if (session == null) return;
 
     _session = AuthSession(
-      userId: session.userId,
+      userId: session.userId ?? _intValue(user['id']),
       fullName: _stringValue(user['fullName']),
       email: session.email,
       roles: session.roles,
@@ -564,6 +1014,7 @@ class ApiService {
       refreshToken: session.refreshToken,
       accessTokenExpiresAt: session.accessTokenExpiresAt,
     );
+    _persistSession();
   }
 
   void _notifyProfileChanged() {
@@ -594,9 +1045,13 @@ class ApiService {
     switch (status) {
       case 'CONFIRMED':
         return const Color(0xFF2864A7);
+      case 'CHECKED_IN':
+        return const Color(0xFF7C3AED);
       case 'COMPLETED':
+      case 'CHECKED_OUT':
         return const Color(0xFF22C55E);
       case 'CANCELLED':
+      case 'REJECTED':
         return const Color(0xFFFF3B30);
       default:
         return const Color(0xFFD97706);
@@ -605,19 +1060,30 @@ class ApiService {
 
   String _statusLabel(String status) {
     switch (status) {
+      case 'PENDING':
+        return 'Dang cho xac nhan';
       case 'CONFIRMED':
         return 'Da xac nhan';
+      case 'CHECKED_IN':
+        return 'Da check-in';
+      case 'CHECKED_OUT':
+        return 'Da check-out';
       case 'COMPLETED':
         return 'Hoan thanh';
       case 'CANCELLED':
         return 'Da huy';
+      case 'REJECTED':
+        return 'Da tu choi';
       default:
         return 'Dang cho xac nhan';
     }
   }
 
   bool _isHistoryStatus(String status) {
-    return status == 'COMPLETED' || status == 'CANCELLED';
+    return status == 'COMPLETED' ||
+        status == 'CHECKED_OUT' ||
+        status == 'CANCELLED' ||
+        status == 'REJECTED';
   }
 
   String _dateRange(DateTime? checkIn, DateTime? checkOut) {
@@ -630,6 +1096,22 @@ class ApiService {
     final day = local.day.toString().padLeft(2, '0');
     final month = local.month.toString().padLeft(2, '0');
     return '$day/$month/${local.year}';
+  }
+
+  String _formatChatTime(DateTime? value) {
+    if (value == null) return '';
+    final local = value.toLocal();
+    final now = DateTime.now();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    if (local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day) {
+      return '$hour:$minute';
+    }
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    return '$day/$month $hour:$minute';
   }
 
   String _formatCurrency(num amount) {
@@ -662,6 +1144,101 @@ class ApiService {
     return text == null || text.isEmpty ? null : text;
   }
 
+  String? _aiText(dynamic value) {
+    if (value is String) return _stringValue(value);
+
+    if (value is List) {
+      for (final item in value.reversed) {
+        final text = _aiText(item);
+        if (text != null) return text;
+      }
+      return null;
+    }
+
+    if (value is! Map) return null;
+
+    final directKeys = [
+      'reply',
+      'answer',
+      'response',
+      'outputText',
+      'output_text',
+      'content',
+      'text',
+    ];
+    for (final key in directKeys) {
+      final raw = value[key];
+      final text = raw is Map || raw is List ? _aiText(raw) : _stringValue(raw);
+      if (text != null) return text;
+    }
+
+    final message = value['message'];
+    if (message is String) {
+      final text = _stringValue(message);
+      if (text != null) return text;
+    }
+    if (message is Map || message is List) {
+      final text = _aiText(message);
+      if (text != null) return text;
+    }
+
+    final choices = value['choices'];
+    if (choices is List) {
+      for (final choice in choices) {
+        final text = _aiText(choice);
+        if (text != null) return text;
+      }
+    }
+
+    final messages = value['messages'];
+    if (messages is List) {
+      for (final item in messages.reversed) {
+        if (item is Map) {
+          final role = _stringValue(item['role'])?.toLowerCase();
+          if (role == null || role == 'assistant' || role == 'ai') {
+            final text = _aiText(item);
+            if (text != null) return text;
+          }
+        } else {
+          final text = _aiText(item);
+          if (text != null) return text;
+        }
+      }
+    }
+
+    final data = value['data'];
+    if (data != null) {
+      final text = _aiText(data);
+      if (text != null) return text;
+    }
+
+    final output = value['output'];
+    if (output != null) {
+      final text = _aiText(output);
+      if (text != null) return text;
+    }
+
+    return null;
+  }
+
+  String? _aiThreadId(dynamic value) {
+    if (value is! Map) return null;
+    for (final key in [
+      'threadId',
+      'thread_id',
+      'conversationId',
+      'conversation_id',
+      'sessionId',
+      'session_id',
+    ]) {
+      final text = _stringValue(value[key]);
+      if (text != null) return text;
+    }
+    final data = value['data'];
+    if (data is Map) return _aiThreadId(data);
+    return null;
+  }
+
   String? _resourceUrl(dynamic value) {
     final text = _stringValue(value);
     if (text == null) return null;
@@ -677,6 +1254,10 @@ class ApiService {
   DateTime? _dateTimeValue(dynamic value) {
     final text = _stringValue(value);
     return text == null ? null : DateTime.tryParse(text);
+  }
+
+  DateTime _dateOnlyUtc(DateTime value) {
+    return DateTime.utc(value.year, value.month, value.day);
   }
 
   Map<String, String> get _headers {
@@ -760,7 +1341,48 @@ class ApiService {
     }
 
     _session = session;
+    _persistSession();
     return session;
+  }
+
+  bool _shouldRefreshSession(AuthSession session) {
+    final expiresAt = session.accessTokenExpiresAt;
+    if (expiresAt == null) return false;
+    return DateTime.now().toUtc().isAfter(
+          expiresAt.toUtc().subtract(const Duration(minutes: 2)),
+        );
+  }
+
+  void _persistSession() {
+    final session = _session;
+    if (session == null) {
+      clearStoredSession();
+      return;
+    }
+    writeStoredSession(jsonEncode(session.toJson()));
+  }
+
+  Future<void> _ensureActiveSession(String endpoint) async {
+    if (_isAuthEndpoint(endpoint)) return;
+
+    final session = _session;
+    if (session == null || !_shouldRefreshSession(session)) {
+      return;
+    }
+
+    try {
+      await refreshSession();
+    } on ApiException {
+      logout();
+      rethrow;
+    } catch (_) {
+      // Keep the current token when refresh cannot be reached; the request may
+      // still succeed if the token is not actually expired yet.
+    }
+  }
+
+  bool _isAuthEndpoint(String endpoint) {
+    return endpoint.startsWith('/auth/');
   }
 
   _NameParts _splitFullName(String fullName) {
