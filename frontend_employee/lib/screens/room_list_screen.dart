@@ -1,88 +1,151 @@
 import 'package:flutter/material.dart';
 
-class RoomListScreen extends StatelessWidget {
-  const RoomListScreen({super.key});
+import '../services/auth_service.dart';
+import '../services/owner_api_service.dart';
+import '../utils/display_format.dart';
 
-  final Color primaryBlue = const Color(0xFF3F63B5);
+class RoomListScreen extends StatefulWidget {
+  const RoomListScreen({super.key, this.hotel});
+
+  final Map<String, dynamic>? hotel;
+
+  @override
+  State<RoomListScreen> createState() => _RoomListScreenState();
+}
+
+class _RoomListScreenState extends State<RoomListScreen> {
+  static const Color _primaryBlue = Color(0xFF3F63B5);
+  final OwnerApiService _api = OwnerApiService();
+
+  List<Map<String, dynamic>> _rooms = const [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final allRooms = await _api.fetchRooms();
+      final hotelId = widget.hotel == null
+          ? null
+          : intValue(widget.hotel!['id']);
+      final rooms = hotelId == null
+          ? allRooms
+          : allRooms
+                .where((room) => intValue(room['hotelId']) == hotelId)
+                .toList();
+      if (!mounted) return;
+      setState(() {
+        _rooms = rooms;
+        _loading = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.message;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _openForm([Map<String, dynamic>? room]) async {
+    final result = await Navigator.pushNamed(
+      context,
+      '/room-form',
+      arguments: {'room': room, 'hotel': widget.hotel},
+    );
+    if (result == true) await _load();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final subtitle = widget.hotel == null
+        ? null
+        : textValue(widget.hotel!['name']);
     return Scaffold(
-      backgroundColor: Colors.grey[200],
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 450),
-          child: Container(
-            decoration: BoxDecoration(boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20)]),
-            child: Scaffold(
-              backgroundColor: const Color(0xFFF8F9FA),
-              appBar: AppBar(
-                backgroundColor: Colors.white,
-                elevation: 0,
-                leading: const BackButton(color: Colors.black87),
-                title: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Quản lý Phòng', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 18)),
-                    Text('White Hotel - Hoàn Kiếm', style: TextStyle(color: Colors.black54, fontSize: 12)),
-                  ],
-                ),
+      backgroundColor: const Color(0xFFF5F7FB),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Quan ly phong'),
+            if (subtitle != null)
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
               ),
-              body: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  _buildRoomCard('Phòng 301', 'Deluxe Double', '1.200.000 đ', 'CÓ SẴN', Colors.green),
-                  const SizedBox(height: 12),
-                  _buildRoomCard('Phòng 302', 'Suite Family', '2.500.000 đ', 'ĐANG BẢO TRÌ', Colors.red),
-                  const SizedBox(height: 12),
-                  _buildRoomCard('Phòng 303', 'Standard', '800.000 đ', 'CÓ SẴN', Colors.green),
-                ],
-              ),
-              floatingActionButton: FloatingActionButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/room-form');
-                },
-                backgroundColor: primaryBlue,
-                child: const Icon(Icons.add, color: Colors.white),
-              ),
-            ),
-          ),
+          ],
         ),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Text(_error!, style: const TextStyle(color: Colors.red)),
+            )
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: _rooms.isEmpty
+                  ? ListView(
+                      children: const [
+                        SizedBox(height: 160),
+                        Center(child: Text('Chua co phong nao.')),
+                      ],
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _rooms.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (_, index) => _roomCard(_rooms[index]),
+                    ),
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _openForm(),
+        backgroundColor: _primaryBlue,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildRoomCard(String roomNumber, String type, String price, String status, Color statusColor) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 5))]),
-      child: Row(
-        children: [
-          Container(
-            width: 60, height: 60,
-            decoration: BoxDecoration(color: const Color(0xFFF8F9FA), borderRadius: BorderRadius.circular(12)),
-            child: const Center(child: Icon(Icons.bed, color: Colors.black45, size: 30)),
+  Widget _roomCard(Map<String, dynamic> room) {
+    final status = textValue(room['status'], 'UNAVAILABLE');
+    final color = switch (status) {
+      'AVAILABLE' => Colors.green,
+      'OCCUPIED' => _primaryBlue,
+      'MAINTENANCE' => Colors.orange,
+      _ => Colors.red,
+    };
+    return Card(
+      elevation: 0,
+      child: ListTile(
+        onTap: () => _openForm(room),
+        leading: const CircleAvatar(child: Icon(Icons.bed_outlined)),
+        title: Text(
+          'Phong ${textValue(room['roomNumber'])}',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          'Suc chua: ${intValue(room['capacity'])} khach | ${formatMoney(room['price'])}',
+        ),
+        trailing: Text(
+          status,
+          style: TextStyle(
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(roomNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    Text(status, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(type, style: const TextStyle(color: Colors.black54, fontSize: 13)),
-                const SizedBox(height: 4),
-                Text(price, style: const TextStyle(color: Color(0xFF3F63B5), fontWeight: FontWeight.bold, fontSize: 14)),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

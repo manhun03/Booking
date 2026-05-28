@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/language_service.dart';
 import '../utils/colors.dart';
 import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
@@ -12,52 +13,69 @@ class MoreScreen extends StatefulWidget {
 }
 
 class _MoreScreenState extends State<MoreScreen> {
+  final LanguageService _language = LanguageService();
   int _selectedIndex = 4;
 
-  static const List<Map<String, dynamic>> _menuItems = [
-    {
-      'icon': Icons.person_outline,
-      'title': 'Account Settings',
-      'subtitle': 'Manage your profile and personal information',
-      'route': '/user-profile',
-      'color': AppColors.colorPrimary,
-    },
-    {
-      'icon': Icons.favorite_border,
-      'title': 'Favorites',
-      'subtitle': 'Review hotels and rooms you saved',
-      'route': '/favorite',
-      'color': Color(0xFFE11D48),
-    },
-    {
-      'icon': Icons.card_giftcard_outlined,
-      'title': 'Promotions',
-      'subtitle': 'Apply deals and limited hotel offers',
-      'route': '/promotion',
-      'color': Color(0xFFD97706),
-    },
-    {
-      'icon': Icons.language_outlined,
-      'title': 'Language',
-      'subtitle': 'Change app language and region',
-      'route': '/language',
-      'color': Color(0xFF0891B2),
-    },
-    {
-      'icon': Icons.privacy_tip_outlined,
-      'title': 'Privacy Policy',
-      'subtitle': 'Terms, privacy and booking policies',
-      'route': '/legal-policies',
-      'color': Color(0xFF7C3AED),
-    },
-    {
-      'icon': Icons.logout,
-      'title': 'Logout',
-      'subtitle': 'Sign out of your account',
-      'route': '',
-      'color': Color(0xFFDC2626),
-    },
-  ];
+  List<Map<String, dynamic>> get _menuItems => [
+        {
+          'icon': Icons.person_outline,
+          'title': _language.t('more.accountSettings'),
+          'subtitle': _language.t('more.accountSettingsSubtitle'),
+          'route': '/user-profile',
+          'color': AppColors.colorPrimary,
+        },
+        {
+          'icon': Icons.favorite_border,
+          'title': _language.t('profile.favorites'),
+          'subtitle': _language.t('more.favoritesSubtitle'),
+          'route': '/favorite',
+          'color': const Color(0xFFE11D48),
+        },
+        {
+          'icon': Icons.card_giftcard_outlined,
+          'title': _language.t('profile.promotions'),
+          'subtitle': _language.t('more.promotionsSubtitle'),
+          'route': '/promotion',
+          'color': const Color(0xFFD97706),
+        },
+        {
+          'icon': Icons.language_outlined,
+          'title': _language.t('profile.language'),
+          'subtitle': _language.t('more.languageSubtitle'),
+          'route': '/language',
+          'color': const Color(0xFF0891B2),
+        },
+        {
+          'icon': Icons.privacy_tip_outlined,
+          'title': _language.t('more.privacyPolicy'),
+          'subtitle': _language.t('more.privacyPolicySubtitle'),
+          'route': '/legal-policies',
+          'color': const Color(0xFF7C3AED),
+        },
+        {
+          'icon': Icons.logout,
+          'title': _language.t('profile.logout'),
+          'subtitle': _language.t('more.logoutSubtitle'),
+          'route': '',
+          'color': const Color(0xFFDC2626),
+        },
+      ];
+
+  @override
+  void initState() {
+    super.initState();
+    _language.addListener(_refreshLanguage);
+  }
+
+  @override
+  void dispose() {
+    _language.removeListener(_refreshLanguage);
+    super.dispose();
+  }
+
+  void _refreshLanguage() {
+    if (mounted) setState(() {});
+  }
 
   void _onBottomNavTapped(int index) {
     setState(() {
@@ -121,9 +139,8 @@ class _MoreScreenState extends State<MoreScreen> {
 
   Widget _buildDesktopPage(BuildContext context) {
     return WebAppShell(
-      title: 'Menu',
-      subtitle:
-          'Quản lý tài khoản, ưu đãi, cài đặt và các tác vụ hỗ trợ trong cùng một khu vực.',
+      title: _language.t('more.title'),
+      subtitle: _language.t('more.subtitle'),
       selectedIndex: 4,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -167,22 +184,22 @@ class _MoreScreenState extends State<MoreScreen> {
                 onTap: () => Navigator.of(context).pushNamed('/user-profile'),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'StaySmart User',
-                      style: TextStyle(
+                      _language.t('more.user'),
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      'Member account',
-                      style: TextStyle(
+                      _language.t('more.memberAccount'),
+                      style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
@@ -195,19 +212,19 @@ class _MoreScreenState extends State<MoreScreen> {
           const SizedBox(height: 22),
           _buildProfileStat(
             icon: Icons.bookmark_added_outlined,
-            label: 'Bookings',
+            label: _language.t('profile.bookings'),
             value: '12',
           ),
           const SizedBox(height: 10),
           _buildProfileStat(
             icon: Icons.favorite_border,
-            label: 'Saved hotels',
+            label: _language.t('profile.savedHotels'),
             value: '8',
           ),
           const SizedBox(height: 10),
           _buildProfileStat(
             icon: Icons.card_giftcard_outlined,
-            label: 'Promotions',
+            label: _language.t('profile.promotions'),
             value: '3',
           ),
           const SizedBox(height: 22),
@@ -217,7 +234,7 @@ class _MoreScreenState extends State<MoreScreen> {
             child: ElevatedButton.icon(
               onPressed: () => Navigator.of(context).pushNamed('/edit-profile'),
               icon: const Icon(Icons.manage_accounts_outlined, size: 18),
-              label: const Text('Edit profile'),
+              label: Text(_language.t('profile.edit')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.colorPrimary,
                 foregroundColor: AppColors.white,
@@ -237,18 +254,18 @@ class _MoreScreenState extends State<MoreScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Quick actions',
-            style: TextStyle(
+          Text(
+            _language.t('more.quickActions'),
+            style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Các mục được sắp xếp dạng lưới để thao tác nhanh trên website.',
-            style: TextStyle(
+          Text(
+            _language.t('more.quickActionsSubtitle'),
+            style: const TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,
             ),
@@ -284,10 +301,10 @@ class _MoreScreenState extends State<MoreScreen> {
       width: double.infinity,
       color: AppColors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      child: const Center(
+      child: Center(
         child: Text(
-          'Menu',
-          style: TextStyle(
+          _language.t('more.title'),
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: AppColors.textPrimary,
@@ -449,29 +466,29 @@ class _MoreScreenState extends State<MoreScreen> {
           fontWeight: FontWeight.w600,
         ),
         unselectedLabelStyle: const TextStyle(fontSize: 10),
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
+            icon: const Icon(Icons.home_outlined),
+            activeIcon: const Icon(Icons.home),
+            label: _language.t('nav.home'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.mail_outline),
-            activeIcon: Icon(Icons.mail),
-            label: 'Message',
+            icon: const Icon(Icons.mail_outline),
+            activeIcon: const Icon(Icons.mail),
+            label: _language.t('nav.message'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.book_outlined),
-            activeIcon: Icon(Icons.book),
-            label: 'Booking',
+            icon: const Icon(Icons.book_outlined),
+            activeIcon: const Icon(Icons.book),
+            label: _language.t('nav.booking'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
+            icon: const Icon(Icons.search),
+            label: _language.t('nav.search'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.more_horiz),
-            label: 'Menu',
+            icon: const Icon(Icons.more_horiz),
+            label: _language.t('nav.menu'),
           ),
         ],
       ),

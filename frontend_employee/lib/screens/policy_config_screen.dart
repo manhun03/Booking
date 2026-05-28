@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
+import '../services/owner_api_service.dart';
+import '../utils/display_format.dart';
+
 class PolicyConfigScreen extends StatefulWidget {
   const PolicyConfigScreen({super.key});
 
@@ -8,145 +12,159 @@ class PolicyConfigScreen extends StatefulWidget {
 }
 
 class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
-  final Color primaryBlue = const Color(0xFF3F63B5);
-  bool _allowFreeCancel = true;
+  static const Color _primaryBlue = Color(0xFF3F63B5);
+  final OwnerApiService _api = OwnerApiService();
+  final TextEditingController _depositController = TextEditingController();
+  final TextEditingController _noticeController = TextEditingController();
+
+  bool _allowReview = true;
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _depositController.dispose();
+    _noticeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final data = await _api.fetchSettings();
+      if (!mounted) return;
+      _depositController.text = (doubleValue(data['depositRate']) * 100)
+          .toStringAsFixed(0);
+      _noticeController.text = '${intValue(data['minBookingNotice'])}';
+      setState(() {
+        _allowReview = data['allowReview'] != false;
+        _loading = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.message;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    final depositPercent = double.tryParse(_depositController.text.trim());
+    final notice = int.tryParse(_noticeController.text.trim());
+    if (depositPercent == null || depositPercent < 0 || depositPercent > 100) {
+      _message('Ty le dat coc phai tu 0 den 100.');
+      return;
+    }
+    if (notice == null || notice < 0) {
+      _message('Thoi gian bao truoc khong hop le.');
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await _api.updateSettings(
+        depositRate: depositPercent / 100,
+        minBookingNotice: notice,
+        allowReview: _allowReview,
+      );
+      if (!mounted) return;
+      _message('Da luu chinh sach.');
+      Navigator.pop(context, true);
+    } on ApiException catch (error) {
+      if (mounted) _message(error.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _message(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200],
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 450),
-          child: Container(
-            decoration: BoxDecoration(boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20)]),
-            child: Scaffold(
-              backgroundColor: const Color(0xFFF8F9FA),
-              appBar: AppBar(
-                backgroundColor: Colors.white,
-                elevation: 0,
-                leading: const BackButton(color: Colors.black87),
-                title: const Text('Chính sách Vận hành', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 18)),
-              ),
-              body: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('THỜI GIAN NHẬN / TRẢ PHÒNG', style: TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel('Giờ Check-in'),
-                              _buildDropdown(['12:00', '14:00', '15:00'], '14:00'),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel('Giờ Check-out'),
-                              _buildDropdown(['11:00', '12:00', '13:00'], '12:00'),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-
-                    const Text('CHÍNH SÁCH ĐẶT CỌC', style: TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    _buildLabel('Tỷ lệ cọc yêu cầu (%)'),
-                    _buildTextField('VD: 50'),
-                    const SizedBox(height: 8),
-                    const Text('Khách hàng cần thanh toán trước số % này để đơn đặt phòng được xác nhận.', style: TextStyle(color: Colors.black45, fontSize: 12)),
-                    const SizedBox(height: 32),
-
-                    const Text('CHÍNH SÁCH HỦY PHÒNG', style: TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    Container(
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.black12)),
-                      child: Column(
-                        children: [
-                          SwitchListTile(
-                            title: const Text('Cho phép hủy miễn phí', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                            value: _allowFreeCancel,
-                            activeThumbColor: primaryBlue,
-                            onChanged: (val) => setState(() => _allowFreeCancel = val),
-                          ),
-                          if (_allowFreeCancel) ...[
-                            const Divider(height: 1),
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildLabel('Miễn phí hủy trước (Ngày)'),
-                                  _buildTextField('VD: 3'),
-                                  const SizedBox(height: 8),
-                                  const Text('Nếu hủy sau thời gian này, khách sẽ mất tiền cọc.', style: TextStyle(color: Colors.black45, fontSize: 11)),
-                                ],
-                              ),
-                            ),
-                          ]
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(backgroundColor: primaryBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                        child: const Text('Lưu chính sách', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                    ),
-                  ],
+      backgroundColor: const Color(0xFFF5F7FB),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        title: const Text('Chinh sach dat phong'),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Text(_error!, style: const TextStyle(color: Colors.red)),
+            )
+          : ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                const Text(
+                  'Cau hinh nay duoc dung khi khach gui yeu cau dat phong.',
+                  style: TextStyle(color: Colors.black54),
                 ),
-              ),
+                const SizedBox(height: 24),
+                _label('Ty le dat coc yeu cau (%)'),
+                TextField(
+                  controller: _depositController,
+                  keyboardType: TextInputType.number,
+                  decoration: _inputDecoration('Vi du: 30'),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Khach can thanh toan toi thieu ty le nay de dat phong duoc xu ly.',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+                const SizedBox(height: 24),
+                _label('Thoi gian bao truoc toi thieu (gio)'),
+                TextField(
+                  controller: _noticeController,
+                  keyboardType: TextInputType.number,
+                  decoration: _inputDecoration('Vi du: 2'),
+                ),
+                const SizedBox(height: 24),
+                Card(
+                  elevation: 0,
+                  child: SwitchListTile(
+                    value: _allowReview,
+                    activeThumbColor: _primaryBlue,
+                    onChanged: (value) => setState(() => _allowReview = value),
+                    title: const Text('Cho phep danh gia'),
+                    subtitle: const Text(
+                      'Khach hang co the danh gia sau khi hoan thanh luu tru.',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 30),
+                SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _saving ? null : _save,
+                    child: _saving
+                        ? const CircularProgressIndicator()
+                        : const Text('Luu chinh sach'),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ),
-      ),
     );
   }
 
-  Widget _buildLabel(String text) {
-    return Padding(padding: const EdgeInsets.only(bottom: 8.0), child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)));
-  }
+  Widget _label(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold)),
+  );
 
-  Widget _buildTextField(String hint) {
-    return TextFormField(
-      keyboardType: TextInputType.number,
-      decoration: InputDecoration(
-        filled: true, fillColor: Colors.white, hintText: hint,
-        hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.black12)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.black12)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primaryBlue)),
-      ),
-    );
-  }
-
-  Widget _buildDropdown(List<String> items, String initial) {
-    return DropdownButtonFormField<String>(
-      initialValue: initial,
-      decoration: InputDecoration(
-        filled: true, fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.black12)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.black12)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primaryBlue)),
-      ),
-      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-      onChanged: (value) {},
-    );
-  }
+  InputDecoration _inputDecoration(String hint) => InputDecoration(
+    hintText: hint,
+    filled: true,
+    fillColor: Colors.white,
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+  );
 }

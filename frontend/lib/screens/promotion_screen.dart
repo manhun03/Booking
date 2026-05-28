@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
@@ -12,50 +13,52 @@ class PromotionScreen extends StatefulWidget {
 }
 
 class _PromotionScreenState extends State<PromotionScreen> {
+  final ApiService _api = ApiService();
   int _selectedIndex = 4;
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _vouchers = [];
 
-  static const List<Map<String, dynamic>> _vouchers = [
-    {
-      'title': 'Giảm giá tại Việt Nam trong thời gian giới hạn',
-      'description':
-          'Giảm tới 40% khi đặt phòng tại Việt Nam, áp dụng cho các khách sạn tham gia chương trình.',
-      'colors': [Color(0xFFE9C088), Color(0xFFB95D34)],
-      'icon': Icons.apartment,
-      'code': 'VNSTAY40',
-    },
-    {
-      'title': 'Tiết kiệm đến 20% cho kỳ nghỉ cuối tuần',
-      'description':
-          'Tận hưởng kỳ nghỉ ngắn ngày với mức giá ưu đãi đặc biệt vào thứ Sáu, thứ Bảy và Chủ nhật.',
-      'colors': [Color(0xFFFFB3C7), Color(0xFFE74C6A)],
-      'icon': Icons.local_offer,
-      'code': 'WEEKEND20',
-    },
-    {
-      'title': 'Ưu đãi nội địa - giảm đến 25%',
-      'description':
-          'Giá đặc biệt tại các khách sạn và khu nghỉ dưỡng địa phương cho chuyến đi trong nước.',
-      'colors': [Color(0xFF1FAA59), Color(0xFF74C67A)],
-      'icon': Icons.location_on,
-      'code': 'LOCAL25',
-    },
-    {
-      'title': 'Đặt phòng khách sạn siêu tiết kiệm',
-      'description':
-          'Voucher độc quyền cho chỗ nghỉ trong tháng này, áp dụng khi thanh toán qua StaySmart.',
-      'colors': [Color(0xFF0B5574), Color(0xFF8AC6D8)],
-      'icon': Icons.hotel,
-      'code': 'SMARTSTAY',
-    },
-    {
-      'title': 'Tiết kiệm đến 50% cho chuyến du lịch xanh',
-      'description':
-          'Tận hưởng kỳ nghỉ gần thiên nhiên, nhận thêm ưu đãi từ các điểm đến xanh.',
-      'colors': [Color(0xFF80C565), Color(0xFF2D8CCB)],
-      'icon': Icons.beach_access,
-      'code': 'GREEN50',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadVouchers();
+  }
+
+  Future<void> _loadVouchers() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      await _api.restoreSession();
+      final vouchers = await _api.fetchCoupons();
+      if (!mounted) return;
+      setState(() {
+        _vouchers = vouchers;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _openAddPromotion() async {
+    final result = await Navigator.of(context).pushNamed('/add-promotion');
+    if (!mounted) return;
+    final code = result is Map<String, dynamic>
+        ? result['code']?.toString()
+        : result?.toString();
+    if (code == null || code.trim().isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Da chon ma ${code.trim()}')),
+    );
+  }
 
   void _onBottomNavTapped(int index) {
     setState(() {
@@ -88,21 +91,22 @@ class _PromotionScreenState extends State<PromotionScreen> {
         children: [
           _buildTopBar(context),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(28, 14, 28, 18),
-              child: Column(
-                children: [
-                  _buildTitleRow(context),
-                  const SizedBox(height: 20),
-                  _buildHero(),
-                  const SizedBox(height: 22),
-                  _buildVoucherActions(),
-                  const SizedBox(height: 14),
-                  for (final voucher in _vouchers) ...[
-                    _buildVoucherCard(voucher),
-                    const SizedBox(height: 12),
+            child: RefreshIndicator(
+              onRefresh: _loadVouchers,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(28, 14, 28, 18),
+                child: Column(
+                  children: [
+                    _buildTitleRow(context),
+                    const SizedBox(height: 20),
+                    _buildHero(),
+                    const SizedBox(height: 22),
+                    _buildVoucherActions(),
+                    const SizedBox(height: 18),
+                    _buildVoucherList(),
                   ],
-                ],
+                ),
               ),
             ),
           ),
@@ -117,7 +121,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
     return WebAppShell(
       title: 'Promotions',
       subtitle:
-          'Theo dõi voucher đang có, thêm mã ưu đãi và chọn khuyến mãi phù hợp cho lần đặt phòng tiếp theo.',
+          'Theo doi voucher dang co, them ma uu dai va chon khuyen mai phu hop cho lan dat phong tiep theo.',
       selectedIndex: 4,
       child: Column(
         children: [
@@ -143,38 +147,134 @@ class _PromotionScreenState extends State<PromotionScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Voucher hiện có',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Voucher hien co',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Tai lai',
+                      onPressed: _loadVouchers,
+                      icon: const Icon(Icons.refresh),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 18),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final columns = constraints.maxWidth >= 860 ? 2 : 1;
-                    final spacing = columns == 2 ? 14.0 : 0.0;
-                    final itemWidth =
-                        (constraints.maxWidth - spacing) / columns.toDouble();
-
-                    return Wrap(
-                      spacing: spacing,
-                      runSpacing: 14,
-                      children: [
-                        for (final voucher in _vouchers)
-                          SizedBox(
-                            width: itemWidth,
-                            child: _buildVoucherCard(voucher, wide: true),
-                          ),
-                      ],
-                    );
-                  },
-                ),
+                _buildVoucherList(wide: true),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVoucherList({bool wide = false}) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 34),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return _buildStateCard(
+        icon: Icons.error_outline,
+        title: 'Khong tai duoc voucher',
+        message: _error!,
+        actionLabel: 'Thu lai',
+        onAction: _loadVouchers,
+      );
+    }
+
+    if (_vouchers.isEmpty) {
+      return _buildStateCard(
+        icon: Icons.confirmation_number_outlined,
+        title: 'Chua co voucher kha dung',
+        message: 'Backend hien chua tra ve voucher dang hoat dong.',
+        actionLabel: 'Tai lai',
+        onAction: _loadVouchers,
+      );
+    }
+
+    if (!wide) {
+      return Column(
+        children: [
+          for (final voucher in _vouchers) ...[
+            _buildVoucherCard(voucher),
+            const SizedBox(height: 12),
+          ],
+        ],
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 860 ? 2 : 1;
+        final spacing = columns == 2 ? 14.0 : 0.0;
+        final itemWidth = (constraints.maxWidth - spacing) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: 14,
+          children: [
+            for (final voucher in _vouchers)
+              SizedBox(
+                width: itemWidth,
+                child: _buildVoucherCard(voucher, wide: true),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildStateCard({
+    required IconData icon,
+    required String title,
+    required String message,
+    required String actionLabel,
+    required VoidCallback onAction,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: AppColors.colorPrimary, size: 34),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton(onPressed: onAction, child: Text(actionLabel)),
         ],
       ),
     );
@@ -205,7 +305,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'Ưu đãi mùa du lịch',
+                    'Uu dai dang hoat dong',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
@@ -214,7 +314,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
                   ),
                   SizedBox(height: 10),
                   Text(
-                    'Nhận voucher khách sạn, resort và chuyến đi cuối tuần với mức giảm tốt hơn khi đặt sớm.',
+                    'Danh sach voucher duoc lay truc tiep tu backend va cap nhat khi admin thay doi ma khuyen mai.',
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.45,
@@ -249,7 +349,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Tác vụ nhanh',
+          'Tac vu nhanh',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
@@ -259,22 +359,22 @@ class _PromotionScreenState extends State<PromotionScreen> {
         const SizedBox(height: 16),
         _buildActionTile(
           Icons.confirmation_number_outlined,
-          'Thêm mã voucher',
-          'Nhập mã ưu đãi bạn nhận được',
-          onTap: () => Navigator.of(context).pushNamed('/add-promotion'),
+          'Them ma voucher',
+          'Nhap ma uu dai ban nhan duoc',
+          onTap: _openAddPromotion,
         ),
         const SizedBox(height: 12),
         _buildActionTile(
-          Icons.image_outlined,
-          'Tìm thêm voucher',
-          'Khám phá các ưu đãi mới',
-          onTap: () {},
+          Icons.refresh,
+          'Tai lai voucher',
+          'Lay lai danh sach tu backend',
+          onTap: _loadVouchers,
         ),
         const SizedBox(height: 12),
         _buildActionTile(
           Icons.history,
-          'Lịch sử áp dụng',
-          'Xem các voucher đã dùng',
+          'Lich su ap dung',
+          'Se hien thi khi co API lich su voucher',
           onTap: () {},
         ),
       ],
@@ -335,7 +435,15 @@ class _PromotionScreenState extends State<PromotionScreen> {
             ),
           ),
         ),
-        const SizedBox(width: 28),
+        IconButton(
+          padding: EdgeInsets.zero,
+          icon: const Icon(
+            Icons.refresh,
+            size: 18,
+            color: AppColors.colorPrimary,
+          ),
+          onPressed: _loadVouchers,
+        ),
       ],
     );
   }
@@ -356,32 +464,12 @@ class _PromotionScreenState extends State<PromotionScreen> {
             end: Alignment.bottomRight,
           ),
         ),
-        child: Stack(
-          children: [
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                height: 26,
-                color: AppColors.white.withValues(alpha: 0.35),
-              ),
-            ),
-            const Positioned(
-              right: 30,
-              top: 18,
-              child: Icon(Icons.flight_takeoff, size: 20, color: Colors.red),
-            ),
-            const Positioned(
-              left: 28,
-              bottom: 16,
-              child: Icon(
-                Icons.beach_access,
-                color: AppColors.white,
-                size: 22,
-              ),
-            ),
-          ],
+        child: const Center(
+          child: Icon(
+            Icons.confirmation_number_outlined,
+            color: AppColors.white,
+            size: 34,
+          ),
         ),
       ),
     );
@@ -394,12 +482,16 @@ class _PromotionScreenState extends State<PromotionScreen> {
           child: _buildActionButton(
             Icons.confirmation_number_outlined,
             'Extra voucher code',
-            onTap: () => Navigator.of(context).pushNamed('/add-promotion'),
+            onTap: _openAddPromotion,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: _buildActionButton(Icons.image_outlined, 'Find more voucher'),
+          child: _buildActionButton(
+            Icons.refresh,
+            'Reload voucher',
+            onTap: _loadVouchers,
+          ),
         ),
       ],
     );
@@ -496,6 +588,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
     bool wide = false,
   }) {
     final colors = _colorsValue(voucher);
+    final code = _textValue(voucher, 'code');
 
     return Container(
       decoration: BoxDecoration(
@@ -510,120 +603,101 @@ class _PromotionScreenState extends State<PromotionScreen> {
           ),
         ],
       ),
-      child: Stack(
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
+      child: Row(
         children: [
-          Positioned(
-            right: 8,
-            top: 8,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(7),
             child: Container(
-              width: 22,
-              height: 22,
+              width: wide ? 90 : 70,
+              height: wide ? 90 : 70,
               decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(4),
+                gradient: LinearGradient(
+                  colors: colors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
-              child: const Icon(
-                Icons.delete_outline,
-                size: 14,
-                color: Colors.red,
+              child: Icon(
+                _iconValue(voucher),
+                color: AppColors.white,
+                size: wide ? 38 : 32,
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(7),
-                  child: Container(
-                    width: wide ? 90 : 70,
-                    height: wide ? 90 : 70,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: colors,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: Icon(
-                      _iconValue(voucher),
-                      color: AppColors.white,
-                      size: wide ? 38 : 32,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(right: wide ? 70 : 56),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _textValue(voucher, 'title'),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: wide ? 13 : 11,
+                      height: 1.2,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(right: wide ? 70 : 56),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _textValue(voucher, 'title'),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: wide ? 13 : 11,
-                            height: 1.2,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _textValue(voucher, 'description'),
-                          maxLines: wide ? 3 : 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: wide ? 11 : 9,
-                            height: 1.25,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        if (wide) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            _textValue(voucher, 'code'),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.colorPrimary,
-                            ),
-                          ),
-                        ],
-                      ],
+                  const SizedBox(height: 4),
+                  Text(
+                    _textValue(voucher, 'description'),
+                    maxLines: wide ? 3 : 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: wide ? 11 : 9,
+                      height: 1.25,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                ),
-                SizedBox(
-                  width: wide ? 70 : 58,
-                  height: 30,
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.colorPrimary,
-                      elevation: 0,
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: const Text(
-                      'Nhận',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.white,
-                      ),
+                  const SizedBox(height: 8),
+                  Text(
+                    code,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.colorPrimary,
                     ),
                   ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(
+            width: wide ? 70 : 58,
+            height: 30,
+            child: ElevatedButton(
+              onPressed: () => _claimVoucher(code),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.colorPrimary,
+                elevation: 0,
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-              ],
+              ),
+              child: const Text(
+                'Nhan',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.white,
+                ),
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  void _claimVoucher(String code) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Da chon ma $code')),
     );
   }
 
@@ -684,37 +758,10 @@ class _PromotionScreenState extends State<PromotionScreen> {
   Widget _buildBellButton(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.of(context).pushNamed('/notification'),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const Icon(
-            Icons.notifications_none,
-            size: 22,
-            color: AppColors.textPrimary,
-          ),
-          Positioned(
-            right: -2,
-            top: -4,
-            child: Container(
-              width: 14,
-              height: 14,
-              decoration: const BoxDecoration(
-                color: Colors.red,
-                shape: BoxShape.circle,
-              ),
-              child: const Center(
-                child: Text(
-                  '1',
-                  style: TextStyle(
-                    color: AppColors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+      child: const Icon(
+        Icons.notifications_none,
+        size: 22,
+        color: AppColors.textPrimary,
       ),
     );
   }

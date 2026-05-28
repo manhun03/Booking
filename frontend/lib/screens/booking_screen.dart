@@ -408,6 +408,13 @@ class _BookingScreenState extends State<BookingScreen> {
                     ),
                   ],
                 ),
+                if (_canReviewBooking(booking)) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _buildReviewAction(booking),
+                  ),
+                ],
               ],
             ),
           ),
@@ -776,6 +783,13 @@ class _BookingScreenState extends State<BookingScreen> {
                   statusColor: statusColor,
                   alignEnd: statusAlignment == 'end',
                 ),
+                if (_canReviewBooking(booking)) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _buildReviewAction(booking, compact: true),
+                  ),
+                ],
               ],
             ),
           ),
@@ -860,6 +874,72 @@ class _BookingScreenState extends State<BookingScreen> {
         statusText,
       ],
     );
+  }
+
+  Widget _buildReviewAction(
+    Map<String, dynamic> booking, {
+    bool compact = false,
+  }) {
+    if (booking['reviewed'] == true) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.check_circle_outline,
+            size: 16,
+            color: Color(0xFF15803D),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            'Đã đánh giá',
+            style: TextStyle(
+              fontSize: compact ? 10 : 12,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF15803D),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return SizedBox(
+      height: compact ? 30 : 34,
+      child: OutlinedButton.icon(
+        onPressed: () => _openReviewBooking(booking),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.colorPrimary,
+          side: const BorderSide(color: AppColors.colorPrimary),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6),
+          ),
+          padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 13),
+        ),
+        icon: Icon(Icons.rate_review_outlined, size: compact ? 14 : 16),
+        label: Text(
+          'Đánh giá',
+          style: TextStyle(
+            fontSize: compact ? 10 : 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool _canReviewBooking(Map<String, dynamic> booking) {
+    final status = booking['statusCode']?.toString().trim().toUpperCase();
+    return status == 'COMPLETED' || status == 'CHECKED_OUT';
+  }
+
+  Future<void> _openReviewBooking(Map<String, dynamic> booking) async {
+    final result = await Navigator.of(context).pushNamed(
+      '/review-booking',
+      arguments: booking,
+    );
+    if (!mounted || result is! Map<String, dynamic>) return;
+    setState(() {
+      booking['reviewed'] = true;
+    });
   }
 
   Widget _buildBottomNav() {

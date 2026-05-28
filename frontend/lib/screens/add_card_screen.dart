@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
@@ -12,12 +14,21 @@ class AddCardScreen extends StatefulWidget {
 }
 
 class _AddCardScreenState extends State<AddCardScreen> {
+  final ApiService _api = ApiService();
   int _selectedIndex = 4;
-  final _cardNumberController =
-      TextEditingController(text: '0987 6421 9845 4651');
-  final _cardHolderController = TextEditingController(text: 'Nguyen Doan Quan');
-  final _expiredController = TextEditingController(text: '12/49');
-  final _cvvController = TextEditingController(text: '***');
+  bool _saving = false;
+  final _cardNumberController = TextEditingController();
+  final _cardHolderController = TextEditingController();
+  final _expiredController = TextEditingController();
+  final _cvvController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _cardNumberController.addListener(_refreshPreview);
+    _cardHolderController.addListener(_refreshPreview);
+    _expiredController.addListener(_refreshPreview);
+  }
 
   @override
   void dispose() {
@@ -26,6 +37,68 @@ class _AddCardScreenState extends State<AddCardScreen> {
     _expiredController.dispose();
     _cvvController.dispose();
     super.dispose();
+  }
+
+  void _refreshPreview() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _submitCard() async {
+    if (_saving) return;
+
+    final cardNumber = _cardNumberController.text.trim();
+    final cardHolder = _cardHolderController.text.trim();
+    final expiry = _expiredController.text.trim();
+    final cvv = _cvvController.text.trim();
+    final digits = _digitsOnly(cardNumber);
+
+    if (digits.length < 12 || digits.length > 19) {
+      _showError('So the phai co tu 12 den 19 chu so.');
+      return;
+    }
+    if (cardHolder.isEmpty) {
+      _showError('Vui long nhap ten chu the.');
+      return;
+    }
+    if (!_isValidExpiry(expiry)) {
+      _showError('Ngay het han phai dung dinh dang MM/YY.');
+      return;
+    }
+    if (cvv.isNotEmpty && !_isValidCvv(cvv)) {
+      _showError('CVV phai co 3 hoac 4 chu so.');
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+    });
+
+    try {
+      await _api.restoreSession();
+      await _api.addPaymentCard(
+        cardNumber: cardNumber,
+        cardHolderName: cardHolder,
+        expiry: expiry,
+        brand: _detectBrand(digits),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      _showError(error.toString());
+    } finally {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   void _onBottomNavTapped(int index) {
@@ -75,7 +148,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
     return WebAppShell(
       title: 'Add New Card',
       subtitle:
-          'Thêm thẻ thanh toán mới vào tài khoản để sử dụng nhanh khi đặt phòng.',
+          'Them the thanh toan moi vao tai khoan. Backend chi luu metadata an toan, khong luu CVV.',
       selectedIndex: 4,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -133,7 +206,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
         ),
         const SizedBox(height: 6),
         const Text(
-          'Thông tin thẻ sẽ được hiển thị trước khi lưu.',
+          'Preview cap nhat theo thong tin dang nhap.',
           style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 22),
@@ -159,7 +232,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Thông tin thẻ được dùng cho mô phỏng giao diện và có thể thay bằng luồng bảo mật thật sau này.',
+              'Backend chi luu brand, 4 so cuoi, ngay het han va ten chu the. CVV khong duoc luu vao DB.',
               style: TextStyle(
                 fontSize: 12,
                 height: 1.35,
@@ -178,7 +251,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
       children: [
         if (web) ...[
           const Text(
-            'Thông tin thẻ',
+            'Thong tin the',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
@@ -187,18 +260,44 @@ class _AddCardScreenState extends State<AddCardScreen> {
           ),
           const SizedBox(height: 18),
         ],
-        _buildLabeledField('Card Number', _cardNumberController),
+        _buildLabeledField(
+          'Card Number',
+          _cardNumberController,
+          keyboardType: TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9 ]')),
+            LengthLimitingTextInputFormatter(23),
+          ],
+        ),
         const SizedBox(height: 18),
         _buildLabeledField('Card Holder Name', _cardHolderController),
         const SizedBox(height: 18),
         Row(
           children: [
             Expanded(
-              child: _buildLabeledField('Expired', _expiredController),
+              child: _buildLabeledField(
+                'Expired',
+                _expiredController,
+                hintText: 'MM/YY',
+                keyboardType: TextInputType.datetime,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')),
+                  LengthLimitingTextInputFormatter(5),
+                ],
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: _buildLabeledField('CVV Code', _cvvController),
+              child: _buildLabeledField(
+                'CVV Code',
+                _cvvController,
+                keyboardType: TextInputType.number,
+                obscureText: true,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(4),
+                ],
+              ),
             ),
           ],
         ),
@@ -207,7 +306,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
           width: double.infinity,
           height: 48,
           child: ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: _saving ? null : _submitCard,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.colorPrimary,
               elevation: 0,
@@ -215,14 +314,23 @@ class _AddCardScreenState extends State<AddCardScreen> {
                 borderRadius: BorderRadius.circular(6),
               ),
             ),
-            child: const Text(
-              'Thêm',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.white,
-              ),
-            ),
+            child: _saving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.white,
+                    ),
+                  )
+                : const Text(
+                    'Them',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.white,
+                    ),
+                  ),
           ),
         ),
       ],
@@ -283,24 +391,21 @@ class _AddCardScreenState extends State<AddCardScreen> {
             ),
           ),
         ),
-        SizedBox(
-          width: 28,
-          height: 28,
-          child: IconButton(
-            padding: EdgeInsets.zero,
-            icon: const Icon(
-              Icons.filter_list,
-              size: 18,
-              color: AppColors.colorPrimary,
-            ),
-            onPressed: () {},
-          ),
-        ),
+        const SizedBox(width: 28),
       ],
     );
   }
 
   Widget _buildPreviewCard({double width = 292, double height = 180}) {
+    final digits = _digitsOnly(_cardNumberController.text);
+    final brand = _detectBrand(digits);
+    final holder = _cardHolderController.text.trim().isEmpty
+        ? 'CARDHOLDER'
+        : _cardHolderController.text.trim().toUpperCase();
+    final expiry = _expiredController.text.trim().isEmpty
+        ? 'MM/YY'
+        : _expiredController.text.trim();
+
     return Container(
       width: width,
       height: height,
@@ -309,40 +414,42 @@ class _AddCardScreenState extends State<AddCardScreen> {
         borderRadius: BorderRadius.circular(8),
       ),
       padding: const EdgeInsets.fromLTRB(24, 16, 20, 16),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Align(
             alignment: Alignment.centerRight,
             child: Text(
-              'Bank Name',
-              style: TextStyle(
+              brand,
+              style: const TextStyle(
                 color: AppColors.white,
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
               ),
             ),
           ),
-          SizedBox(height: 16),
-          Icon(Icons.credit_card, color: Color(0xFFD7D5FF), size: 40),
-          SizedBox(height: 12),
+          const SizedBox(height: 16),
+          const Icon(Icons.credit_card, color: Color(0xFFD7D5FF), size: 40),
+          const SizedBox(height: 12),
           Text(
-            '1234   5678   9976   5432',
-            style: TextStyle(
+            _maskedCardNumber(digits),
+            style: const TextStyle(
               color: Color(0xFFD7D5FF),
               fontSize: 18,
               letterSpacing: 1,
             ),
           ),
-          SizedBox(height: 2),
+          const SizedBox(height: 2),
           Text(
-            '1234          12/49',
-            style: TextStyle(color: AppColors.white, fontSize: 9),
+            expiry,
+            style: const TextStyle(color: AppColors.white, fontSize: 9),
           ),
-          Spacer(),
+          const Spacer(),
           Text(
-            'CARDHOLDER',
-            style: TextStyle(
+            holder,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
               color: AppColors.white,
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -355,8 +462,12 @@ class _AddCardScreenState extends State<AddCardScreen> {
 
   Widget _buildLabeledField(
     String label,
-    TextEditingController controller,
-  ) {
+    TextEditingController controller, {
+    String? hintText,
+    TextInputType? keyboardType,
+    bool obscureText = false,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -371,11 +482,15 @@ class _AddCardScreenState extends State<AddCardScreen> {
         const SizedBox(height: 8),
         TextField(
           controller: controller,
+          keyboardType: keyboardType,
+          obscureText: obscureText,
+          inputFormatters: inputFormatters,
           style: const TextStyle(
             fontSize: 12,
             color: AppColors.textPrimary,
           ),
           decoration: InputDecoration(
+            hintText: hintText,
             filled: true,
             fillColor: AppColors.white,
             isDense: true,
@@ -450,42 +565,58 @@ class _AddCardScreenState extends State<AddCardScreen> {
   Widget _buildBellButton(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.of(context).pushNamed('/notification'),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const Icon(
-            Icons.notifications_none,
-            size: 22,
-            color: AppColors.textPrimary,
-          ),
-          Positioned(
-            right: -2,
-            top: -4,
-            child: Container(
-              width: 14,
-              height: 14,
-              decoration: const BoxDecoration(
-                color: Colors.red,
-                shape: BoxShape.circle,
-              ),
-              child: const Center(
-                child: Text(
-                  '1',
-                  style: TextStyle(
-                    color: AppColors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+      child: const Icon(
+        Icons.notifications_none,
+        size: 22,
+        color: AppColors.textPrimary,
       ),
     );
   }
 
   static Widget _buildAvatar({required double size}) {
     return CurrentUserAvatar(size: size);
+  }
+
+  String _digitsOnly(String value) {
+    return value.replaceAll(RegExp(r'\D'), '');
+  }
+
+  String _maskedCardNumber(String digits) {
+    final last4 =
+        digits.length >= 4 ? digits.substring(digits.length - 4) : '0000';
+    return '**** **** **** $last4';
+  }
+
+  String _detectBrand(String digits) {
+    if (digits.startsWith('4')) return 'VISA';
+    if (digits.startsWith('34') || digits.startsWith('37')) return 'AMEX';
+    if (digits.startsWith('35')) return 'JCB';
+    final prefix2 =
+        digits.length >= 2 ? int.tryParse(digits.substring(0, 2)) : null;
+    final prefix4 =
+        digits.length >= 4 ? int.tryParse(digits.substring(0, 4)) : null;
+    if ((prefix2 != null && prefix2 >= 51 && prefix2 <= 55) ||
+        (prefix4 != null && prefix4 >= 2221 && prefix4 <= 2720)) {
+      return 'MASTERCARD';
+    }
+    return 'CARD';
+  }
+
+  bool _isValidExpiry(String value) {
+    final match = RegExp(r'^(\d{1,2})/(\d{2})$').firstMatch(value.trim());
+    if (match == null) return false;
+    final month = int.tryParse(match.group(1) ?? '');
+    final year = int.tryParse(match.group(2) ?? '');
+    if (month == null || year == null || month < 1 || month > 12) {
+      return false;
+    }
+    final fullYear = 2000 + year;
+    final now = DateTime.now();
+    final expiryEnd = DateTime(fullYear, month + 1, 0, 23, 59, 59);
+    return expiryEnd.isAfter(now);
+  }
+
+  bool _isValidCvv(String value) {
+    return RegExp(r'^\d{3,4}$').hasMatch(value.trim());
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/google_identity.dart';
 import '../utils/colors.dart';
+import '../utils/constants.dart';
 import '../utils/strings.dart';
 import 'widgets/custom_text_field.dart';
 
@@ -18,6 +20,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   late TextEditingController _passwordController;
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
 
   @override
   void initState() {
@@ -96,8 +99,33 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
-  void _handleGoogleSignUp() {
-    _showMessage('Google sign up is not connected on the backend yet.');
+  Future<void> _handleGoogleSignUp() async {
+    if (_isLoading || _isGoogleLoading) return;
+
+    setState(() {
+      _isGoogleLoading = true;
+    });
+
+    try {
+      final idToken = await requestGoogleIdToken(
+        clientId: AppConstants.googleClientId,
+      );
+      await ApiService().loginWithGoogle(idToken: idToken, role: 'Customer');
+      if (!mounted) return;
+      _goToHome();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      _showMessage(error.message);
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(_cleanErrorMessage(error));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGoogleLoading = false;
+        });
+      }
+    }
   }
 
   void _goToHome() {
@@ -118,6 +146,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  String _cleanErrorMessage(Object error) {
+    return error
+        .toString()
+        .replaceFirst(RegExp(r'^(StateError|Exception):\s*'), '');
   }
 
   @override
@@ -229,7 +263,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _handleSignUp,
+                        onPressed: _isLoading || _isGoogleLoading
+                            ? null
+                            : _handleSignUp,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.colorPrimary,
                           foregroundColor: Colors.white,
@@ -263,7 +299,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       width: double.infinity,
                       height: 48,
                       child: OutlinedButton(
-                        onPressed: _handleGoogleSignUp,
+                        onPressed: _isLoading || _isGoogleLoading
+                            ? null
+                            : _handleGoogleSignUp,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.textPrimary,
                           backgroundColor:
@@ -277,23 +315,32 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.g_translate,
-                                size: 20,
-                                color: AppColors
-                                    .colorPrimary), // Reusing existing icon style
-                            SizedBox(width: 8),
-                            Text(
-                              AppStrings.signUpWithGoogle,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
+                        child: _isGoogleLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.g_translate,
+                                    size: 20,
+                                    color: AppColors.colorPrimary,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    AppStrings.signUpWithGoogle,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
                       ),
                     ),
 

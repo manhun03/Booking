@@ -59,6 +59,17 @@ class AuthSession {
   final String refreshToken;
   final DateTime? accessTokenExpiresAt;
 
+  bool hasRole(String roleName) {
+    final expected = _normalizeRole(roleName);
+    return roles.any((role) => _normalizeRole(role) == expected);
+  }
+
+  bool get isCustomer => hasRole('Customer');
+
+  static String _normalizeRole(String value) {
+    return value.toLowerCase().replaceFirst('role_', '').trim();
+  }
+
   static int? _intValue(dynamic value) {
     if (value is int) return value;
     if (value is num) return value.toInt();
@@ -188,6 +199,21 @@ class ApiService {
     return _setSession(data);
   }
 
+  Future<AuthSession> loginWithGoogle({
+    required String idToken,
+    String role = 'Customer',
+  }) async {
+    final data = await _post(
+      AppConstants.googleLoginEndpoint,
+      body: {
+        'idToken': idToken.trim(),
+        'role': role,
+      },
+    );
+
+    return _setSession(data);
+  }
+
   Future<AuthSession> refreshSession() async {
     final refreshToken = _session?.refreshToken.trim();
     if (refreshToken == null || refreshToken.isEmpty) {
@@ -199,6 +225,53 @@ class ApiService {
       body: {'refreshToken': refreshToken},
     );
     return _setSession(data);
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _post(
+      '/auth/change-password',
+      body: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> sendEmailVerification({
+    required String email,
+  }) async {
+    final data = await _post(
+      '/auth/send-email-verification',
+      body: {'email': email.trim()},
+    );
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid email verification response.');
+    }
+    return {
+      'message': _stringValue(data['message']) ?? '',
+      'token': _stringValue(data['token']),
+      'expiresAt': _dateTimeValue(data['expiresAt']),
+      'backend': data,
+    };
+  }
+
+  Future<Map<String, dynamic>> verifyEmail({
+    required String token,
+  }) async {
+    final data = await _post(
+      '/auth/verify-email',
+      body: {'token': token.trim()},
+    );
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid email verification response.');
+    }
+    return {
+      'message': _stringValue(data['message']) ?? '',
+      'backend': data,
+    };
   }
 
   Future<List<Map<String, dynamic>>> fetchChatConversations() async {
@@ -243,6 +316,27 @@ class ApiService {
     return _mapChatMessage(data);
   }
 
+  Future<List<Map<String, dynamic>>> fetchNotifications() async {
+    final data = await _get('/notifications/my');
+    return _listFromData(data).map(_mapNotification).toList();
+  }
+
+  Future<void> markNotificationRead(int id) async {
+    await _post('/notifications/$id/read');
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    await _post('/notifications/read-all');
+  }
+
+  Future<void> registerFcmToken(String token) async {
+    final trimmed = token.trim();
+    if (trimmed.isEmpty) {
+      throw const ApiException('FCM token cannot be empty.');
+    }
+    await _post('/users/fcm-token', body: {'token': trimmed});
+  }
+
   Future<Map<String, dynamic>> sendAiChatMessage({
     required String message,
     String? threadId,
@@ -262,6 +356,34 @@ class ApiService {
     );
 
     return _mapAiChatResponse(data);
+  }
+
+  Future<List<Map<String, dynamic>>> fetchCoupons() async {
+    final data = await _get('/coupons/active');
+    return _listFromData(data).map(_mapCoupon).toList();
+  }
+
+  Future<Map<String, dynamic>> validateCoupon({
+    required String code,
+    required num amount,
+  }) async {
+    final normalizedCode = code.trim();
+    if (normalizedCode.isEmpty) {
+      throw const ApiException('Coupon code cannot be empty.');
+    }
+    final data = await _get(
+      '/coupons/validate',
+      queryParameters: {'code': normalizedCode, 'amount': amount},
+    );
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid coupon validation response.');
+    }
+    return {
+      'code': _stringValue(data['code']) ?? normalizedCode,
+      'discountAmount': _numValue(data['discountAmount']) ?? 0,
+      'finalAmount': _numValue(data['finalAmount']) ?? amount,
+      'backend': data,
+    };
   }
 
   Future<List<Map<String, dynamic>>> fetchHotels({
@@ -302,6 +424,28 @@ class ApiService {
   Future<List<Map<String, dynamic>>> fetchReviewsByHotel(int hotelId) async {
     final data = await _get('/reviews/by-hotel/$hotelId');
     return _listFromData(data);
+  }
+
+  Future<Map<String, dynamic>> createReview({
+    required int bookingId,
+    required int rating,
+    String? comment,
+  }) async {
+    final trimmedComment = comment?.trim();
+    final data = await _post(
+      '/reviews',
+      body: {
+        'bookingId': bookingId,
+        'rating': rating,
+        if (trimmedComment != null && trimmedComment.isNotEmpty)
+          'comment': trimmedComment,
+      },
+    );
+
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid review response.');
+    }
+    return data;
   }
 
   Future<Map<String, dynamic>> createHotel({
@@ -387,6 +531,30 @@ class ApiService {
     return null;
   }
 
+  Future<Map<String, bool>> fetchRoomAvailability({
+    required int roomId,
+    required DateTime from,
+    required DateTime to,
+    int? excludedBookingId,
+  }) async {
+    final data = await _get(
+      '/time-slots/room/$roomId/availability',
+      queryParameters: {
+        'from': _dateKey(from),
+        'to': _dateKey(to),
+        if (excludedBookingId != null) 'excludedBookingId': excludedBookingId,
+      },
+    );
+
+    final availability = <String, bool>{};
+    for (final item in _listFromData(data)) {
+      final date = _stringValue(item['date']);
+      if (date == null) continue;
+      availability[date] = item['available'] == true;
+    }
+    return availability;
+  }
+
   Future<List<Map<String, dynamic>>> fetchMyBookings({
     int pageIndex = 1,
     int pageSize = 50,
@@ -408,6 +576,7 @@ class ApiService {
     required int paidAmount,
     DateTime? checkInDate,
     DateTime? checkOutDate,
+    String? customerAddress,
     String? note,
     String? paymentMethod,
   }) async {
@@ -424,6 +593,7 @@ class ApiService {
         'checkOutDate': checkOut.toIso8601String(),
         'guestCount': guestCount < 1 ? 1 : guestCount,
         'paidAmount': paidAmount < 0 ? 0 : paidAmount,
+        'customerAddress': customerAddress?.trim(),
         'paymentMethod': paymentMethod,
         'note': note,
       },
@@ -485,8 +655,8 @@ class ApiService {
   Future<Map<String, dynamic>> initiatePayment({
     required int bookingId,
     int? amount,
-    String provider = 'MOCK',
-    String method = 'CARD',
+    String provider = 'VNPAY',
+    String method = 'VNPAY',
   }) async {
     final data = await _post(
       '/payments/initiate',
@@ -522,6 +692,54 @@ class ApiService {
       throw const ApiException('Invalid payment completion response.');
     }
     return _mapPayment(data);
+  }
+
+  Future<List<Map<String, dynamic>>> fetchPaymentsForBooking(
+    int bookingId,
+  ) async {
+    final data = await _get('/payments/by-booking/$bookingId');
+    return _listFromData(data).map(_mapPayment).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> fetchPaymentCards() async {
+    final data = await _get('/payment-cards');
+    return _listFromData(data).map(_mapPaymentCard).toList();
+  }
+
+  Future<Map<String, dynamic>> addPaymentCard({
+    required String cardNumber,
+    required String cardHolderName,
+    required String expiry,
+    String? brand,
+    bool defaultCard = false,
+  }) async {
+    final data = await _post(
+      '/payment-cards',
+      body: {
+        'cardNumber': cardNumber.trim(),
+        'cardHolderName': cardHolderName.trim(),
+        'expiry': expiry.trim(),
+        'brand': brand?.trim(),
+        'defaultCard': defaultCard,
+      },
+    );
+
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid payment card response.');
+    }
+    return _mapPaymentCard(data);
+  }
+
+  Future<Map<String, dynamic>> setDefaultPaymentCard(int id) async {
+    final data = await _post('/payment-cards/$id/default');
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid payment card response.');
+    }
+    return _mapPaymentCard(data);
+  }
+
+  Future<void> deletePaymentCard(int id) async {
+    await _delete('/payment-cards/$id');
   }
 
   Future<List<Map<String, dynamic>>> fetchFavoriteHotels() async {
@@ -863,6 +1081,17 @@ class ApiService {
     final checkOut = _dateTimeValue(raw['checkOutDate']);
     final guestCount = _intValue(raw['guestCount']) ?? 1;
     final totalAmount = _numValue(raw['totalAmount']) ?? raw['totalAmount'];
+    final totalAmountValue = _numValue(raw['totalAmount']) ?? 0;
+    final paidAmountValue = _numValue(raw['paidAmount']) ?? 0;
+    final remainingAmount =
+        (totalAmountValue - paidAmountValue).clamp(0, totalAmountValue);
+    final paymentStatusCode = totalAmountValue <= 0
+        ? 'UNPAID'
+        : paidAmountValue >= totalAmountValue
+            ? 'COMPLETED'
+            : paidAmountValue > 0
+                ? 'PARTIAL'
+                : 'UNPAID';
     final roomUnitPrice =
         _numValue(raw['roomUnitPrice']) ?? raw['roomUnitPrice'];
     final displayAmount = totalAmount is num ? totalAmount : roomUnitPrice;
@@ -871,7 +1100,9 @@ class ApiService {
     return {
       'id': id,
       'roomId': _intValue(raw['roomId']),
+      'ownerId': _intValue(raw['ownerId']),
       'customerId': _intValue(raw['customerId']),
+      'customerAddress': _stringValue(raw['customerAddress']) ?? '',
       'name': _stringValue(raw['hotelName']) ?? 'Booking #$id',
       'location': _stringValue(raw['roomNumber']) == null
           ? 'Dang cap nhat phong'
@@ -886,6 +1117,12 @@ class ApiService {
       'rating': '4.7',
       'status': _statusLabel(status),
       'statusCode': status,
+      'totalAmount': totalAmountValue,
+      'paidAmount': paidAmountValue,
+      'remainingAmount': remainingAmount,
+      'paymentStatus': _paymentStatusLabel(paymentStatusCode),
+      'paymentStatusCode': paymentStatusCode,
+      'reviewed': raw['reviewed'] == true,
       'statusColor': _statusColor(status),
       'statusAlignment': _isHistoryStatus(status) ? 'end' : 'start',
       'palette': palette,
@@ -896,19 +1133,24 @@ class ApiService {
   }
 
   Map<String, dynamic> _mapPayment(Map<String, dynamic> raw) {
+    final statusCode = (_stringValue(raw['status']) ?? 'PENDING').toUpperCase();
     return {
       'id': _intValue(raw['id'] ?? raw['paymentId']),
       'bookingId': _intValue(raw['bookingId']),
       'amount': _numValue(raw['amount']),
       'method': _stringValue(raw['method']),
       'provider': _stringValue(raw['provider']),
-      'status': _stringValue(raw['status']),
+      'status': _paymentStatusLabel(statusCode),
+      'statusCode': statusCode,
       'transactionCode': _stringValue(raw['transactionCode']),
       'gatewayTransactionId': _stringValue(raw['gatewayTransactionId']),
       'checkoutUrl': _stringValue(raw['checkoutUrl']),
       'failureReason': _stringValue(raw['failureReason']),
+      'refundedAmount': _numValue(raw['refundedAmount']) ?? 0,
       'paidAt': _stringValue(raw['paidAt']),
+      'refundedAt': _stringValue(raw['refundedAt']),
       'createdAt': _stringValue(raw['createdAt']),
+      'updatedAt': _stringValue(raw['updatedAt']),
       'backend': raw,
     };
   }
@@ -932,6 +1174,95 @@ class ApiService {
     };
   }
 
+  Map<String, dynamic> _mapNotification(Map<String, dynamic> raw) {
+    final id = _intValue(raw['id']) ?? 0;
+    final createdAt = _dateTimeValue(raw['createdAt']);
+    final type = (_stringValue(raw['type']) ?? 'GENERAL').toUpperCase();
+    return {
+      'id': id,
+      'userId': _intValue(raw['userId']),
+      'senderId': _intValue(raw['senderId']),
+      'title': _stringValue(raw['title']) ?? 'Thong bao moi',
+      'message': _stringValue(raw['message']) ?? '',
+      'type': type,
+      'relatedTable': _stringValue(raw['relatedTable']),
+      'relatedId': _intValue(raw['relatedId']),
+      'read': raw['read'] == true,
+      'createdAt': createdAt,
+      'readAt': _dateTimeValue(raw['readAt']),
+      'time': _formatChatTime(createdAt),
+      'icon': _notificationIcon(type),
+      'colors': _notificationPalette(id),
+      'backend': raw,
+    };
+  }
+
+  Map<String, dynamic> _mapCoupon(Map<String, dynamic> raw) {
+    final id = _intValue(raw['id']) ?? 0;
+    final code = _stringValue(raw['code']) ?? 'COUPON$id';
+    final discountType =
+        (_stringValue(raw['discountType']) ?? '').toUpperCase();
+    final discountValue = _numValue(raw['discountValue']) ?? 0;
+    final discountText = discountType == 'PERCENT'
+        ? 'Giam ${discountValue.round()}%'
+        : 'Giam ${_formatCurrency(discountValue)} VND';
+    final description = _stringValue(raw['description']) ??
+        'Ap dung ma uu dai $code cho lan dat phong tiep theo.';
+    final palette = _couponPalette(id);
+
+    return {
+      'id': id,
+      'code': code,
+      'title': '$discountText voi ma $code',
+      'description': description,
+      'discountType': discountType,
+      'discountValue': discountValue,
+      'maxDiscountAmount': _numValue(raw['maxDiscountAmount']),
+      'minOrderAmount': _numValue(raw['minOrderAmount']),
+      'startAt': _dateTimeValue(raw['startAt']),
+      'endAt': _dateTimeValue(raw['endAt']),
+      'maxUses': _intValue(raw['maxUses']),
+      'usedCount': _intValue(raw['usedCount']) ?? 0,
+      'active': raw['active'] == true,
+      'colors': palette,
+      'icon': _couponIcon(id),
+      'backend': raw,
+    };
+  }
+
+  Map<String, dynamic> _mapPaymentCard(Map<String, dynamic> raw) {
+    final id = _intValue(raw['id']) ?? 0;
+    final last4 = _stringValue(raw['last4']) ?? '0000';
+    final brand = (_stringValue(raw['brand']) ?? 'CARD').toUpperCase();
+    final expiryMonth = _intValue(raw['expiryMonth']);
+    final expiryYear = _intValue(raw['expiryYear']);
+    final expiry = expiryMonth == null || expiryYear == null
+        ? '--/--'
+        : '${expiryMonth.toString().padLeft(2, '0')}/${(expiryYear % 100).toString().padLeft(2, '0')}';
+    final palette = _cardPalette(id);
+
+    return {
+      'id': id,
+      'customerId': _intValue(raw['customerId']),
+      'holder': _stringValue(raw['cardHolderName']) ?? 'CARDHOLDER',
+      'cardHolderName': _stringValue(raw['cardHolderName']) ?? 'CARDHOLDER',
+      'brand': brand,
+      'bank': brand,
+      'last4': last4,
+      'number': '**** $last4',
+      'displayNumber': '**** **** **** $last4',
+      'expiryMonth': expiryMonth,
+      'expiryYear': expiryYear,
+      'expiry': expiry,
+      'defaultCard': raw['defaultCard'] == true,
+      'primary': raw['defaultCard'] == true,
+      'createdAt': _dateTimeValue(raw['createdAt']),
+      'updatedAt': _dateTimeValue(raw['updatedAt']),
+      'colors': palette,
+      'backend': raw,
+    };
+  }
+
   Map<String, dynamic> _mapUser(Map<String, dynamic> raw) {
     final firstName = _stringValue(raw['firstName']) ?? '';
     final lastName = _stringValue(raw['lastName']) ?? '';
@@ -948,6 +1279,7 @@ class ApiService {
       'email': _stringValue(raw['email']) ?? '',
       'phone': _stringValue(raw['phone']) ?? '',
       'avatarUrl': _resourceUrl(raw['avatarUrl']) ?? '',
+      'emailVerified': raw['emailVerified'] == true,
       'status': _stringValue(raw['status']) ?? '',
       'createdAt': _stringValue(raw['createdAt']) ?? '',
       'backend': raw,
@@ -1041,6 +1373,63 @@ class ApiService {
     return palettes[seed.abs() % palettes.length];
   }
 
+  List<Color> _couponPalette(int seed) {
+    const palettes = <List<Color>>[
+      [Color(0xFFE9C088), Color(0xFFB95D34)],
+      [Color(0xFFFFB3C7), Color(0xFFE74C6A)],
+      [Color(0xFF1FAA59), Color(0xFF74C67A)],
+      [Color(0xFF0B5574), Color(0xFF8AC6D8)],
+      [Color(0xFF80C565), Color(0xFF2D8CCB)],
+    ];
+    return palettes[seed.abs() % palettes.length];
+  }
+
+  IconData _couponIcon(int seed) {
+    const icons = <IconData>[
+      Icons.apartment,
+      Icons.local_offer,
+      Icons.location_on,
+      Icons.hotel,
+      Icons.beach_access,
+    ];
+    return icons[seed.abs() % icons.length];
+  }
+
+  List<Color> _notificationPalette(int seed) {
+    const palettes = <List<Color>>[
+      [Color(0xFF2864A7), Color(0xFF68A5E8)],
+      [Color(0xFFD97706), Color(0xFFFBBF24)],
+      [Color(0xFF16A34A), Color(0xFF86EFAC)],
+      [Color(0xFF7C3AED), Color(0xFFC4B5FD)],
+    ];
+    return palettes[seed.abs() % palettes.length];
+  }
+
+  IconData _notificationIcon(String type) {
+    switch (type) {
+      case 'BOOKING':
+        return Icons.book_online_outlined;
+      case 'PAYMENT':
+        return Icons.payments_outlined;
+      case 'REVIEW':
+        return Icons.rate_review_outlined;
+      case 'SYSTEM':
+        return Icons.settings_outlined;
+      default:
+        return Icons.notifications_none;
+    }
+  }
+
+  List<Color> _cardPalette(int seed) {
+    const palettes = <List<Color>>[
+      [Color(0xFF201A59), Color(0xFF4B3DA3)],
+      [Color(0xFF050505), Color(0xFF2A2A2A)],
+      [Color(0xFF0B5574), Color(0xFF38BDF8)],
+      [Color(0xFF6D28D9), Color(0xFFA78BFA)],
+    ];
+    return palettes[seed.abs() % palettes.length];
+  }
+
   Color _statusColor(String status) {
     switch (status) {
       case 'CONFIRMED':
@@ -1079,6 +1468,26 @@ class ApiService {
     }
   }
 
+  String _paymentStatusLabel(String status) {
+    switch (status) {
+      case 'COMPLETED':
+        return 'Da thanh toan';
+      case 'FAILED':
+        return 'Thanh toan that bai';
+      case 'REFUNDED':
+        return 'Da hoan tien';
+      case 'PARTIALLY_REFUNDED':
+        return 'Hoan tien mot phan';
+      case 'PARTIAL':
+        return 'Thanh toan mot phan';
+      case 'UNPAID':
+        return 'Chua thanh toan';
+      case 'PENDING':
+      default:
+        return 'Dang cho thanh toan';
+    }
+  }
+
   bool _isHistoryStatus(String status) {
     return status == 'COMPLETED' ||
         status == 'CHECKED_OUT' ||
@@ -1096,6 +1505,13 @@ class ApiService {
     final day = local.day.toString().padLeft(2, '0');
     final month = local.month.toString().padLeft(2, '0');
     return '$day/$month/${local.year}';
+  }
+
+  String _dateKey(DateTime date) {
+    final local = date.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return '${local.year}-$month-$day';
   }
 
   String _formatChatTime(DateTime? value) {
@@ -1382,6 +1798,7 @@ class ApiService {
   }
 
   bool _isAuthEndpoint(String endpoint) {
+    if (endpoint == '/auth/change-password') return false;
     return endpoint.startsWith('/auth/');
   }
 

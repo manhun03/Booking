@@ -24,12 +24,66 @@ final class BusinessExtensionsController {
 
 @RestController
 @RequestMapping("/api/coupons")
-class CouponController extends CrudController<Coupon> {
+class CouponController {
     private final CouponRepository coupons;
 
     CouponController(CouponRepository repository) {
-        super(repository);
         this.coupons = repository;
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('Admin')")
+    ApiResponse<List<Coupon>> all() {
+        return ApiResponse.ok(coupons.findAll());
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('Admin')")
+    ApiResponse<Coupon> byId(@PathVariable Integer id) {
+        return ApiResponse.ok(coupons.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Coupon not found")));
+    }
+
+    @PostMapping
+    @PreAuthorize("hasRole('Admin')")
+    ApiResponse<Coupon> create(@RequestBody Coupon request) {
+        return ApiResponse.ok("Created", coupons.save(request));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('Admin')")
+    ApiResponse<Coupon> update(@PathVariable Integer id, @RequestBody Coupon request) {
+        var coupon = coupons.findById(id).orElseThrow(() -> new IllegalArgumentException("Coupon not found"));
+        coupon.setCode(request.getCode());
+        coupon.setDescription(request.getDescription());
+        coupon.setDiscountType(request.getDiscountType());
+        coupon.setDiscountValue(request.getDiscountValue());
+        coupon.setMaxDiscountAmount(request.getMaxDiscountAmount());
+        coupon.setMinOrderAmount(request.getMinOrderAmount());
+        coupon.setStartAt(request.getStartAt());
+        coupon.setEndAt(request.getEndAt());
+        coupon.setMaxUses(request.getMaxUses());
+        coupon.setUsedCount(request.getUsedCount());
+        coupon.setActive(request.isActive());
+        return ApiResponse.ok("Updated", coupons.save(coupon));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('Admin')")
+    ApiResponse<Void> delete(@PathVariable Integer id) {
+        coupons.deleteById(id);
+        return ApiResponse.ok("Deleted", null);
+    }
+
+    @GetMapping("/active")
+    ApiResponse<List<Coupon>> active() {
+        var now = Instant.now();
+        return ApiResponse.ok(coupons.findAll().stream()
+                .filter(Coupon::isActive)
+                .filter(coupon -> coupon.getStartAt() == null || !now.isBefore(coupon.getStartAt()))
+                .filter(coupon -> coupon.getEndAt() == null || !now.isAfter(coupon.getEndAt()))
+                .filter(coupon -> coupon.getMaxUses() == null || coupon.getUsedCount() < coupon.getMaxUses())
+                .toList());
     }
 
     @GetMapping("/validate")

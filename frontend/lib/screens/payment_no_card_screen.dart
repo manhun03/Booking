@@ -55,6 +55,7 @@ class PaymentNoCardScreen extends StatelessWidget {
         paidAmount: 0,
         checkInDate: _effectiveCheckInDate,
         checkOutDate: _effectiveCheckOutDate,
+        customerAddress: customer?['address']?.toString(),
         paymentMethod: 'NO_CARD',
         note: _bookingNote,
       );
@@ -91,6 +92,31 @@ class PaymentNoCardScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _openPromotion(BuildContext context) async {
+    final result = await Navigator.of(context).pushNamed(
+      '/add-promotion',
+      arguments: {'amount': _finalPrice},
+    );
+    if (!context.mounted || result == null) return;
+    if (result is Map<String, dynamic>) {
+      final code = result['code']?.toString() ?? '';
+      final discount = _asInt(result['discountAmount']) ?? 0;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            discount > 0
+                ? 'Da ap dung ma $code, giam ${_formatPrice(discount)} VND'
+                : 'Da chon ma $code',
+          ),
+        ),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Da chon ma ${result.toString()}')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ResponsivePageScaffold(
@@ -110,8 +136,7 @@ class PaymentNoCardScreen extends StatelessWidget {
                   _buildPriceCard(),
                   const SizedBox(height: 18),
                   InkWell(
-                    onTap: () =>
-                        Navigator.of(context).pushNamed('/add-promotion'),
+                    onTap: () => _openPromotion(context),
                     borderRadius: BorderRadius.circular(4),
                     child: const Padding(
                       padding: EdgeInsets.symmetric(vertical: 4),
@@ -171,7 +196,7 @@ class PaymentNoCardScreen extends StatelessWidget {
               _buildPriceCard(),
               const SizedBox(height: 16),
               InkWell(
-                onTap: () => Navigator.of(context).pushNamed('/add-promotion'),
+                onTap: () => _openPromotion(context),
                 borderRadius: BorderRadius.circular(4),
                 child: const WebPanel(
                   child: Row(
@@ -753,9 +778,11 @@ class PaymentNoCardScreen extends StatelessWidget {
 
   String get _bookingNote {
     final email = customer?['email']?.toString().trim();
+    final address = customer?['address']?.toString().trim();
     final tripPurpose = customer?['tripPurpose']?.toString().trim();
     final parts = <String>[
       if (email != null && email.isNotEmpty) 'Customer email: $email',
+      if (address != null && address.isNotEmpty) 'Customer address: $address',
       if (tripPurpose != null && tripPurpose.isNotEmpty)
         'Trip purpose: $tripPurpose',
       'Payment method: no-card',

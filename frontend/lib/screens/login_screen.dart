@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/google_identity.dart';
 import '../utils/colors.dart';
+import '../utils/constants.dart';
 import '../utils/strings.dart';
 import 'widgets/custom_text_field.dart';
 
@@ -16,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   late TextEditingController _passwordController;
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
 
   @override
   void initState() {
@@ -51,8 +54,14 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await ApiService().login(email: email, password: password);
+      final session =
+          await ApiService().login(email: email, password: password);
       if (!mounted) return;
+      if (!session.isCustomer) {
+        ApiService().logout();
+        _showMessage('This account is not allowed to use the customer app.');
+        return;
+      }
       _goToHome();
     } on ApiException catch (error) {
       if (!mounted) return;
@@ -69,8 +78,38 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _handleGoogleLogin() {
-    _showMessage('Google login is not connected on the backend yet.');
+  Future<void> _handleGoogleLogin() async {
+    if (_isLoading || _isGoogleLoading) return;
+
+    setState(() {
+      _isGoogleLoading = true;
+    });
+
+    try {
+      final idToken = await requestGoogleIdToken(
+        clientId: AppConstants.googleClientId,
+      );
+      final session = await ApiService().loginWithGoogle(idToken: idToken);
+      if (!mounted) return;
+      if (!session.isCustomer) {
+        ApiService().logout();
+        _showMessage('This account is not allowed to use the customer app.');
+        return;
+      }
+      _goToHome();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      _showMessage(error.message);
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(_cleanErrorMessage(error));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGoogleLoading = false;
+        });
+      }
+    }
   }
 
   void _goToHome() {
@@ -85,6 +124,12 @@ class _LoginScreenState extends State<LoginScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  String _cleanErrorMessage(Object error) {
+    return error
+        .toString()
+        .replaceFirst(RegExp(r'^(StateError|Exception):\s*'), '');
   }
 
   @override
@@ -188,7 +233,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _handleLogin,
+                        onPressed: _isLoading || _isGoogleLoading
+                            ? null
+                            : _handleLogin,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.colorPrimary,
                           foregroundColor: Colors.white,
@@ -251,7 +298,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: double.infinity,
                       height: 48,
                       child: OutlinedButton(
-                        onPressed: _handleGoogleLogin,
+                        onPressed: _isLoading || _isGoogleLoading
+                            ? null
+                            : _handleGoogleLogin,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.colorPrimary,
                           side: const BorderSide(
@@ -262,20 +311,28 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.g_translate, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              AppStrings.loginWithGoogle,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
+                        child: _isGoogleLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.g_translate, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    AppStrings.loginWithGoogle,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
                       ),
                     ),
                     const SizedBox(height: 24),

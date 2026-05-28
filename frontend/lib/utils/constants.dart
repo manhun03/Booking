@@ -6,6 +6,11 @@ class AppConstants {
   static const String appVersion = '1.0.0';
   static const String _apiBaseUrlOverride =
       String.fromEnvironment('API_BASE_URL');
+  static const String googleClientId = String.fromEnvironment(
+    'GOOGLE_CLIENT_ID',
+    defaultValue:
+        '883824205385-182f65ondho5qnima9ladd5j7qk2b40h.apps.googleusercontent.com',
+  );
 
   static String get backendBaseUrl {
     if (_apiBaseUrlOverride.isNotEmpty) {

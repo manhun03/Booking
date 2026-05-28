@@ -1,117 +1,157 @@
 import 'package:flutter/material.dart';
 
-class SettingsMenuScreen extends StatelessWidget {
+import '../services/auth_service.dart';
+import '../services/owner_api_service.dart';
+import '../utils/display_format.dart';
+
+class SettingsMenuScreen extends StatefulWidget {
   const SettingsMenuScreen({super.key});
 
-  final Color primaryBlue = const Color(0xFF3F63B5);
+  @override
+  State<SettingsMenuScreen> createState() => _SettingsMenuScreenState();
+}
+
+class _SettingsMenuScreenState extends State<SettingsMenuScreen> {
+  static const Color _primaryBlue = Color(0xFF3F63B5);
+  final OwnerApiService _api = OwnerApiService();
+
+  Map<String, dynamic> _settings = const {};
+  bool _bankValid = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final values = await Future.wait([
+        _api.fetchSettings(),
+        _api.validateBankInfo(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _settings = values[0] as Map<String, dynamic>;
+        _bankValid = values[1] as bool;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _open(String route) async {
+    final changed = await Navigator.pushNamed(context, route);
+    if (changed == true) await _load();
+  }
+
+  void _logout() {
+    AuthService().logout();
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final session = AuthService().currentSession;
     return Scaffold(
-      backgroundColor: Colors.grey[200],
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 450),
-          child: Container(
-            decoration: BoxDecoration(boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20)]),
-            child: Scaffold(
-              backgroundColor: const Color(0xFFF8F9FA),
-              appBar: AppBar(
-                backgroundColor: Colors.white,
-                elevation: 0,
-                title: const Text('Tài khoản & Cài đặt', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 18)),
-              ),
-              body: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                children: [
-                  // Thông tin Owner
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      children: [
-                        const CircleAvatar(radius: 30, backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=11')),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Trần Văn Chủ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              Text('owner@whitehotel.vn', style: TextStyle(color: Colors.black54, fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                      ],
+      backgroundColor: const Color(0xFFF5F7FB),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        title: const Text('Tai khoan & Cai dat'),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                Card(
+                  elevation: 0,
+                  child: ListTile(
+                    leading: const CircleAvatar(
+                      radius: 28,
+                      child: Icon(Icons.person_outline),
                     ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Nhóm Cài đặt Hệ thống
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Text('CÀI ĐẶT VẬN HÀNH', style: TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.bold)),
-                  ),
-                  _buildMenuTile(context, Icons.rule_folder, 'Chính sách đặt & Hủy phòng', '/policy-config'),
-                  _buildMenuTile(context, Icons.account_balance, 'Thông tin Ngân hàng', '/bank-info', subtitle: 'Đã xác minh', subtitleColor: Colors.green),
-                  _buildMenuTile(context, Icons.notifications_active, 'Cài đặt thông báo', ''),
-
-                  const SizedBox(height: 24),
-
-                  // Nhóm Tài khoản
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Text('TÀI KHOẢN CỦA TÔI', style: TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.bold)),
-                  ),
-                  _buildMenuTile(context, Icons.lock_outline, 'Đổi mật khẩu', '/reset-password'),
-                  _buildMenuTile(context, Icons.help_outline, 'Trung tâm hỗ trợ', ''),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Đăng xuất
-                  Material(
-                    color: Colors.white,
-                    child: InkWell(
-                      onTap: () => Navigator.pushReplacementNamed(context, '/login'),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                        child: Row(
-                          children: [
-                            Icon(Icons.logout, color: Colors.red),
-                            SizedBox(width: 16),
-                            Text('Đăng xuất', style: TextStyle(color: Colors.red, fontSize: 15, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
+                    title: Text(
+                      textValue(session?.fullName, 'Owner'),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
+                    subtitle: Text(session?.email ?? ''),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 20),
+                _header('VAN HANH'),
+                _tile(
+                  Icons.rule_folder_outlined,
+                  'Chinh sach dat phong',
+                  'Coc: ${(doubleValue(_settings['depositRate']) * 100).toStringAsFixed(0)}% | Bao truoc: ${intValue(_settings['minBookingNotice'])} gio',
+                  () => _open('/policy-config'),
+                ),
+                _tile(
+                  Icons.account_balance_outlined,
+                  'Thong tin ngan hang',
+                  _bankValid ? 'Da day du thong tin nhan tien' : 'Can cap nhat',
+                  () => _open('/bank-info'),
+                  statusColor: _bankValid ? Colors.green : Colors.orange,
+                ),
+                const SizedBox(height: 20),
+                _header('TAI KHOAN'),
+                _tile(
+                  Icons.lock_outline,
+                  'Doi mat khau',
+                  'Quan ly mat khau truy cap',
+                  () => Navigator.pushNamed(context, '/reset-password'),
+                ),
+                const SizedBox(height: 20),
+                OutlinedButton.icon(
+                  onPressed: _logout,
+                  icon: const Icon(Icons.logout, color: Colors.red),
+                  label: const Text(
+                    'Dang xuat',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ),
-      ),
     );
   }
 
-  Widget _buildMenuTile(BuildContext context, IconData icon, String title, String route, {String? subtitle, Color? subtitleColor}) {
-    return Material(
-      color: Colors.white,
-      child: InkWell(
-        onTap: route.isNotEmpty ? () => Navigator.pushNamed(context, route) : null,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Row(
-            children: [
-              Icon(icon, color: Colors.black54),
-              const SizedBox(width: 16),
-              Expanded(child: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500))),
-              if (subtitle != null)
-                Text(subtitle, style: TextStyle(color: subtitleColor ?? Colors.black54, fontSize: 12, fontWeight: FontWeight.bold)),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right, color: Colors.black26),
-            ],
-          ),
+  Widget _header(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Colors.black45,
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  );
+
+  Widget _tile(
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap, {
+    Color? statusColor,
+  }) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        onTap: onTap,
+        leading: Icon(icon, color: _primaryBlue),
+        title: Text(title),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(color: statusColor ?? Colors.black54),
         ),
+        trailing: const Icon(Icons.chevron_right),
       ),
     );
   }

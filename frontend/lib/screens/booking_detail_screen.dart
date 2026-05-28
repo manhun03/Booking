@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
+import '../services/payment_redirect.dart';
 import '../utils/colors.dart';
 import 'widgets/responsive_page.dart';
 
@@ -20,11 +23,15 @@ class BookingDetailScreen extends StatefulWidget {
 class _BookingDetailScreenState extends State<BookingDetailScreen> {
   int _selectedIndex = 2;
   late Map<String, dynamic>? _booking;
+  bool _isLoadingPayments = false;
+  String? _paymentError;
+  List<Map<String, dynamic>> _payments = [];
 
   @override
   void initState() {
     super.initState();
     _booking = widget.booking;
+    _loadPayments();
   }
 
   void _onBottomNavTapped(int index) {
@@ -48,6 +55,76 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       case 4:
         Navigator.of(context).pushNamed('/more');
         break;
+    }
+  }
+
+  Future<void> _loadPayments() async {
+    final bookingId = _bookingId;
+    if (bookingId == null || !ApiService().isAuthenticated) return;
+
+    setState(() {
+      _isLoadingPayments = true;
+      _paymentError = null;
+    });
+
+    try {
+      final payments = await ApiService().fetchPaymentsForBooking(bookingId);
+      if (!mounted) return;
+      setState(() {
+        _payments = payments;
+        _isLoadingPayments = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _paymentError = error.toString();
+        _isLoadingPayments = false;
+      });
+    }
+  }
+
+  Future<void> _openVnpayPayment() async {
+    final bookingId = _bookingId;
+    if (bookingId == null || _remainingAmount <= 0) return;
+
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      ),
+    );
+
+    var loadingOpen = true;
+    try {
+      final payment = await ApiService().initiatePayment(
+        bookingId: bookingId,
+        provider: 'VNPAY',
+        method: 'VNPAY',
+      );
+      final checkoutUrl = payment['checkoutUrl']?.toString().trim();
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      loadingOpen = false;
+      if (checkoutUrl == null || checkoutUrl.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Khong tim thay link thanh toan.')),
+        );
+        await _loadPayments();
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Dang chuyen sang VNPay...')),
+      );
+      redirectToPaymentUrl(checkoutUrl);
+    } catch (error) {
+      if (!mounted) return;
+      if (loadingOpen) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
     }
   }
 
@@ -137,6 +214,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       ),
       const SizedBox(height: 8),
       _buildStatusLine(),
+      const SizedBox(height: 14),
+      _buildPaymentSection(),
       const SizedBox(height: 17),
       const Divider(height: 1, color: AppColors.divider),
       const SizedBox(height: 16),
@@ -177,6 +256,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       ),
       const SizedBox(height: 12),
       _buildStatusLine(),
+      const SizedBox(height: 16),
+      _buildPaymentSection(),
       const SizedBox(height: 22),
       const Divider(height: 1, color: AppColors.divider),
       const SizedBox(height: 18),
@@ -340,8 +421,201 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
+  Widget _buildPaymentSection() {
+    final canPay = _remainingAmount > 0 &&
+        _canModifyBooking &&
+        _latestPaymentStatusCode != 'PENDING';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.account_balance_wallet_outlined,
+                size: 18,
+                color: AppColors.textPrimary,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Thanh toan',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _paymentStatusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  _paymentStatusText,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: _paymentStatusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildPaymentRow('Tong tien', _formatMoney(_totalAmount)),
+          const SizedBox(height: 7),
+          _buildPaymentRow('Da thanh toan', _formatMoney(_paidAmount)),
+          const SizedBox(height: 7),
+          _buildPaymentRow('Con lai', _formatMoney(_remainingAmount)),
+          if (_isLoadingPayments) ...[
+            const SizedBox(height: 12),
+            const LinearProgressIndicator(minHeight: 2),
+          ] else if (_paymentError != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _paymentError!,
+              style: const TextStyle(
+                fontSize: 11,
+                color: Colors.redAccent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ] else if (_payments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: AppColors.divider),
+            const SizedBox(height: 10),
+            ..._payments.take(3).map(_buildPaymentHistoryItem),
+          ] else ...[
+            const SizedBox(height: 12),
+            const Text(
+              'Chua co giao dich thanh toan.',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          if (canPay) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 38,
+              child: ElevatedButton.icon(
+                onPressed: _openVnpayPayment,
+                icon: const Icon(Icons.payment_outlined, size: 16),
+                label: const Text('Thanh toan VNPay'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.colorPrimary,
+                  foregroundColor: AppColors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentRow(String label, String value) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentHistoryItem(Map<String, dynamic> payment) {
+    final amount = _numValue(payment['amount']) ?? 0;
+    final status = payment['status']?.toString() ?? 'Dang cho thanh toan';
+    final provider = payment['provider']?.toString() ?? 'VNPAY';
+    final transactionCode = payment['transactionCode']?.toString() ?? '';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.receipt_long_outlined,
+            size: 15,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$provider - $status',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                if (transactionCode.isNotEmpty)
+                  Text(
+                    transactionCode,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _formatMoney(amount),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionsSection() {
     final canModify = _canModifyBooking;
+    final canReview = _canReviewBooking;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -354,6 +628,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           ),
         ),
         const SizedBox(height: 12),
+        if (canReview) ...[
+          _buildActionLink(
+            _hasReviewed ? 'Đã đánh giá' : 'Đánh giá',
+            enabled: !_hasReviewed,
+            onTap: _openReviewBooking,
+          ),
+          const SizedBox(height: 9),
+        ],
         _buildActionLink(
           'Thay đổi ngày đặt phòng',
           enabled: canModify,
@@ -405,6 +687,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     required String title,
     required VoidCallback onPressed,
   }) {
+    final isHotelContact = title.toLowerCase().contains('kh');
+    if (!isHotelContact) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -421,7 +706,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           width: double.infinity,
           height: 32,
           child: OutlinedButton(
-            onPressed: onPressed,
+            onPressed: _openHotelOwnerChat,
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.textPrimary,
               side: const BorderSide(color: AppColors.colorPrimary),
@@ -531,6 +816,86 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     return 'Đang đặt phòng';
   }
 
+  num get _totalAmount {
+    return _numValue(
+            _booking?['totalAmount'] ?? _backendField('totalAmount')) ??
+        0;
+  }
+
+  num get _paidAmount {
+    return _numValue(_booking?['paidAmount'] ?? _backendField('paidAmount')) ??
+        0;
+  }
+
+  num get _remainingAmount {
+    final explicit = _numValue(
+        _booking?['remainingAmount'] ?? _backendField('remainingAmount'));
+    if (explicit != null) return explicit < 0 ? 0 : explicit;
+    return math.max<num>(0, _totalAmount - _paidAmount);
+  }
+
+  String get _paymentStatusText {
+    final latestStatus = _latestPaymentStatusCode;
+    if (latestStatus.isNotEmpty) return _paymentStatusLabel(latestStatus);
+    final mappedStatus = _booking?['paymentStatus']?.toString();
+    if (mappedStatus != null && mappedStatus.trim().isNotEmpty) {
+      return mappedStatus.trim();
+    }
+    if (_totalAmount > 0 && _paidAmount >= _totalAmount) {
+      return 'Da thanh toan';
+    }
+    if (_paidAmount > 0) return 'Thanh toan mot phan';
+    return 'Chua thanh toan';
+  }
+
+  Color get _paymentStatusColor {
+    switch (_latestPaymentStatusCode) {
+      case 'COMPLETED':
+        return const Color(0xFF15803D);
+      case 'FAILED':
+        return const Color(0xFFDC2626);
+      case 'REFUNDED':
+      case 'PARTIALLY_REFUNDED':
+        return const Color(0xFF7C3AED);
+      case 'PENDING':
+        return const Color(0xFFD97706);
+      default:
+        if (_totalAmount > 0 && _paidAmount >= _totalAmount) {
+          return const Color(0xFF15803D);
+        }
+        if (_paidAmount > 0) return const Color(0xFFD97706);
+        return AppColors.textSecondary;
+    }
+  }
+
+  String get _latestPaymentStatusCode {
+    if (_payments.isNotEmpty) {
+      final status = _payments.first['statusCode']?.toString().trim();
+      if (status != null && status.isNotEmpty) return status.toUpperCase();
+    }
+    final status = _booking?['paymentStatusCode']?.toString().trim();
+    return status == null ? '' : status.toUpperCase();
+  }
+
+  String _paymentStatusLabel(String status) {
+    switch (status) {
+      case 'COMPLETED':
+        return 'Da thanh toan';
+      case 'FAILED':
+        return 'Thanh toan that bai';
+      case 'REFUNDED':
+        return 'Da hoan tien';
+      case 'PARTIALLY_REFUNDED':
+        return 'Hoan tien mot phan';
+      case 'PARTIAL':
+        return 'Thanh toan mot phan';
+      case 'PENDING':
+        return 'Dang cho thanh toan';
+      default:
+        return 'Chua thanh toan';
+    }
+  }
+
   String get _titleText {
     final name = _booking?['name'];
     if (name is String && name.trim().isNotEmpty) return name.trim();
@@ -545,6 +910,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         status != 'CHECKED_OUT' &&
         status != 'REJECTED';
   }
+
+  bool get _canReviewBooking {
+    final status = _statusCode;
+    return _bookingId != null &&
+        (status == 'COMPLETED' || status == 'CHECKED_OUT');
+  }
+
+  bool get _hasReviewed => _booking?['reviewed'] == true;
 
   String get _statusCode {
     final code = _booking?['statusCode'] ?? _backendField('status');
@@ -572,11 +945,44 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     _syncReturnedBooking(result);
   }
 
+  Future<void> _openReviewBooking() async {
+    final result = await Navigator.of(context).pushNamed(
+      '/review-booking',
+      arguments: _booking,
+    );
+    if (!mounted || result is! Map<String, dynamic>) return;
+    setState(() {
+      _booking = <String, dynamic>{
+        ...?_booking,
+        'reviewed': true,
+      };
+    });
+  }
+
+  void _openHotelOwnerChat() {
+    final ownerId = _intValue(_booking?['ownerId'] ?? _backendField('ownerId'));
+    if (ownerId == null || ownerId <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Khong tim thay chu khach san.')),
+      );
+      return;
+    }
+
+    Navigator.of(context).pushNamed(
+      '/message-chat',
+      arguments: {
+        'userId': ownerId,
+        'name': _titleText,
+      },
+    );
+  }
+
   void _syncReturnedBooking(Object? result) {
     if (!mounted || result is! Map<String, dynamic>) return;
     setState(() {
       _booking = result;
     });
+    unawaited(_loadPayments());
   }
 
   dynamic _backendField(String key) {
@@ -591,6 +997,24 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     if (value is num) return value.toInt();
     if (value is String) return int.tryParse(value.trim());
     return null;
+  }
+
+  num? _numValue(dynamic value) {
+    if (value is num) return value;
+    if (value is String) {
+      final normalized = value.replaceAll(',', '').trim();
+      if (normalized.isEmpty) return null;
+      return num.tryParse(normalized) ??
+          num.tryParse(normalized.replaceAll(RegExp(r'[^0-9.]'), ''));
+    }
+    return null;
+  }
+
+  String _formatMoney(num value) {
+    return '${value.round().toString().replaceAllMapped(
+          RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+          (match) => '${match[1]}.',
+        )} VND';
   }
 }
 

@@ -13,8 +13,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 public class ChatMessageService {
@@ -31,8 +35,12 @@ public class ChatMessageService {
     @Transactional(readOnly = true)
     public List<ChatConversationDto> conversations(Integer userId) {
         var summaries = new LinkedHashMap<Integer, ConversationAccumulator>();
+        var rolesByUserId = new HashMap<Integer, Set<String>>();
         for (var message : messages.inboxMessages(userId)) {
             var other = userId.equals(message.getSender().getId()) ? message.getReceiver() : message.getSender();
+            if (!canChat(userId, other.getId(), rolesByUserId)) {
+                continue;
+            }
             var summary = summaries.computeIfAbsent(other.getId(), ignored ->
                     new ConversationAccumulator(other.getId(), displayName(other), other.getEmail(),
                             message.getContent(), message.getCreatedAt()));
@@ -51,7 +59,10 @@ public class ChatMessageService {
         var existingIds = conversations.stream()
                 .map(ChatConversationDto::userId)
                 .collect(java.util.stream.Collectors.toSet());
-        users.findChatContacts(userId).stream()
+        var contacts = hasRole(userId, "Customer") && !hasRole(userId, "Owner")
+                ? users.findOwnerChatContacts(userId)
+                : users.findChatContacts(userId);
+        contacts.stream()
                 .filter(user -> !existingIds.contains(user.getId()))
                 .map(user -> new ChatConversationDto(user.getId(), displayName(user), user.getEmail(), null, 0, null))
                 .forEach(conversations::add);
@@ -60,6 +71,9 @@ public class ChatMessageService {
 
     @Transactional(readOnly = true)
     public List<ChatMessageDto> conversation(Integer userId, Integer otherUserId) {
+        if (!canChat(userId, otherUserId)) {
+            throw new IllegalArgumentException("Customers can only chat with hotel owners");
+        }
         return messages.conversation(userId, otherUserId).stream()
                 .map(mapper::toChatMessageDto)
                 .toList();
@@ -84,6 +98,9 @@ public class ChatMessageService {
         if (request.receiverId().equals(senderId)) {
             throw new IllegalArgumentException("Receiver must be different from sender");
         }
+        if (!canChat(senderId, request.receiverId())) {
+            throw new IllegalArgumentException("Customers can only chat with hotel owners");
+        }
 
         var sender = new User();
         sender.setId(senderId);
@@ -99,6 +116,49 @@ public class ChatMessageService {
         }
         message.setContent(content);
         return mapper.toChatMessageDto(messages.save(message));
+    }
+
+    private boolean canChat(Integer userId, Integer otherUserId) {
+        return canChat(userId, otherUserId, new HashMap<>());
+    }
+
+    private boolean canChat(Integer userId, Integer otherUserId, Map<Integer, Set<String>> rolesByUserId) {
+        if (userId == null || otherUserId == null || userId.equals(otherUserId)) {
+            return false;
+        }
+
+        var userRoles = roles(userId, rolesByUserId);
+        var otherRoles = roles(otherUserId, rolesByUserId);
+        if (userRoles.isEmpty() || otherRoles.isEmpty()) {
+            return false;
+        }
+
+        var userIsCustomerOnly = userRoles.contains("customer") && !userRoles.contains("owner") && !userRoles.contains("admin");
+        var otherIsCustomerOnly = otherRoles.contains("customer") && !otherRoles.contains("owner") && !otherRoles.contains("admin");
+        if (userIsCustomerOnly || otherIsCustomerOnly) {
+            return (userRoles.contains("customer") && otherRoles.contains("owner"))
+                    || (userRoles.contains("owner") && otherRoles.contains("customer"));
+        }
+        return true;
+    }
+
+    private boolean hasRole(Integer userId, String role) {
+        return roles(userId, new HashMap<>()).contains(normalizeRole(role));
+    }
+
+    private Set<String> roles(Integer userId, Map<Integer, Set<String>> rolesByUserId) {
+        return rolesByUserId.computeIfAbsent(userId, ignored -> {
+            var names = new HashSet<String>();
+            users.findRoleNamesByUserId(userId).stream()
+                    .map(this::normalizeRole)
+                    .filter(name -> !name.isBlank())
+                    .forEach(names::add);
+            return names;
+        });
+    }
+
+    private String normalizeRole(String role) {
+        return role == null ? "" : role.toLowerCase().replaceFirst("^role_", "").trim();
     }
 
     @Transactional

@@ -9,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.ConnectException;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -63,6 +64,8 @@ public class AiChatProxyService {
             return objectMapper.readTree(response.body());
         } catch (ResponseStatusException ex) {
             throw ex;
+        } catch (ConnectException ex) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(502), "Cannot connect to AI chat service", ex);
         } catch (IOException ex) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(502), "Invalid AI chat response", ex);
         } catch (InterruptedException ex) {

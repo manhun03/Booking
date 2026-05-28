@@ -278,7 +278,6 @@ class _MessageScreenState extends State<MessageScreen> {
                     ),
                   ),
                 ),
-                _buildStatusPill(),
               ],
             ),
           ),
@@ -540,39 +539,6 @@ class _MessageScreenState extends State<MessageScreen> {
               fontSize: compact ? 18 : 20,
               fontWeight: FontWeight.w800,
               color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusPill() {
-    final connected = _socket != null;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: (connected ? const Color(0xFF22C55E) : const Color(0xFFD97706))
-            .withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            connected ? Icons.wifi_tethering : Icons.sync,
-            size: 14,
-            color:
-                connected ? const Color(0xFF16A34A) : const Color(0xFFD97706),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            connected ? 'Realtime' : 'Đang đồng bộ',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color:
-                  connected ? const Color(0xFF16A34A) : const Color(0xFFD97706),
             ),
           ),
         ],

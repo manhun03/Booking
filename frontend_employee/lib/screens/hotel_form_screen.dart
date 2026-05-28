@@ -1,134 +1,159 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
+import '../services/owner_api_service.dart';
+import '../utils/display_format.dart';
+
 class HotelFormScreen extends StatefulWidget {
-  const HotelFormScreen({super.key});
+  const HotelFormScreen({super.key, this.hotel});
+
+  final Map<String, dynamic>? hotel;
 
   @override
   State<HotelFormScreen> createState() => _HotelFormScreenState();
 }
 
 class _HotelFormScreenState extends State<HotelFormScreen> {
-  final Color primaryBlue = const Color(0xFF3F63B5);
-  bool _isActive = true;
+  static const Color _primaryBlue = Color(0xFF3F63B5);
+  final OwnerApiService _api = OwnerApiService();
+  final TextEditingController _name = TextEditingController();
+  final TextEditingController _street = TextEditingController();
+  final TextEditingController _phone = TextEditingController();
+  final TextEditingController _description = TextEditingController();
+
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final hotel = widget.hotel;
+    if (hotel != null) {
+      _name.text = textValue(hotel['name'], '');
+      _street.text = textValue(hotel['street'], '');
+      _phone.text = textValue(hotel['phone'], '');
+      _description.text = textValue(hotel['description'], '');
+    }
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _street.dispose();
+    _phone.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_name.text.trim().isEmpty || _street.text.trim().isEmpty) {
+      _message('Vui long nhap ten va dia chi khach san.');
+      return;
+    }
+    setState(() => _saving = true);
+    final payload = {
+      'name': _name.text.trim(),
+      'street': _street.text.trim(),
+      'phone': _phone.text.trim(),
+      'description': _description.text.trim(),
+    };
+    try {
+      final id = widget.hotel == null ? null : intValue(widget.hotel!['id']);
+      if (id == null) {
+        await _api.createHotel(payload);
+      } else {
+        await _api.updateHotel(id, payload);
+      }
+      if (!mounted) return;
+      _message(
+        id == null
+            ? 'Da gui khach san de admin duyet.'
+            : 'Da cap nhat khach san.',
+      );
+      Navigator.pop(context, true);
+    } on ApiException catch (error) {
+      if (mounted) _message(error.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _message(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
 
   @override
   Widget build(BuildContext context) {
+    final editing = widget.hotel != null;
     return Scaffold(
-      backgroundColor: Colors.grey[200],
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 450),
-          child: Container(
-            decoration: BoxDecoration(boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20)]),
-            child: Scaffold(
-              backgroundColor: const Color(0xFFF8F9FA),
-              appBar: AppBar(
-                backgroundColor: Colors.white,
-                elevation: 0,
-                leading: const BackButton(color: Colors.black87),
-                title: const Text('Thông tin Khách sạn', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 18)),
-              ),
-              body: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Upload Ảnh (Giả lập)
-                    Container(
-                      width: double.infinity,
-                      height: 150,
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.black12, style: BorderStyle.solid)),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_photo_alternate_outlined, size: 40, color: primaryBlue),
-                          const SizedBox(height: 8),
-                          const Text('Tải ảnh bìa lên (Chọn từ thư mục lastest)', style: TextStyle(color: Colors.black54, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    _buildLabel('Tên khách sạn'),
-                    _buildTextField('VD: White Hotel - Cầu Giấy'),
-                    const SizedBox(height: 16),
-                    
-                    _buildLabel('Tỉnh / Thành phố'),
-                    DropdownButtonFormField<String>(
-                      decoration: _inputDecoration(),
-                      items: ['Hà Nội', 'Hồ Chí Minh', 'Đà Nẵng'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                      onChanged: (value) {},
-                      hint: const Text('Chọn Tỉnh/Thành'),
-                    ),
-                    const SizedBox(height: 16),
-
-                    _buildLabel('Địa chỉ chi tiết'),
-                    _buildTextField('Số nhà, tên đường...'),
-                    const SizedBox(height: 16),
-
-                    _buildLabel('Mô tả ngắn gọn'),
-                    TextFormField(
-                      maxLines: 4,
-                      decoration: _inputDecoration().copyWith(hintText: 'Mô tả cơ sở vật chất, vị trí...'),
-                    ),
-                    const SizedBox(height: 24),
-
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.black12)),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Trạng thái hoạt động', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          Switch(
-                            value: _isActive,
-                            activeThumbColor: primaryBlue,
-                            onChanged: (val) => setState(() => _isActive = val),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(backgroundColor: primaryBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                        child: const Text('Lưu thông tin', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+      backgroundColor: const Color(0xFFF5F7FB),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        title: Text(editing ? 'Chinh sua khach san' : 'Them khach san'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          if (!editing)
+            const Card(
+              elevation: 0,
+              child: Padding(
+                padding: EdgeInsets.all(14),
+                child: Text(
+                  'Khach san moi se o trang thai cho admin duyet.',
+                  style: TextStyle(color: Colors.black54),
                 ),
               ),
             ),
+          if (!editing) const SizedBox(height: 15),
+          _field('Ten khach san', _name),
+          const SizedBox(height: 15),
+          _field('Dia chi', _street),
+          const SizedBox(height: 15),
+          _field('So dien thoai', _phone, type: TextInputType.phone),
+          const SizedBox(height: 15),
+          _field('Mo ta', _description, lines: 4),
+          const SizedBox(height: 30),
+          SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _saving ? null : _save,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryBlue,
+                foregroundColor: Colors.white,
+              ),
+              child: _saving
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Luu thong tin'),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
-    );
-  }
-
-  Widget _buildTextField(String hint) {
-    return TextFormField(decoration: _inputDecoration().copyWith(hintText: hint));
-  }
-
-  InputDecoration _inputDecoration() {
-    return InputDecoration(
-      filled: true,
-      fillColor: Colors.white,
-      hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.black12)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.black12)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primaryBlue)),
+  Widget _field(
+    String label,
+    TextEditingController controller, {
+    TextInputType? type,
+    int lines = 1,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          keyboardType: type,
+          maxLines: lines,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
@@ -12,7 +13,102 @@ class CreditCardScreen extends StatefulWidget {
 }
 
 class _CreditCardScreenState extends State<CreditCardScreen> {
+  final ApiService _api = ApiService();
   int _selectedIndex = 4;
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _cards = [];
+
+  Map<String, dynamic>? get _defaultCard {
+    for (final card in _cards) {
+      if (card['defaultCard'] == true) return card;
+    }
+    return _cards.isEmpty ? null : _cards.first;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCards();
+  }
+
+  Future<void> _loadCards() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      await _api.restoreSession();
+      final cards = await _api.fetchPaymentCards();
+      if (!mounted) return;
+      setState(() {
+        _cards = cards;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _openAddCard() async {
+    final saved = await Navigator.of(context).pushNamed('/add-card');
+    if (saved == true) {
+      await _loadCards();
+    }
+  }
+
+  Future<void> _setDefaultCard(Map<String, dynamic> card) async {
+    final id = _intValue(card['id']);
+    if (id == null || card['defaultCard'] == true) return;
+    try {
+      await _api.setDefaultPaymentCard(id);
+      await _loadCards();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
+  }
+
+  Future<void> _deleteCard(Map<String, dynamic> card) async {
+    final id = _intValue(card['id']);
+    if (id == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xoa the thanh toan?'),
+        content:
+            Text('The ${_textValue(card, 'number')} se bi xoa khoi tai khoan.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Huy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Xoa'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await _api.deletePaymentCard(id);
+      await _loadCards();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
+  }
 
   void _onBottomNavTapped(int index) {
     setState(() {
@@ -45,29 +141,18 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
         children: [
           _buildTopBar(context),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(28, 14, 28, 18),
-              child: Column(
-                children: [
-                  _buildTitleRow(context, 'Credit Card'),
-                  const SizedBox(height: 22),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildPurpleCard(),
-                  ),
-                  const SizedBox(height: 32),
-                  const Divider(height: 1, color: AppColors.textSecondary),
-                  const SizedBox(height: 30),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildBlackCard(),
-                  ),
-                  const SizedBox(height: 68),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _buildAddButton(context),
-                  ),
-                ],
+            child: RefreshIndicator(
+              onRefresh: _loadCards,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(28, 14, 28, 18),
+                child: Column(
+                  children: [
+                    _buildTitleRow(context, 'Credit Card'),
+                    const SizedBox(height: 22),
+                    _buildMobileCards(),
+                  ],
+                ),
               ),
             ),
           ),
@@ -82,7 +167,7 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
     return WebAppShell(
       title: 'Payment Cards',
       subtitle:
-          'Quản lý thẻ thanh toán đã lưu, thêm thẻ mới và kiểm tra trạng thái bảo mật tài khoản.',
+          'Quan ly the thanh toan da luu, them the moi va kiem tra trang thai bao mat tai khoan.',
       selectedIndex: 4,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -113,7 +198,28 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
     );
   }
 
+  Widget _buildMobileCards() {
+    if (_loading || _error != null || _cards.isEmpty) {
+      return _buildStateContent();
+    }
+
+    return Column(
+      children: [
+        for (final card in _cards) ...[
+          _buildCardTile(card: card),
+          const SizedBox(height: 16),
+        ],
+        const SizedBox(height: 18),
+        Align(
+          alignment: Alignment.centerRight,
+          child: _buildAddButton(context),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDesktopSummaryPanel(BuildContext context) {
+    final defaultCard = _defaultCard;
     return WebPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,7 +239,7 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
           ),
           const SizedBox(height: 18),
           const Text(
-            'Thẻ đã lưu',
+            'The da luu',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
@@ -141,9 +247,9 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            '2 thẻ đang khả dụng cho thanh toán đặt phòng.',
-            style: TextStyle(
+          Text(
+            '${_cards.length} the dang kha dung cho thanh toan dat phong.',
+            style: const TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,
             ),
@@ -151,23 +257,25 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
           const SizedBox(height: 22),
           _buildSummaryTile(
             icon: Icons.verified_user_outlined,
-            label: 'Bảo mật',
-            value: 'Đã xác minh',
+            label: 'Bao mat',
+            value: 'Chi luu metadata',
           ),
           const SizedBox(height: 10),
           _buildSummaryTile(
             icon: Icons.payments_outlined,
-            label: 'Mặc định',
-            value: 'Bank Name',
+            label: 'Mac dinh',
+            value: defaultCard == null
+                ? 'Chua co'
+                : '${_textValue(defaultCard, 'brand')} ${_textValue(defaultCard, 'number')}',
           ),
           const SizedBox(height: 22),
           SizedBox(
             width: double.infinity,
             height: 46,
             child: ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).pushNamed('/add-card'),
+              onPressed: _openAddCard,
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('Thêm thẻ mới'),
+              label: const Text('Them the moi'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.colorPrimary,
                 foregroundColor: AppColors.white,
@@ -192,7 +300,7 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
             children: [
               const Expanded(
                 child: Text(
-                  'Danh sách thẻ',
+                  'Danh sach the',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -200,44 +308,102 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
                   ),
                 ),
               ),
+              IconButton(
+                tooltip: 'Tai lai',
+                onPressed: _loadCards,
+                icon: const Icon(Icons.refresh),
+              ),
               TextButton.icon(
-                onPressed: () => Navigator.of(context).pushNamed('/add-card'),
+                onPressed: _openAddCard,
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('Add card'),
               ),
             ],
           ),
           const SizedBox(height: 18),
-          Wrap(
-            spacing: 18,
-            runSpacing: 18,
-            children: [
-              _buildCardTile(
-                card: _buildPurpleCard(width: 320, height: 198),
-                bank: 'Bank Name',
-                number: '**** 5432',
-                primary: true,
-              ),
-              _buildCardTile(
-                card: _buildBlackCard(width: 320, height: 198),
-                bank: 'BANK',
-                number: '**** 5463',
-              ),
-            ],
+          if (_loading || _error != null || _cards.isEmpty)
+            _buildStateContent()
+          else
+            Wrap(
+              spacing: 18,
+              runSpacing: 18,
+              children: [
+                for (final card in _cards)
+                  _buildCardTile(card: card, wide: true),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStateContent() {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final hasError = _error != null;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            hasError ? Icons.error_outline : Icons.credit_card_off_outlined,
+            color: AppColors.colorPrimary,
+            size: 34,
           ),
+          const SizedBox(height: 10),
+          Text(
+            hasError
+                ? 'Khong tai duoc danh sach the'
+                : 'Chua co the thanh toan',
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            hasError ? _error! : 'Bam Add card de luu the moi vao backend.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (hasError)
+            OutlinedButton(onPressed: _loadCards, child: const Text('Thu lai'))
+          else
+            ElevatedButton.icon(
+              onPressed: _openAddCard,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add card'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.colorPrimary,
+                foregroundColor: AppColors.white,
+              ),
+            ),
         ],
       ),
     );
   }
 
   Widget _buildCardTile({
-    required Widget card,
-    required String bank,
-    required String number,
-    bool primary = false,
+    required Map<String, dynamic> card,
+    bool wide = false,
   }) {
     return Container(
-      width: 344,
+      width: wide ? 344 : double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.colorBg,
@@ -247,13 +413,14 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          card,
+          _buildPaymentCard(card,
+              width: wide ? 320 : 292, height: wide ? 198 : 180),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: Text(
-                  bank,
+                  _textValue(card, 'brand'),
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
@@ -261,7 +428,7 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
                   ),
                 ),
               ),
-              if (primary)
+              if (card['defaultCard'] == true)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -279,12 +446,26 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
                       color: AppColors.colorPrimary,
                     ),
                   ),
+                )
+              else
+                TextButton(
+                  onPressed: () => _setDefaultCard(card),
+                  child: const Text('Set default'),
                 ),
+              IconButton(
+                tooltip: 'Xoa the',
+                onPressed: () => _deleteCard(card),
+                icon: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.red,
+                  size: 20,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
-            number,
+            _textValue(card, 'number'),
             style: const TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,
@@ -392,66 +573,73 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
             ),
           ),
         ),
-        SizedBox(
-          width: 28,
-          height: 28,
-          child: IconButton(
-            padding: EdgeInsets.zero,
-            icon: const Icon(
-              Icons.filter_list,
-              size: 18,
-              color: AppColors.colorPrimary,
-            ),
-            onPressed: () {},
+        IconButton(
+          padding: EdgeInsets.zero,
+          icon: const Icon(
+            Icons.refresh,
+            size: 18,
+            color: AppColors.colorPrimary,
           ),
+          onPressed: _loadCards,
         ),
       ],
     );
   }
 
-  Widget _buildPurpleCard({double width = 292, double height = 180}) {
+  Widget _buildPaymentCard(
+    Map<String, dynamic> card, {
+    double width = 292,
+    double height = 180,
+  }) {
+    final colors = _colorsValue(card);
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: const Color(0xFF201A59),
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(8),
       ),
       padding: const EdgeInsets.fromLTRB(24, 16, 20, 16),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Align(
             alignment: Alignment.centerRight,
             child: Text(
-              'Bank Name',
-              style: TextStyle(
+              _textValue(card, 'brand'),
+              style: const TextStyle(
                 color: AppColors.white,
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
               ),
             ),
           ),
-          SizedBox(height: 16),
-          Icon(Icons.credit_card, color: Color(0xFFD7D5FF), size: 40),
-          SizedBox(height: 12),
+          const SizedBox(height: 16),
+          const Icon(Icons.credit_card, color: Color(0xFFD7D5FF), size: 40),
+          const SizedBox(height: 12),
           Text(
-            '1234   5678   9976   5432',
-            style: TextStyle(
+            _textValue(card, 'displayNumber'),
+            style: const TextStyle(
               color: Color(0xFFD7D5FF),
               fontSize: 18,
               letterSpacing: 1,
             ),
           ),
-          SizedBox(height: 2),
+          const SizedBox(height: 2),
           Text(
-            '1234          12/49',
-            style: TextStyle(color: AppColors.white, fontSize: 9),
+            _textValue(card, 'expiry'),
+            style: const TextStyle(color: AppColors.white, fontSize: 9),
           ),
-          Spacer(),
+          const Spacer(),
           Text(
-            'CARDHOLDER',
-            style: TextStyle(
+            _textValue(card, 'holder').toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
               color: AppColors.white,
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -462,60 +650,9 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
     );
   }
 
-  Widget _buildBlackCard({double width = 302, double height = 190}) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              'BANK',
-              style: TextStyle(
-                color: AppColors.white,
-                fontSize: 34,
-                letterSpacing: 1,
-              ),
-            ),
-          ),
-          const Spacer(),
-          Container(
-            width: 46,
-            height: 38,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(5),
-              border: Border.all(color: AppColors.white),
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            '1234    4567    8921    5463',
-            style: TextStyle(
-              color: AppColors.white,
-              fontSize: 18,
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            '****',
-            style: TextStyle(color: AppColors.white, fontSize: 10),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildAddButton(BuildContext context) {
     return OutlinedButton(
-      onPressed: () => Navigator.of(context).pushNamed('/add-card'),
+      onPressed: _openAddCard,
       style: OutlinedButton.styleFrom(
         shape: const CircleBorder(),
         side: const BorderSide(color: AppColors.colorPrimary),
@@ -582,42 +719,34 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
   Widget _buildBellButton(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.of(context).pushNamed('/notification'),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const Icon(
-            Icons.notifications_none,
-            size: 22,
-            color: AppColors.textPrimary,
-          ),
-          Positioned(
-            right: -2,
-            top: -4,
-            child: Container(
-              width: 14,
-              height: 14,
-              decoration: const BoxDecoration(
-                color: Colors.red,
-                shape: BoxShape.circle,
-              ),
-              child: const Center(
-                child: Text(
-                  '1',
-                  style: TextStyle(
-                    color: AppColors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+      child: const Icon(
+        Icons.notifications_none,
+        size: 22,
+        color: AppColors.textPrimary,
       ),
     );
   }
 
   static Widget _buildAvatar({required double size}) {
     return CurrentUserAvatar(size: size);
+  }
+
+  String _textValue(Map<String, dynamic> data, String key) {
+    final value = data[key];
+    if (value == null) return '';
+    return value.toString();
+  }
+
+  List<Color> _colorsValue(Map<String, dynamic> data) {
+    final value = data['colors'];
+    if (value is List<Color> && value.length >= 2) return value;
+    return const [Color(0xFF201A59), Color(0xFF4B3DA3)];
+  }
+
+  int? _intValue(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 }

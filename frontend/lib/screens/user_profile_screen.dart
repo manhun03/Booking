@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/language_service.dart';
 import '../utils/colors.dart';
 import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
@@ -13,47 +14,78 @@ class UserProfileScreen extends StatefulWidget {
 }
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
+  final LanguageService _language = LanguageService();
   int _selectedIndex = 4;
   bool _isLoadingProfile = false;
+  bool _isSendingEmailVerification = false;
   String? _profileError;
   Map<String, dynamic>? _profile;
 
-  static const List<_ProfileMenuItem> _menuItems = [
-    _ProfileMenuItem(Icons.home_outlined, 'Home', route: '/home'),
-    _ProfileMenuItem(
-      Icons.account_balance_wallet_outlined,
-      'Tài khoản ngân hàng',
-    ),
-    _ProfileMenuItem(Icons.history, 'Lịch sử thuê'),
-    _ProfileMenuItem(
-      Icons.favorite,
-      'Yêu thích',
-      route: '/favorite',
-      color: Colors.red,
-    ),
-    _ProfileMenuItem(
-      Icons.credit_card_outlined,
-      'Thẻ thanh toán',
-      route: '/credit-card',
-    ),
-    _ProfileMenuItem(
-      Icons.notifications_none,
-      'Thông báo',
-      route: '/notification',
-    ),
-    _ProfileMenuItem(Icons.article_outlined, 'Ngôn ngữ', route: '/language'),
-    _ProfileMenuItem(Icons.local_offer_outlined, 'Ưu đãi', route: '/promotion'),
-    _ProfileMenuItem(
-      Icons.account_balance_outlined,
-      'Chính sách',
-      route: '/legal-policies',
-    ),
-  ];
+  List<_ProfileMenuItem> get _menuItems => [
+        _ProfileMenuItem(
+          Icons.home_outlined,
+          _language.t('profile.home'),
+          route: '/home',
+        ),
+        _ProfileMenuItem(
+          Icons.account_balance_wallet_outlined,
+          _language.t('profile.bankAccount'),
+        ),
+        _ProfileMenuItem(Icons.history, _language.t('profile.history')),
+        _ProfileMenuItem(
+          Icons.favorite,
+          _language.t('profile.favorites'),
+          route: '/favorite',
+          color: Colors.red,
+        ),
+        _ProfileMenuItem(
+          Icons.credit_card_outlined,
+          _language.t('profile.paymentCards'),
+          route: '/credit-card',
+        ),
+        _ProfileMenuItem(
+          Icons.notifications_none,
+          _language.t('profile.notifications'),
+          route: '/notification',
+        ),
+        _ProfileMenuItem(
+          Icons.article_outlined,
+          _language.t('profile.language'),
+          route: '/language',
+        ),
+        _ProfileMenuItem(
+          Icons.local_offer_outlined,
+          _language.t('profile.promotions'),
+          route: '/promotion',
+        ),
+        _ProfileMenuItem(
+          Icons.account_balance_outlined,
+          _language.t('profile.policies'),
+          route: '/legal-policies',
+        ),
+        if (_isCustomer)
+          _ProfileMenuItem(
+            Icons.lock_reset_outlined,
+            _language.t('profile.changePassword'),
+            route: '/change-password',
+          ),
+      ];
 
   @override
   void initState() {
     super.initState();
+    _language.addListener(_refreshLanguage);
     _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _language.removeListener(_refreshLanguage);
+    super.dispose();
+  }
+
+  void _refreshLanguage() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadProfile() async {
@@ -140,6 +172,177 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 
+  void _openChangePassword() {
+    Navigator.of(context).pushNamed('/change-password');
+  }
+
+  Future<void> _sendEmailVerification() async {
+    final email = _textValue(_profile?['email']);
+    if (!ApiService().isAuthenticated) {
+      _showSnack(_language.t('emailVerification.loginRequired'));
+      return;
+    }
+    if (!_isCustomer) {
+      _showSnack(_language.t('emailVerification.customerOnly'));
+      return;
+    }
+    if (email.isEmpty || _isSendingEmailVerification) return;
+
+    setState(() {
+      _isSendingEmailVerification = true;
+      _profileError = null;
+    });
+
+    try {
+      final response = await ApiService().sendEmailVerification(email: email);
+      if (!mounted) return;
+      setState(() {
+        _isSendingEmailVerification = false;
+      });
+      _showSnack(_language.t('emailVerification.sendSuccess'));
+      await _showEmailVerificationDialog(
+        generatedToken: _textValue(response['token']),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isSendingEmailVerification = false;
+        _profileError = error.toString();
+      });
+    }
+  }
+
+  Future<void> _showEmailVerificationDialog({String? generatedToken}) async {
+    final tokenController = TextEditingController(text: generatedToken ?? '');
+    var isVerifying = false;
+    String? errorMessage;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> verify() async {
+              final token = tokenController.text.trim();
+              if (token.isEmpty) {
+                setDialogState(() {
+                  errorMessage = _language.t('emailVerification.tokenRequired');
+                });
+                return;
+              }
+
+              setDialogState(() {
+                isVerifying = true;
+                errorMessage = null;
+              });
+
+              try {
+                await ApiService().verifyEmail(token: token);
+                final profile = await ApiService().fetchCurrentUser();
+                if (!mounted) return;
+                setState(() {
+                  _profile = profile;
+                  _profileError = null;
+                });
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop();
+                _showSnack(_language.t('emailVerification.success'));
+              } catch (error) {
+                if (!dialogContext.mounted) return;
+                setDialogState(() {
+                  isVerifying = false;
+                  errorMessage = error.toString();
+                });
+              }
+            }
+
+            return AlertDialog(
+              title: Text(_language.t('emailVerification.title')),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_language.t('emailVerification.subtitle')),
+                    if (generatedToken != null &&
+                        generatedToken.trim().isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      SelectableText(
+                        '${_language.t('emailVerification.generatedToken')}: $generatedToken',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.colorPrimary,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: tokenController,
+                      decoration: InputDecoration(
+                        labelText: _language.t('emailVerification.token'),
+                        prefixIcon: const Icon(Icons.verified_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        errorMessage!,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isVerifying
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('OK'),
+                ),
+                ElevatedButton(
+                  onPressed: isVerifying ? null : verify,
+                  child: Text(
+                    isVerifying
+                        ? _language.t('emailVerification.verifying')
+                        : _language.t('emailVerification.verify'),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    tokenController.dispose();
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  bool get _isCustomer {
+    final roles = ApiService().currentSession?.roles ?? const <String>[];
+    return roles.any(
+      (role) => role.toLowerCase().replaceFirst('role_', '') == 'customer',
+    );
+  }
+
+  bool get _emailVerified => _profile?['emailVerified'] == true;
+
   String get _displayName {
     final name = _textValue(_profile?['fullName']);
     return name.isEmpty ? 'Customer' : name;
@@ -147,12 +350,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   String get _displayEmail {
     final email = _textValue(_profile?['email']);
-    return email.isEmpty ? 'Chua co email' : email;
+    return email.isEmpty ? _language.t('profile.missingEmail') : email;
   }
 
   String get _displayPhone {
     final phone = _textValue(_profile?['phone']);
-    return phone.isEmpty ? 'Chua cap nhat' : phone;
+    return phone.isEmpty ? _language.t('profile.notUpdated') : phone;
   }
 
   String _textValue(dynamic value) {
@@ -170,22 +373,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           children: [
             _buildTopBar(context),
             Expanded(
-              child: ColoredBox(
-                color: AppColors.colorBg,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(28, 14, 28, 18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildTitleRow(context, 'Information'),
-                      const SizedBox(height: 18),
-                      _buildUserInfoCard(),
-                      const SizedBox(height: 28),
-                      _buildMenuCard(context),
-                      const SizedBox(height: 18),
-                      _buildLogoutButton(),
-                    ],
-                  ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(28, 14, 28, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTitleRow(context, _language.t('profile.title')),
+                    const SizedBox(height: 18),
+                    _buildUserInfoCard(),
+                    const SizedBox(height: 28),
+                    _buildMenuCard(context),
+                    const SizedBox(height: 18),
+                    _buildLogoutButton(),
+                  ],
                 ),
               ),
             ),
@@ -199,9 +399,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Widget _buildDesktopPage(BuildContext context) {
     return WebAppShell(
-      title: 'Account Settings',
-      subtitle:
-          'Quản lý hồ sơ, thông tin liên hệ và các thiết lập tài khoản StaySmart trên màn hình rộng.',
+      title: _language.t('profile.accountSettings'),
+      subtitle: _language.t('profile.subtitle'),
       selectedIndex: 4,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -246,7 +445,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _isLoadingProfile ? 'Dang tai ho so' : _displayName,
+                      _isLoadingProfile
+                          ? _language.t('profile.loading')
+                          : _displayName,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -254,9 +455,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'StaySmart member',
-                      style: TextStyle(
+                    Text(
+                      _language.t('profile.member'),
+                      style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
@@ -269,13 +470,21 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           const SizedBox(height: 22),
           _buildProfileStat(
             Icons.bookmark_added_outlined,
-            'Đặt phòng',
+            _language.t('profile.bookings'),
             '12',
           ),
           const SizedBox(height: 10),
-          _buildProfileStat(Icons.favorite_border, 'Yêu thích', '8'),
+          _buildProfileStat(
+            Icons.favorite_border,
+            _language.t('profile.favorites'),
+            '8',
+          ),
           const SizedBox(height: 10),
-          _buildProfileStat(Icons.local_offer_outlined, 'Ưu đãi', '3'),
+          _buildProfileStat(
+            Icons.local_offer_outlined,
+            _language.t('profile.promotions'),
+            '3',
+          ),
           const SizedBox(height: 22),
           SizedBox(
             width: double.infinity,
@@ -283,7 +492,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             child: ElevatedButton.icon(
               onPressed: _openEditProfile,
               icon: const Icon(Icons.edit_outlined, size: 18),
-              label: const Text('Chỉnh sửa hồ sơ'),
+              label: Text(_language.t('profile.edit')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.colorPrimary,
                 foregroundColor: AppColors.white,
@@ -301,7 +510,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             child: OutlinedButton.icon(
               onPressed: _logout,
               icon: const Icon(Icons.logout, size: 18),
-              label: const Text('Đăng xuất'),
+              label: Text(_language.t('profile.logout')),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.red,
                 side: const BorderSide(color: Colors.red),
@@ -325,18 +534,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Thiết lập nhanh',
-                style: TextStyle(
+              Text(
+                _language.t('profile.quickSettings'),
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Mở nhanh các khu vực quản lý tài khoản thường dùng.',
-                style: TextStyle(
+              Text(
+                _language.t('profile.quickSettingsSubtitle'),
+                style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
                 ),
@@ -478,7 +687,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         Padding(
           padding: const EdgeInsets.only(left: 8, bottom: 6),
           child: Text(
-            _isLoadingProfile ? 'Dang tai ho so' : _displayName,
+            _isLoadingProfile ? _language.t('profile.loading') : _displayName,
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w800,
@@ -494,21 +703,59 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
           child: Column(
             children: [
-              if (_profileError != null)
-                _buildInfoRow('Trang thai', _profileError!),
-              if (_profileError != null)
+              if (_profileError != null) ...[
+                _buildInfoRow(_language.t('profile.status'), _profileError!),
                 const Divider(height: 1, color: AppColors.divider),
-              _buildInfoRow('Địa chỉ email', _displayEmail),
+              ],
+              _buildInfoRow(
+                _language.t('profile.email'),
+                '$_displayEmail • ${_language.t(_emailVerified ? 'profile.emailVerified' : 'profile.emailUnverified')}',
+                trailing: _isCustomer && !_emailVerified
+                    ? TextButton.icon(
+                        onPressed: _isSendingEmailVerification
+                            ? null
+                            : _sendEmailVerification,
+                        icon: _isSendingEmailVerification
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.mark_email_read_outlined),
+                        label: Text(
+                          _isSendingEmailVerification
+                              ? _language.t('profile.sendingVerification')
+                              : _language.t('profile.sendVerification'),
+                        ),
+                      )
+                    : Icon(
+                        _emailVerified
+                            ? Icons.verified_outlined
+                            : Icons.error_outline,
+                        color: _emailVerified ? Colors.green : Colors.orange,
+                        size: 20,
+                      ),
+              ),
               const Divider(height: 1, color: AppColors.divider),
-              _buildInfoRow('Số điện thoại', _displayPhone),
+              _buildInfoRow(_language.t('profile.phone'), _displayPhone),
               const Divider(height: 1, color: AppColors.divider),
-              _buildInfoRow('Mật khẩu', '****************'),
+              _buildInfoRow(
+                _language.t('profile.password'),
+                '****************',
+                trailing: _isCustomer
+                    ? TextButton(
+                        onPressed: _openChangePassword,
+                        child: Text(_language.t('profile.changePassword')),
+                      )
+                    : null,
+              ),
               Align(
                 alignment: Alignment.centerRight,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(0, 0, 10, 8),
                   child: SizedBox(
-                    width: compact ? 78 : 120,
+                    width: compact ? 88 : 132,
                     height: 32,
                     child: ElevatedButton(
                       onPressed: _openEditProfile,
@@ -520,9 +767,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: const Text(
-                        'Chỉnh sửa',
-                        style: TextStyle(
+                      child: Text(
+                        _language.t('profile.editShort'),
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                           color: AppColors.white,
@@ -539,34 +786,43 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(String label, String value, {Widget? trailing}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 9),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textSecondary,
-            ),
-          ),
+          if (trailing != null) trailing,
         ],
       ),
     );
   }
 
   Widget _buildMenuCard(BuildContext context) {
+    final items = _menuItems;
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -576,9 +832,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         children: [
-          for (var index = 0; index < _menuItems.length; index++) ...[
-            _buildMenuItem(context, _menuItems[index]),
-            if (index < _menuItems.length - 1)
+          for (var index = 0; index < items.length; index++) ...[
+            _buildMenuItem(context, items[index]),
+            if (index < items.length - 1)
               const Divider(height: 1, color: AppColors.divider),
           ],
         ],
@@ -684,9 +940,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             borderRadius: BorderRadius.circular(4),
           ),
         ),
-        child: const Text(
-          'Đăng Xuất',
-          style: TextStyle(
+        child: Text(
+          _language.t('profile.logout'),
+          style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
             color: AppColors.white,
@@ -721,29 +977,29 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           fontWeight: FontWeight.w600,
         ),
         unselectedLabelStyle: const TextStyle(fontSize: 10),
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
+            icon: const Icon(Icons.home_outlined),
+            activeIcon: const Icon(Icons.home),
+            label: _language.t('nav.home'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.mail_outline),
-            activeIcon: Icon(Icons.mail),
-            label: 'Message',
+            icon: const Icon(Icons.mail_outline),
+            activeIcon: const Icon(Icons.mail),
+            label: _language.t('nav.message'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.book_outlined),
-            activeIcon: Icon(Icons.book),
-            label: 'Booking',
+            icon: const Icon(Icons.book_outlined),
+            activeIcon: const Icon(Icons.book),
+            label: _language.t('nav.booking'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
+            icon: const Icon(Icons.search),
+            label: _language.t('nav.search'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.more_horiz),
-            label: 'Menu',
+            icon: const Icon(Icons.more_horiz),
+            label: _language.t('nav.menu'),
           ),
         ],
       ),

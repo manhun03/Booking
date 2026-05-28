@@ -9,6 +9,9 @@ public record RoomDto(
         String roomNumber,
         int capacity,
         BigDecimal price,
+        String amenities,
+        BigDecimal seasonalPrice,
+        BigDecimal promotionPrice,
         String status,
         boolean isDeleted
 ) {

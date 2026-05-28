@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import '../utils/colors.dart';
+import 'widgets/availability_date_picker.dart';
 import 'widgets/responsive_page.dart';
 
 class BookingFormScreen extends StatefulWidget {
@@ -25,17 +26,20 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _addressController = TextEditingController();
   final _phoneController = TextEditingController();
   late DateTime _checkInDate;
   late DateTime _checkOutDate;
   int? _resolvedUnitPrice;
   bool _isRefreshingPrice = false;
+  bool _isLoadingAvailability = false;
+  Map<String, bool> _availabilityByDate = {};
 
   bool _saveInfo = false;
   String? _selectedCountry;
   String _tripPurpose = 'work';
 
-  final List<String> _countries = const [
+  final List<String> countries = const [
     'Việt Nam',
     'Hoa Kỳ',
     'Hàn Quốc',
@@ -51,7 +55,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     _checkOutDate = DateTime(now.year, now.month, now.day + 2);
     _resolvedUnitPrice = _asInt(widget.room?['price']);
     _prefillCurrentUser();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshRoomPrice());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadRoomAvailability();
+      _refreshRoomPrice();
+    });
   }
 
   @override
@@ -59,6 +66,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
+    _addressController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
@@ -100,8 +108,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       ),
       desktopBody: WebAppShell(
         title: 'Booking Information',
-        subtitle:
-            'Nhap thong tin khach hang, xac nhan muc dich chuyen di va kiem tra tong tien truoc khi thanh toan.',
+        subtitle: 'Vui long nhap thong tin khach hang',
         selectedIndex: 2,
         child: _buildDesktopLayout(),
       ),
@@ -177,7 +184,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
           keyboardType: TextInputType.emailAddress,
           validator: _validateEmail,
         ),
-        _buildCountryField(),
+        _buildAddressField(),
         _buildTextField(
           label: 'Dien thoai',
           controller: _phoneController,
@@ -330,7 +337,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     );
   }
 
-  Widget _buildCountryField() {
+  Widget buildCountryField() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -351,7 +358,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
               color: AppColors.textPrimary,
             ),
             decoration: _inputDecoration(),
-            items: _countries
+            items: countries
                 .map(
                   (country) => DropdownMenuItem<String>(
                     value: country,
@@ -376,30 +383,207 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     );
   }
 
+  Widget _buildAddressField() {
+    return _buildTextField(
+      label: 'Dia chi',
+      controller: _addressController,
+      keyboardType: TextInputType.streetAddress,
+      validator: (value) => _required(value, 'dia chi'),
+    );
+  }
+
   Widget _buildDateFields() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: _buildDateButton(
-              label: 'Ngay nhan phong',
-              value: _formatDate(_checkInDate),
-              onTap: _pickCheckInDate,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: _buildDateButton(
+                  label: 'Ngay nhan phong',
+                  value: _formatDate(_checkInDate),
+                  onTap: _pickCheckInDate,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildDateButton(
+                  label: 'Ngay tra phong',
+                  value: _formatDate(_checkOutDate),
+                  onTap: _pickCheckOutDate,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _buildDateButton(
-              label: 'Ngay tra phong',
-              value: _formatDate(_checkOutDate),
-              onTap: _pickCheckOutDate,
-            ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _buildAvailabilityLegendItem(
+                color: const Color(0xFFE2F8EA),
+                borderColor: const Color(0xFF22C55E),
+                label: 'Con phong',
+              ),
+              _buildAvailabilityLegendItem(
+                color: const Color(0xFFFFE2E2),
+                borderColor: const Color(0xFFEF4444),
+                label: 'Het phong',
+              ),
+              if (_isLoadingAvailability)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
           ),
         ],
       ),
     );
   }
+
+  Widget _buildAvailabilityLegendItem({
+    required Color color,
+    required Color borderColor,
+    required String label,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: borderColor),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _loadRoomAvailability() async {
+    final roomId = _roomId;
+    if (roomId == null || !mounted) return;
+    final today = _today();
+    setState(() {
+      _isLoadingAvailability = true;
+    });
+    try {
+      final availability = await ApiService().fetchRoomAvailability(
+        roomId: roomId,
+        from: today,
+        to: today.add(const Duration(days: 365)),
+      );
+      if (!mounted) return;
+      setState(() {
+        _availabilityByDate = availability;
+        _isLoadingAvailability = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _availabilityByDate = {};
+        _isLoadingAvailability = false;
+      });
+    }
+  }
+
+  Future<DateTime?> _pickAvailabilityDate({
+    required DateTime initialDate,
+    required DateTime firstDate,
+    required DateTime lastDate,
+    required String title,
+    bool Function(DateTime date)? isSelectableDate,
+  }) async {
+    if (_isLoadingAvailability) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Dang tai lich trong cua phong...')),
+      );
+      return null;
+    }
+    if (_availabilityByDate.isEmpty && !_isLoadingAvailability) {
+      await _loadRoomAvailability();
+    }
+    if (!mounted) return null;
+    if (_roomId != null && _availabilityByDate.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Khong tai duoc lich trong cua phong. Vui long thu lai.'),
+        ),
+      );
+      return null;
+    }
+    return showDialog<DateTime>(
+      context: context,
+      builder: (context) => AvailabilityDatePickerDialog(
+        initialDate: initialDate,
+        firstDate: firstDate,
+        lastDate: lastDate,
+        availabilityByDate: _availabilityByDate,
+        isSelectableDate: isSelectableDate,
+        title: title,
+      ),
+    );
+  }
+
+  bool _isDateAvailable(DateTime date) {
+    return _availabilityByDate[_dateKey(date)] ?? true;
+  }
+
+  bool _isRangeAvailable(DateTime checkIn, DateTime checkOut) {
+    if (!checkOut.isAfter(checkIn)) return false;
+    var cursor = _dateOnly(checkIn);
+    final end = _dateOnly(checkOut);
+    while (cursor.isBefore(end)) {
+      if (!_isDateAvailable(cursor)) return false;
+      cursor = cursor.add(const Duration(days: 1));
+    }
+    return true;
+  }
+
+  DateTime _nextAvailableCheckOut(DateTime checkIn) {
+    var candidate = _dateOnly(checkIn).add(const Duration(days: 1));
+    final limit = _today().add(const Duration(days: 365));
+    while (!candidate.isAfter(limit)) {
+      if (_isRangeAvailable(checkIn, candidate)) return candidate;
+      candidate = candidate.add(const Duration(days: 1));
+    }
+    return _dateOnly(checkIn).add(const Duration(days: 1));
+  }
+
+  DateTime _dateOnly(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
+  DateTime _today() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  String _dateKey(DateTime date) {
+    final local = _dateOnly(date);
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return '${local.year}-$month-$day';
+  }
+
+  int? get _roomId => _asInt(widget.room?['id']);
 
   Widget _buildDateButton({
     required String label,
@@ -731,19 +915,20 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   }
 
   Future<void> _pickCheckInDate() async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final selected = await showDatePicker(
-      context: context,
+    final today = _today();
+    final selected = await _pickAvailabilityDate(
       initialDate: _checkInDate.isBefore(today) ? today : _checkInDate,
       firstDate: today,
       lastDate: today.add(const Duration(days: 365)),
+      title: 'Chon ngay nhan phong',
+      isSelectableDate: _isDateAvailable,
     );
     if (selected == null) return;
     setState(() {
-      _checkInDate = DateTime(selected.year, selected.month, selected.day);
-      if (!_checkOutDate.isAfter(_checkInDate)) {
-        _checkOutDate = _checkInDate.add(const Duration(days: 1));
+      _checkInDate = _dateOnly(selected);
+      if (!_checkOutDate.isAfter(_checkInDate) ||
+          !_isRangeAvailable(_checkInDate, _checkOutDate)) {
+        _checkOutDate = _nextAvailableCheckOut(_checkInDate);
       }
     });
     await _refreshRoomPrice();
@@ -751,16 +936,17 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
 
   Future<void> _pickCheckOutDate() async {
     final firstDate = _checkInDate.add(const Duration(days: 1));
-    final selected = await showDatePicker(
-      context: context,
+    final selected = await _pickAvailabilityDate(
       initialDate:
           _checkOutDate.isBefore(firstDate) ? firstDate : _checkOutDate,
       firstDate: firstDate,
       lastDate: firstDate.add(const Duration(days: 365)),
+      title: 'Chon ngay tra phong',
+      isSelectableDate: (date) => _isRangeAvailable(_checkInDate, date),
     );
     if (selected == null) return;
     setState(() {
-      _checkOutDate = DateTime(selected.year, selected.month, selected.day);
+      _checkOutDate = _dateOnly(selected);
     });
     await _refreshRoomPrice();
   }
@@ -768,6 +954,15 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   void _submit() {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
+    if (!_isRangeAvailable(_checkInDate, _checkOutDate)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Khoang ngay da chon co ngay het phong. Vui long chon lai.'),
+        ),
+      );
+      return;
+    }
 
     Navigator.pushNamed(
       context,
@@ -785,7 +980,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
           'firstName': _firstNameController.text.trim(),
           'lastName': _lastNameController.text.trim(),
           'email': _emailController.text.trim(),
-          'country': _selectedCountry,
+          'address': _addressController.text.trim(),
           'phone': _phoneController.text.trim(),
           'saveInfo': _saveInfo,
           'tripPurpose': _tripPurpose,

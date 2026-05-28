@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import '../utils/colors.dart';
+import 'widgets/availability_date_picker.dart';
 import 'widgets/responsive_page.dart';
 
 class ChangeBookingDateScreen extends StatefulWidget {
@@ -22,7 +23,9 @@ class _ChangeBookingDateScreenState extends State<ChangeBookingDateScreen> {
   late DateTime _checkOutDate;
 
   bool _isSaving = false;
+  bool _isLoadingAvailability = false;
   String? _errorMessage;
+  Map<String, bool> _availabilityByDate = {};
 
   @override
   void initState() {
@@ -40,6 +43,7 @@ class _ChangeBookingDateScreenState extends State<ChangeBookingDateScreen> {
         parsedCheckOut == null || !parsedCheckOut.isAfter(_checkInDate)
             ? _checkInDate.add(const Duration(days: 1))
             : parsedCheckOut;
+    _loadRoomAvailability();
   }
 
   @override
@@ -82,6 +86,8 @@ class _ChangeBookingDateScreenState extends State<ChangeBookingDateScreen> {
     return [
       _buildBookingSummary(),
       const SizedBox(height: 22),
+      _buildAvailabilityLegend(),
+      const SizedBox(height: 14),
       _buildDateSummary(),
       const SizedBox(height: 22),
       if (!_canChange) _buildInlineMessage('Booking này không thể đổi ngày.'),
@@ -153,6 +159,71 @@ class _ChangeBookingDateScreenState extends State<ChangeBookingDateScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAvailabilityLegend() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Wrap(
+        spacing: 14,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          _buildLegendItem(
+            color: const Color(0xFFE2F8EA),
+            borderColor: const Color(0xFF22C55E),
+            label: 'Con phong',
+          ),
+          _buildLegendItem(
+            color: const Color(0xFFFFE2E2),
+            borderColor: const Color(0xFFEF4444),
+            label: 'Het phong',
+          ),
+          if (_isLoadingAvailability)
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem({
+    required Color color,
+    required Color borderColor,
+    required String label,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: borderColor),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 
@@ -297,19 +368,20 @@ class _ChangeBookingDateScreenState extends State<ChangeBookingDateScreen> {
   }
 
   Future<void> _pickCheckInDate() async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final selected = await showDatePicker(
-      context: context,
+    final today = _today();
+    final selected = await _pickAvailabilityDate(
       initialDate: _checkInDate.isBefore(today) ? today : _checkInDate,
       firstDate: today,
       lastDate: today.add(const Duration(days: 365)),
+      title: 'Chon ngay nhan phong',
+      isSelectableDate: _isDateAvailable,
     );
     if (selected == null) return;
     setState(() {
-      _checkInDate = DateTime(selected.year, selected.month, selected.day);
-      if (!_checkOutDate.isAfter(_checkInDate)) {
-        _checkOutDate = _checkInDate.add(const Duration(days: 1));
+      _checkInDate = _dateOnlyValue(selected);
+      if (!_checkOutDate.isAfter(_checkInDate) ||
+          !_isRangeAvailable(_checkInDate, _checkOutDate)) {
+        _checkOutDate = _nextAvailableCheckOut(_checkInDate);
       }
       _errorMessage = null;
     });
@@ -317,18 +389,110 @@ class _ChangeBookingDateScreenState extends State<ChangeBookingDateScreen> {
 
   Future<void> _pickCheckOutDate() async {
     final firstDate = _checkInDate.add(const Duration(days: 1));
-    final selected = await showDatePicker(
-      context: context,
+    final selected = await _pickAvailabilityDate(
       initialDate:
           _checkOutDate.isBefore(firstDate) ? firstDate : _checkOutDate,
       firstDate: firstDate,
       lastDate: firstDate.add(const Duration(days: 365)),
+      title: 'Chon ngay tra phong',
+      isSelectableDate: (date) => _isRangeAvailable(_checkInDate, date),
     );
     if (selected == null) return;
     setState(() {
-      _checkOutDate = DateTime(selected.year, selected.month, selected.day);
+      _checkOutDate = _dateOnlyValue(selected);
       _errorMessage = null;
     });
+  }
+
+  Future<void> _loadRoomAvailability() async {
+    final roomId = _roomId;
+    if (roomId == null || !mounted) return;
+    final today = _today();
+    setState(() {
+      _isLoadingAvailability = true;
+    });
+    try {
+      final availability = await ApiService().fetchRoomAvailability(
+        roomId: roomId,
+        from: today,
+        to: today.add(const Duration(days: 365)),
+        excludedBookingId: _bookingId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _availabilityByDate = availability;
+        _isLoadingAvailability = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _availabilityByDate = {};
+        _isLoadingAvailability = false;
+      });
+    }
+  }
+
+  Future<DateTime?> _pickAvailabilityDate({
+    required DateTime initialDate,
+    required DateTime firstDate,
+    required DateTime lastDate,
+    required String title,
+    bool Function(DateTime date)? isSelectableDate,
+  }) async {
+    if (_isLoadingAvailability) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Dang tai lich trong cua phong...')),
+      );
+      return null;
+    }
+    if (_availabilityByDate.isEmpty) {
+      await _loadRoomAvailability();
+    }
+    if (!mounted) return null;
+    if (_roomId != null && _availabilityByDate.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Khong tai duoc lich trong cua phong. Vui long thu lai.'),
+        ),
+      );
+      return null;
+    }
+    return showDialog<DateTime>(
+      context: context,
+      builder: (context) => AvailabilityDatePickerDialog(
+        initialDate: initialDate,
+        firstDate: firstDate,
+        lastDate: lastDate,
+        availabilityByDate: _availabilityByDate,
+        isSelectableDate: isSelectableDate,
+        title: title,
+      ),
+    );
+  }
+
+  bool _isDateAvailable(DateTime date) {
+    return _availabilityByDate[_dateKey(date)] ?? true;
+  }
+
+  bool _isRangeAvailable(DateTime checkIn, DateTime checkOut) {
+    if (!checkOut.isAfter(checkIn)) return false;
+    var cursor = _dateOnlyValue(checkIn);
+    final end = _dateOnlyValue(checkOut);
+    while (cursor.isBefore(end)) {
+      if (!_isDateAvailable(cursor)) return false;
+      cursor = cursor.add(const Duration(days: 1));
+    }
+    return true;
+  }
+
+  DateTime _nextAvailableCheckOut(DateTime checkIn) {
+    var cursor = _dateOnlyValue(checkIn).add(const Duration(days: 1));
+    for (var i = 0; i < 365; i++) {
+      if (_isRangeAvailable(checkIn, cursor)) return cursor;
+      cursor = cursor.add(const Duration(days: 1));
+    }
+    return _dateOnlyValue(checkIn).add(const Duration(days: 1));
   }
 
   Future<void> _submitChange() async {
@@ -342,6 +506,14 @@ class _ChangeBookingDateScreenState extends State<ChangeBookingDateScreen> {
     if (!_checkOutDate.isAfter(_checkInDate)) {
       setState(() {
         _errorMessage = 'Ngày trả phòng phải sau ngày nhận phòng.';
+      });
+      return;
+    }
+
+    if (!_isRangeAvailable(_checkInDate, _checkOutDate)) {
+      setState(() {
+        _errorMessage =
+            'Khoang ngay da chon co ngay het phong. Vui long chon lai.';
       });
       return;
     }
@@ -386,6 +558,8 @@ class _ChangeBookingDateScreenState extends State<ChangeBookingDateScreen> {
 
   int? get _bookingId => _intValue(_field('id'));
 
+  int? get _roomId => _intValue(_field('roomId'));
+
   String get _bookingName =>
       _stringValue(_field('name')) ?? 'Booking #${_bookingId ?? ''}';
 
@@ -415,6 +589,21 @@ class _ChangeBookingDateScreenState extends State<ChangeBookingDateScreen> {
     if (value == null) return null;
     final local = value.toLocal();
     return DateTime(local.year, local.month, local.day);
+  }
+
+  DateTime _dateOnlyValue(DateTime value) {
+    return DateTime(value.year, value.month, value.day);
+  }
+
+  DateTime _today() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  String _dateKey(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
   }
 
   String _formatDate(DateTime date) {

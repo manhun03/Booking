@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../services/language_service.dart';
 import '../../utils/colors.dart';
 import 'current_user_avatar.dart';
 
@@ -185,7 +186,7 @@ class StaySmartBrandButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: 'Home',
+      message: LanguageService().t('nav.home'),
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
@@ -264,14 +265,15 @@ class _WebBrandBar extends StatelessWidget {
                       Navigator.of(context).pushNamed('/notification'),
                   icon: const Icon(Icons.notifications_none),
                   color: AppColors.textPrimary,
-                  tooltip: 'Thông báo',
+                  tooltip: LanguageService().t('profile.notifications'),
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  onPressed: () {},
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed('/user-profile'),
                   icon: const Icon(Icons.settings_outlined),
                   color: AppColors.textPrimary,
-                  tooltip: 'Cài đặt',
+                  tooltip: LanguageService().t('profile.accountSettings'),
                 ),
                 const SizedBox(width: 8),
                 CurrentUserAvatar(
@@ -293,11 +295,11 @@ class _WebBottomNav extends StatelessWidget {
   final int selectedIndex;
 
   static const _items = [
-    _WebNavItem('Home', Icons.home_outlined, '/home'),
-    _WebNavItem('Message', Icons.group_outlined, '/message'),
-    _WebNavItem('Booking', Icons.add_box_outlined, '/booking'),
-    _WebNavItem('Search', Icons.search, '/search'),
-    _WebNavItem('Menu', Icons.menu, '/more'),
+    _WebNavItem('nav.home', Icons.home_outlined, '/home'),
+    _WebNavItem('nav.message', Icons.group_outlined, '/message'),
+    _WebNavItem('nav.booking', Icons.add_box_outlined, '/booking'),
+    _WebNavItem('nav.search', Icons.search, '/search'),
+    _WebNavItem('nav.menu', Icons.menu, '/more'),
   ];
 
   @override
@@ -358,7 +360,7 @@ class _WebBottomNav extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            item.label,
+            LanguageService().t(item.labelKey),
             style: TextStyle(
               fontSize: 11,
               fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
@@ -372,9 +374,9 @@ class _WebBottomNav extends StatelessWidget {
 }
 
 class _WebNavItem {
-  const _WebNavItem(this.label, this.icon, this.route);
+  const _WebNavItem(this.labelKey, this.icon, this.route);
 
-  final String label;
+  final String labelKey;
   final IconData icon;
   final String route;
 }

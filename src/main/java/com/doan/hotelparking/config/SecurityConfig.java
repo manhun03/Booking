@@ -38,6 +38,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/reviews/by-hotel/**", "/api/time-slots/room/**", "/api/time-slots/hotel/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/vnpay-return").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/payments/vnpay-ipn").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

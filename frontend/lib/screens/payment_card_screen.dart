@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/payment_redirect.dart';
 import '../utils/colors.dart';
 import 'widgets/responsive_page.dart';
 
@@ -49,14 +50,16 @@ class PaymentCardScreen extends StatelessWidget {
     );
 
     Map<String, dynamic>? createdBooking;
+    var loadingOpen = true;
     try {
-      var booking = await ApiService().createBooking(
+      final booking = await ApiService().createBooking(
         roomId: roomId,
         guestCount: _guestCount,
         paidAmount: 0,
         checkInDate: _effectiveCheckInDate,
         checkOutDate: _effectiveCheckOutDate,
-        paymentMethod: 'CARD',
+        customerAddress: customer?['address']?.toString(),
+        paymentMethod: 'VNPAY',
         note: _bookingNote,
       );
       createdBooking = booking;
@@ -65,33 +68,35 @@ class PaymentCardScreen extends StatelessWidget {
       if (bookingId != null) {
         payment = await ApiService().initiatePayment(
           bookingId: bookingId,
-          provider: 'MOCK',
-          method: 'CARD',
+          provider: 'VNPAY',
+          method: 'VNPAY',
         );
-        final transactionCode = payment['transactionCode']?.toString();
-        if (transactionCode != null && transactionCode.isNotEmpty) {
-          payment = await ApiService().completePayment(
-            transactionCode: transactionCode,
-            gatewayTransactionId: 'MOCK-$transactionCode',
+        final checkoutUrl = payment['checkoutUrl']?.toString().trim();
+        if (checkoutUrl != null && checkoutUrl.isNotEmpty) {
+          if (!context.mounted) return;
+          Navigator.of(context, rootNavigator: true).pop();
+          loadingOpen = false;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Dang chuyen sang VNPay...')),
           );
-          booking = {
-            ...booking,
-            'status': 'Da xac nhan',
-            'statusCode': 'CONFIRMED',
-          };
+          redirectToPaymentUrl(checkoutUrl);
+          return;
         }
       }
       if (!context.mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
+      loadingOpen = false;
       _openSuccess(
         context,
-        paymentMethod: 'card',
+        paymentMethod: 'vnpay-pending',
         booking: booking,
         payment: payment,
       );
     } catch (error) {
       if (!context.mounted) return;
-      Navigator.of(context, rootNavigator: true).pop();
+      if (loadingOpen) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
       if (createdBooking != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -102,7 +107,7 @@ class PaymentCardScreen extends StatelessWidget {
         );
         _openSuccess(
           context,
-          paymentMethod: 'card-pending',
+          paymentMethod: 'vnpay-pending',
           booking: createdBooking,
         );
         return;
@@ -133,6 +138,31 @@ class PaymentCardScreen extends StatelessWidget {
         'booking': booking,
         'payment': payment,
       },
+    );
+  }
+
+  Future<void> _openPromotion(BuildContext context) async {
+    final result = await Navigator.of(context).pushNamed(
+      '/add-promotion',
+      arguments: {'amount': _finalPrice},
+    );
+    if (!context.mounted || result == null) return;
+    if (result is Map<String, dynamic>) {
+      final code = result['code']?.toString() ?? '';
+      final discount = _asInt(result['discountAmount']) ?? 0;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            discount > 0
+                ? 'Da ap dung ma $code, giam ${_formatPrice(discount)} VND'
+                : 'Da chon ma $code',
+          ),
+        ),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Da chon ma ${result.toString()}')),
     );
   }
 
@@ -263,7 +293,7 @@ class PaymentCardScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Bạn muốn thanh toán bằng thẻ nào ?',
+            'Thanh toán online qua VNPay',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
@@ -279,14 +309,14 @@ class PaymentCardScreen extends StatelessWidget {
               border: Border.all(color: AppColors.textPrimary),
             ),
             child: const Icon(
-              Icons.credit_card,
+              Icons.account_balance_wallet_outlined,
               size: 22,
               color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
           const Text(
-            'Thẻ mới',
+            'VNPay QR / ATM / Internet Banking',
             style: TextStyle(
               fontSize: 12,
               color: AppColors.textPrimary,
@@ -320,14 +350,14 @@ class PaymentCardScreen extends StatelessWidget {
               child: const Row(
                 children: [
                   Icon(
-                    Icons.credit_card_off_outlined,
+                    Icons.payments_outlined,
                     size: 18,
                     color: AppColors.textPrimary,
                   ),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Không cần thẻ tín dụng',
+                      'Đặt phòng trước, thanh toán sau',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -346,7 +376,7 @@ class PaymentCardScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           InkWell(
-            onTap: () => Navigator.of(context).pushNamed('/add-promotion'),
+            onTap: () => _openPromotion(context),
             borderRadius: BorderRadius.circular(4),
             child: const Padding(
               padding: EdgeInsets.symmetric(vertical: 4),
@@ -808,7 +838,7 @@ class PaymentCardScreen extends StatelessWidget {
                 ),
               ),
               child: const Text(
-                'Đặt ngay',
+                'Thanh toán VNPay',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
@@ -889,12 +919,14 @@ class PaymentCardScreen extends StatelessWidget {
 
   String get _bookingNote {
     final email = customer?['email']?.toString().trim();
+    final address = customer?['address']?.toString().trim();
     final tripPurpose = customer?['tripPurpose']?.toString().trim();
     final parts = <String>[
       if (email != null && email.isNotEmpty) 'Customer email: $email',
+      if (address != null && address.isNotEmpty) 'Customer address: $address',
       if (tripPurpose != null && tripPurpose.isNotEmpty)
         'Trip purpose: $tripPurpose',
-      'Payment method: card',
+      'Payment method: vnpay',
     ];
     return parts.join(' | ');
   }

@@ -1,74 +1,149 @@
 import 'package:flutter/material.dart';
 
-class NotificationScreen extends StatelessWidget {
+import '../services/auth_service.dart';
+import '../services/owner_api_service.dart';
+import '../utils/display_format.dart';
+
+class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
 
-  final Color primaryBlue = const Color(0xFF3F63B5);
+  @override
+  State<NotificationScreen> createState() => _NotificationScreenState();
+}
+
+class _NotificationScreenState extends State<NotificationScreen> {
+  static const Color _primaryBlue = Color(0xFF3F63B5);
+  final OwnerApiService _api = OwnerApiService();
+
+  List<Map<String, dynamic>> _items = const [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final items = await _api.fetchNotifications();
+      if (!mounted) return;
+      setState(() {
+        _items = items;
+        _loading = false;
+        _error = null;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.message;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _markAll() async {
+    try {
+      await _api.markAllNotificationsRead();
+      await _load();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
+  Future<void> _markRead(Map<String, dynamic> item) async {
+    if (item['read'] == true) return;
+    await _api.markNotificationRead(intValue(item['id']));
+    await _load();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200],
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 450),
-          child: Container(
-            decoration: BoxDecoration(boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20)]),
-            child: Scaffold(
-              backgroundColor: const Color(0xFFF8F9FA),
-              appBar: AppBar(
-                backgroundColor: Colors.white,
-                elevation: 0,
-                leading: const BackButton(color: Colors.black87),
-                title: const Text('Thông báo', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 18)),
-                actions: [
-                  IconButton(icon: Icon(Icons.done_all, color: primaryBlue), onPressed: () {}), // Nút Đánh dấu đã đọc tất cả
-                ],
-              ),
-              body: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                children: [
-                  _buildNotificationItem(Icons.book_online, primaryBlue, 'Booking mới #2221050704', 'Khách hàng Trần Hoàng Nam vừa đặt phòng Deluxe City View.', 'Vừa xong', true),
-                  _buildNotificationItem(Icons.payment, Colors.green, 'Thanh toán thành công', 'Đơn đặt phòng #2221050704 đã thanh toán 3.500.000 đ.', '10 phút trước', true),
-                  _buildNotificationItem(Icons.star, Colors.orange, 'Đánh giá mới', 'Khách hàng Lê Minh Anh vừa để lại đánh giá 5 sao cho khách sạn.', '2 giờ trước', false),
-                  _buildNotificationItem(Icons.cancel, Colors.red, 'Booking bị hủy', 'Hệ thống đã hủy đơn #BK10022 do quá hạn thanh toán.', 'Hôm qua', false),
-                ],
-              ),
-            ),
+      backgroundColor: const Color(0xFFF5F7FB),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        title: const Text('Thong bao'),
+        actions: [
+          IconButton(
+            tooltip: 'Danh dau tat ca da doc',
+            onPressed: _markAll,
+            icon: const Icon(Icons.done_all, color: _primaryBlue),
           ),
-        ),
+        ],
       ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Text(_error!, style: const TextStyle(color: Colors.red)),
+            )
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: _items.isEmpty
+                  ? ListView(
+                      children: const [
+                        SizedBox(height: 180),
+                        Center(child: Text('Chua co thong bao.')),
+                      ],
+                    )
+                  : ListView.builder(
+                      itemCount: _items.length,
+                      itemBuilder: (_, index) => _tile(_items[index]),
+                    ),
+            ),
     );
   }
 
-  Widget _buildNotificationItem(IconData icon, Color color, String title, String body, String time, bool isUnread) {
-    return Container(
-      color: isUnread ? primaryBlue.withValues(alpha: 0.05) : Colors.transparent,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-            child: Icon(icon, color: color, size: 20),
+  Widget _tile(Map<String, dynamic> item) {
+    final unread = item['read'] != true;
+    final type = textValue(item['type'], 'SYSTEM');
+    final icon = switch (type) {
+      'BOOKING' => Icons.book_online,
+      'PAYMENT' => Icons.payments_outlined,
+      'REVIEW' => Icons.star_outline,
+      _ => Icons.notifications_none,
+    };
+    return Material(
+      color: unread ? _primaryBlue.withValues(alpha: 0.05) : Colors.white,
+      child: InkWell(
+        onTap: () => _markRead(item),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 8,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: TextStyle(fontWeight: isUnread ? FontWeight.bold : FontWeight.w600, fontSize: 15, color: Colors.black87)),
-                const SizedBox(height: 4),
-                Text(body, style: TextStyle(color: isUnread ? Colors.black87 : Colors.black54, fontSize: 13, height: 1.4)),
-                const SizedBox(height: 8),
-                Text(time, style: TextStyle(color: primaryBlue, fontSize: 11, fontWeight: FontWeight.w600)),
-              ],
+          leading: CircleAvatar(
+            backgroundColor: _primaryBlue.withValues(alpha: 0.12),
+            child: Icon(icon, color: _primaryBlue),
+          ),
+          title: Text(
+            textValue(item['title']),
+            style: TextStyle(
+              fontWeight: unread ? FontWeight.bold : FontWeight.w500,
             ),
           ),
-          if (isUnread)
-            Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle))
-        ],
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              Text(textValue(item['message'])),
+              const SizedBox(height: 5),
+              Text(
+                formatDate(item['createdAt'], withTime: true),
+                style: const TextStyle(fontSize: 11, color: Colors.black54),
+              ),
+            ],
+          ),
+          trailing: unread
+              ? const CircleAvatar(radius: 5, backgroundColor: _primaryBlue)
+              : null,
+        ),
       ),
     );
   }

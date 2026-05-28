@@ -26,10 +26,14 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _finishSplash() async {
     final hasSession = await ApiService().restoreSession();
+    final isCustomer = ApiService().currentSession?.isCustomer ?? false;
+    if (hasSession && !isCustomer) {
+      ApiService().logout();
+    }
     if (!mounted) return;
     unawaited(
       Navigator.of(context).pushReplacementNamed(
-        hasSession ? '/home' : '/welcome',
+        hasSession && isCustomer ? '/home' : '/welcome',
       ),
     );
   }

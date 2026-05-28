@@ -14,6 +14,7 @@ import com.doan.hotelparking.dto.auth.ResetPasswordRequest;
 import com.doan.hotelparking.dto.auth.VerifyEmailRequest;
 import com.doan.hotelparking.service.AuthService;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -61,6 +62,7 @@ public class AuthController {
     }
 
     @PostMapping("/change-password")
+    @PreAuthorize("hasRole('Customer')")
     public ApiResponse<AuthActionResponse> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         return ApiResponse.ok(authService.changePassword(request));
     }

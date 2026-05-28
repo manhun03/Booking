@@ -7,6 +7,9 @@ public record BookingDto(
         Integer id,
         Integer roomId,
         Integer customerId,
+        String customerName,
+        String customerEmail,
+        String customerPhone,
         Instant checkInDate,
         Instant checkOutDate,
         int nightCount,
@@ -14,9 +17,12 @@ public record BookingDto(
         BigDecimal roomUnitPrice,
         BigDecimal totalAmount,
         BigDecimal paidAmount,
+        String customerAddress,
         String note,
         String status,
+        boolean reviewed,
         String roomNumber,
-        String hotelName
+        String hotelName,
+        Integer ownerId
 ) {
 }

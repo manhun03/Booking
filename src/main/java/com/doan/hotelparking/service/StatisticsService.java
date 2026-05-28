@@ -5,6 +5,8 @@ import com.doan.hotelparking.domain.enums.BookingStatus;
 import com.doan.hotelparking.domain.enums.RoomStatus;
 import com.doan.hotelparking.dto.statistics.*;
 import com.doan.hotelparking.repository.BookingRepository;
+import com.doan.hotelparking.repository.HotelRepository;
+import com.doan.hotelparking.repository.RoomRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,9 +20,13 @@ import java.util.stream.Collectors;
 @Service
 public class StatisticsService {
     private final BookingRepository bookings;
+    private final HotelRepository hotels;
+    private final RoomRepository rooms;
 
-    public StatisticsService(BookingRepository bookings) {
+    public StatisticsService(BookingRepository bookings, HotelRepository hotels, RoomRepository rooms) {
         this.bookings = bookings;
+        this.hotels = hotels;
+        this.rooms = rooms;
     }
 
     @Transactional(readOnly = true)
@@ -29,16 +35,17 @@ public class StatisticsService {
         var today = LocalDate.now(ZoneOffset.UTC);
         var todayBookings = allBookings.stream().filter(b -> toDate(b.getCheckInDate()).equals(today)).toList();
         var revenueBookings = allBookings.stream().filter(this::isRevenueBooking).toList();
-        var rooms = allBookings.stream().map(Booking::getRoom).collect(Collectors.toMap(r -> r.getId(), r -> r, (a, b) -> a)).values();
+        var ownerHotels = hotels.findVisibleByOwnerId(ownerId);
+        var ownerRooms = rooms.findVisibleByHotelOwnerId(ownerId);
         var bookedRoomsToday = todayBookings.stream()
                 .filter(b -> b.getStatus() != BookingStatus.CANCELLED)
                 .map(b -> b.getRoom().getId())
                 .distinct()
                 .count();
-        var occupancyRate = rooms.isEmpty()
+        var occupancyRate = ownerRooms.isEmpty()
                 ? BigDecimal.ZERO
                 : BigDecimal.valueOf(bookedRoomsToday).multiply(BigDecimal.valueOf(100))
-                .divide(BigDecimal.valueOf(rooms.size()), 2, RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(ownerRooms.size()), 2, RoundingMode.HALF_UP);
         var totalRevenue = revenueBookings.stream().map(this::revenueFromBooking).reduce(BigDecimal.ZERO, BigDecimal::add);
         var avgBookingValue = revenueBookings.isEmpty()
                 ? BigDecimal.ZERO
@@ -50,9 +57,9 @@ public class StatisticsService {
                 (int) allBookings.stream().filter(b -> b.getStatus() == BookingStatus.PENDING).count(),
                 (int) allBookings.stream().filter(b -> b.getStatus() == BookingStatus.COMPLETED).count(),
                 (int) allBookings.stream().filter(b -> b.getStatus() == BookingStatus.CANCELLED).count(),
-                (int) rooms.stream().map(r -> r.getHotel().getId()).distinct().count(),
-                rooms.size(),
-                (int) rooms.stream().filter(r -> r.getStatus() == RoomStatus.AVAILABLE && !r.isDeleted()).count(),
+                ownerHotels.size(),
+                ownerRooms.size(),
+                (int) ownerRooms.stream().filter(r -> r.getStatus() == RoomStatus.AVAILABLE && !r.isDeleted()).count(),
                 occupancyRate,
                 avgBookingValue);
     }

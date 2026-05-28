@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/language_service.dart';
 import '../utils/colors.dart';
 import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
@@ -12,23 +13,24 @@ class LanguageScreen extends StatefulWidget {
 }
 
 class _LanguageScreenState extends State<LanguageScreen> {
+  final LanguageService _language = LanguageService();
   int _selectedIndex = 4;
-  String _selectedLanguage = 'Vietnamese';
 
-  static const List<String> _suggestedLanguages = [
-    'Vietnamese',
-    'English',
-    'English (UK)',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _language.addListener(_refreshLanguage);
+  }
 
-  static const List<String> _otherLanguages = [
-    'Chinese',
-    'Croatian',
-    'Czech',
-    'Danish',
-    'Filipino',
-    'Finnish',
-  ];
+  @override
+  void dispose() {
+    _language.removeListener(_refreshLanguage);
+    super.dispose();
+  }
+
+  void _refreshLanguage() {
+    if (mounted) setState(() {});
+  }
 
   void _onBottomNavTapped(int index) {
     setState(() {
@@ -52,6 +54,14 @@ class _LanguageScreenState extends State<LanguageScreen> {
         Navigator.of(context).pushNamed('/more');
         break;
     }
+  }
+
+  Future<void> _selectLanguage(String code) async {
+    await _language.setLanguage(code);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_language.t('language.saved'))),
+    );
   }
 
   @override
@@ -81,9 +91,8 @@ class _LanguageScreenState extends State<LanguageScreen> {
 
   Widget _buildDesktopPage(BuildContext context) {
     return WebAppShell(
-      title: 'Language',
-      subtitle:
-          'Chọn ngôn ngữ hiển thị phù hợp cho ứng dụng và website StaySmart.',
+      title: _language.t('language.title'),
+      subtitle: _language.t('language.subtitle'),
       selectedIndex: 4,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -133,16 +142,16 @@ class _LanguageScreenState extends State<LanguageScreen> {
             ),
           ),
           const SizedBox(height: 18),
-          const Text(
-            'Ngôn ngữ hiện tại',
-            style: TextStyle(
+          Text(
+            _language.t('language.current'),
+            style: const TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            _selectedLanguage,
+            _language.displayName,
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
@@ -150,9 +159,9 @@ class _LanguageScreenState extends State<LanguageScreen> {
             ),
           ),
           const SizedBox(height: 18),
-          const Text(
-            'Thay đổi này sẽ áp dụng cho các màn hình trong ứng dụng sau khi bạn chọn ngôn ngữ mới.',
-            style: TextStyle(
+          Text(
+            _language.t('language.applies'),
+            style: const TextStyle(
               fontSize: 13,
               height: 1.45,
               color: AppColors.textSecondary,
@@ -205,11 +214,11 @@ class _LanguageScreenState extends State<LanguageScreen> {
           ),
         ),
         const SizedBox(width: 40),
-        const Expanded(
+        Expanded(
           child: Center(
             child: Text(
-              'Language',
-              style: TextStyle(
+              _language.t('language.title'),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
@@ -236,13 +245,19 @@ class _LanguageScreenState extends State<LanguageScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionLabel('Suggested Languages', web: web),
-          for (final language in _suggestedLanguages)
-            _buildLanguageRow(language, selectable: true, web: web),
-          Container(height: web ? 12 : 20, color: AppColors.colorBg),
-          _buildSectionLabel('Other Languages', web: web),
-          for (final language in _otherLanguages)
-            _buildLanguageRow(language, selectable: true, web: web),
+          _buildSectionLabel(_language.t('language.choose'), web: web),
+          _buildLanguageRow(
+            code: LanguageService.vietnamese,
+            label: _language.t('language.vietnamese'),
+            subtitle: 'Vietnamese',
+            web: web,
+          ),
+          _buildLanguageRow(
+            code: LanguageService.english,
+            label: _language.t('language.english'),
+            subtitle: 'English',
+            web: web,
+          ),
         ],
       ),
     );
@@ -262,23 +277,18 @@ class _LanguageScreenState extends State<LanguageScreen> {
     );
   }
 
-  Widget _buildLanguageRow(
-    String language, {
-    bool selectable = false,
+  Widget _buildLanguageRow({
+    required String code,
+    required String label,
+    required String subtitle,
     bool web = false,
   }) {
-    final selected = _selectedLanguage == language;
+    final selected = _language.code == code;
 
     return InkWell(
-      onTap: selectable
-          ? () {
-              setState(() {
-                _selectedLanguage = language;
-              });
-            }
-          : null,
+      onTap: () => _selectLanguage(code),
       child: Container(
-        height: web ? 56 : 50,
+        height: web ? 64 : 56,
         padding: const EdgeInsets.symmetric(horizontal: 18),
         decoration: const BoxDecoration(
           border: Border(
@@ -288,13 +298,27 @@ class _LanguageScreenState extends State<LanguageScreen> {
         child: Row(
           children: [
             Expanded(
-              child: Text(
-                language,
-                style: TextStyle(
-                  fontSize: web ? 14 : 12,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: web ? 14 : 12,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: web ? 12 : 10,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ),
             ),
             if (selected)
@@ -334,29 +358,29 @@ class _LanguageScreenState extends State<LanguageScreen> {
           fontWeight: FontWeight.w600,
         ),
         unselectedLabelStyle: const TextStyle(fontSize: 10),
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
+            icon: const Icon(Icons.home_outlined),
+            activeIcon: const Icon(Icons.home),
+            label: _language.t('nav.home'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.mail_outline),
-            activeIcon: Icon(Icons.mail),
-            label: 'Message',
+            icon: const Icon(Icons.mail_outline),
+            activeIcon: const Icon(Icons.mail),
+            label: _language.t('nav.message'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.book_outlined),
-            activeIcon: Icon(Icons.book),
-            label: 'Booking',
+            icon: const Icon(Icons.book_outlined),
+            activeIcon: const Icon(Icons.book),
+            label: _language.t('nav.booking'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
+            icon: const Icon(Icons.search),
+            label: _language.t('nav.search'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.more_horiz),
-            label: 'Menu',
+            icon: const Icon(Icons.more_horiz),
+            label: _language.t('nav.menu'),
           ),
         ],
       ),

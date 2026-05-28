@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
@@ -12,47 +13,38 @@ class AddPromotionScreen extends StatefulWidget {
 }
 
 class _AddPromotionScreenState extends State<AddPromotionScreen> {
+  final ApiService _api = ApiService();
   final TextEditingController _codeController = TextEditingController();
-  int? _selectedVoucherIndex;
 
-  final List<Map<String, dynamic>> _vouchers = const [
-    {
-      'code': 'PHUQUOC15',
-      'title': 'Bay Phú Quốc siêu tiết kiệm!',
-      'description':
-          'Ưu đãi 15% khi đặt phòng nghỉ dưỡng biển, áp dụng cho kỳ nghỉ từ 2 đêm.',
-      'colors': [Color(0xFF5EC2FF), Color(0xFF0A58B7)],
-      'icon': Icons.flight_takeoff,
-      'cornerColor': Color(0xFF7364D8),
-    },
-    {
-      'code': 'BIGSALE20',
-      'title': 'Tiết kiệm đến 20% cho kỳ nghỉ cuối tuần',
-      'description':
-          'Tận hưởng ưu đãi đặc biệt cho khách sạn và căn hộ vào thứ sáu, thứ bảy.',
-      'colors': [Color(0xFFFFB3C7), Color(0xFFE74C6A)],
-      'icon': Icons.local_offer,
-      'cornerColor': Color(0xFFFF8A7A),
-    },
-    {
-      'code': 'VIETNAM40',
-      'title': 'Giảm giá tại Việt Nam trong thời gian giới hạn',
-      'description':
-          'Giảm tới 40% cho các điểm lưu trú nổi bật, áp dụng khi thanh toán trên StaySmart.',
-      'colors': [Color(0xFFE9C088), Color(0xFFB95D34)],
-      'icon': Icons.apartment,
-      'cornerColor': Color(0xFFFF8A7A),
-    },
-    {
-      'code': 'NOIDIA25',
-      'title': 'Ưu Đãi Nội địa - Giảm đến 25%',
-      'description':
-          'Tận hưởng giá đặc biệt tại các khách sạn và khu nghỉ dưỡng địa phương.',
-      'colors': [Color(0xFF1FAA59), Color(0xFF74C67A)],
-      'icon': Icons.location_on,
-      'cornerColor': Color(0xFFFF8A7A),
-    },
-  ];
+  List<Map<String, dynamic>> _vouchers = const [];
+  int? _selectedVoucherIndex;
+  bool _loading = true;
+  bool _submitting = false;
+  String? _error;
+  num? _amount;
+  bool _argumentsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVouchers();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_argumentsLoaded) return;
+    _argumentsLoaded = true;
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map<String, dynamic>) {
+      final value = args['amount'];
+      if (value is num) {
+        _amount = value;
+      } else if (value is String) {
+        _amount = num.tryParse(value);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -60,23 +52,82 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
     super.dispose();
   }
 
+  Future<void> _loadVouchers() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await _api.restoreSession();
+      final vouchers = await _api.fetchCoupons();
+      if (!mounted) return;
+      setState(() {
+        _vouchers = vouchers;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
+    }
+  }
+
   void _selectVoucher(int index) {
     setState(() {
       _selectedVoucherIndex = index;
-      _codeController.text = _vouchers[index]['code'] as String;
+      _codeController.text = _textValue(_vouchers[index], 'code');
     });
   }
 
-  void _submitPromotion() {
+  Future<void> _submitPromotion() async {
     final code = _codeController.text.trim();
     if (code.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập hoặc chọn mã khuyến mãi')),
-      );
+      _showMessage('Vui long nhap hoac chon ma khuyen mai.');
       return;
     }
 
-    Navigator.of(context).pop(code);
+    setState(() => _submitting = true);
+    try {
+      final selected = _selectedVoucherIndex == null
+          ? _findVoucherByCode(code)
+          : _vouchers[_selectedVoucherIndex!];
+      final amount = _amount;
+      final result = amount == null
+          ? <String, dynamic>{
+              'code': code,
+              'coupon': selected,
+              'discountAmount': selected?['discountValue'] ?? 0,
+            }
+          : await _api.validateCoupon(code: code, amount: amount);
+      if (!mounted) return;
+      Navigator.of(context).pop({
+        ...result,
+        'code': result['code'] ?? code,
+        'coupon': selected,
+      });
+    } catch (error) {
+      if (mounted) _showMessage(error.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Map<String, dynamic>? _findVoucherByCode(String code) {
+    final normalized = code.trim().toUpperCase();
+    for (final voucher in _vouchers) {
+      if (_textValue(voucher, 'code').toUpperCase() == normalized) {
+        return voucher;
+      }
+    }
+    return null;
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -85,7 +136,7 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
       backgroundColor: AppColors.colorBg,
       desktopBody: WebAppShell(
         title: 'Promotion Code',
-        subtitle: 'Apply a voucher or enter a promo code for this booking.',
+        subtitle: 'Chon voucher dang hoat dong tu DB hoac nhap ma thu cong.',
         selectedIndex: 2,
         child: _buildDesktopLayout(),
       ),
@@ -93,65 +144,32 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 460),
             child: Column(
               children: [
                 _buildTopBar(context),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(28, 14, 28, 18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildTitleRow(context),
-                        const SizedBox(height: 18),
-                        const Text(
-                          'Nhập mã khuyến mãi',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        _buildCodeField(),
-                        const SizedBox(height: 32),
-                        for (var index = 0; index < _vouchers.length; index++)
-                          Padding(
-                            padding: EdgeInsets.only(
-                              bottom: index == _vouchers.length - 1 ? 0 : 18,
-                            ),
-                            child: _buildVoucherCard(index),
-                          ),
-                      ],
+                  child: RefreshIndicator(
+                    onRefresh: _loadVouchers,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(24, 14, 24, 18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildTitleRow(context),
+                          const SizedBox(height: 18),
+                          _buildCodePanel(),
+                          const SizedBox(height: 20),
+                          _buildVoucherList(),
+                        ],
+                      ),
                     ),
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 12, 28, 18),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: _submitPromotion,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.colorPrimary,
-                        foregroundColor: AppColors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
-                      child: const Text(
-                        'Thêm',
-                        style: TextStyle(
-                          color: AppColors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 18),
+                  child: _buildSubmitButton(),
                 ),
               ],
             ),
@@ -166,7 +184,7 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 380,
+          width: 390,
           child: WebPanel(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -174,7 +192,7 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Promo code',
+                  'Nhap ma khuyen mai',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 20,
@@ -183,21 +201,12 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Choose a voucher or enter a code manually.',
+                  'Ma se duoc kiem tra truc tiep voi backend.',
                   style: TextStyle(color: AppColors.textSecondary),
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Code',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 22),
                 _buildCodeField(),
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
                 _buildSubmitButton(),
               ],
             ),
@@ -210,22 +219,26 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Available vouchers',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Voucher dang hoat dong',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _loadVouchers,
+                      icon: const Icon(Icons.refresh),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 18),
-                for (var index = 0; index < _vouchers.length; index++)
-                  Padding(
-                    padding: EdgeInsets.only(
-                      bottom: index == _vouchers.length - 1 ? 0 : 18,
-                    ),
-                    child: _buildVoucherCard(index),
-                  ),
+                _buildVoucherList(wide: true),
               ],
             ),
           ),
@@ -234,26 +247,314 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
     );
   }
 
+  Widget _buildCodePanel() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Nhap ma khuyen mai',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildCodeField(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCodeField() {
+    return TextField(
+      controller: _codeController,
+      textCapitalization: TextCapitalization.characters,
+      style: const TextStyle(
+        color: AppColors.textPrimary,
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+      ),
+      decoration: InputDecoration(
+        hintText: 'VD: DEMO10',
+        filled: true,
+        fillColor: AppColors.colorBg,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 13,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.divider),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.colorPrimary),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVoucherList({bool wide = false}) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null) {
+      return _buildStateCard(
+        icon: Icons.error_outline,
+        title: 'Khong tai duoc voucher',
+        message: _error!,
+        actionLabel: 'Thu lai',
+        onAction: _loadVouchers,
+      );
+    }
+    if (_vouchers.isEmpty) {
+      return _buildStateCard(
+        icon: Icons.confirmation_number_outlined,
+        title: 'Chua co voucher kha dung',
+        message: 'Backend hien chua tra ve ma khuyen mai dang hoat dong.',
+        actionLabel: 'Tai lai',
+        onAction: _loadVouchers,
+      );
+    }
+
+    if (!wide) {
+      return Column(
+        children: [
+          for (var index = 0; index < _vouchers.length; index++) ...[
+            _buildVoucherCard(index),
+            if (index < _vouchers.length - 1) const SizedBox(height: 14),
+          ],
+        ],
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 820 ? 2 : 1;
+        final gap = columns == 2 ? 14.0 : 0.0;
+        final width = (constraints.maxWidth - gap) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: 14,
+          children: [
+            for (var index = 0; index < _vouchers.length; index++)
+              SizedBox(width: width, child: _buildVoucherCard(index)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildStateCard({
+    required IconData icon,
+    required String title,
+    required String message,
+    required String actionLabel,
+    required VoidCallback onAction,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: AppColors.colorPrimary, size: 32),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton(onPressed: onAction, child: Text(actionLabel)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVoucherCard(int index) {
+    final voucher = _vouchers[index];
+    final colors = _colorsValue(voucher);
+    final isSelected = _selectedVoucherIndex == index;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isSelected ? AppColors.colorPrimary : AppColors.divider,
+          width: isSelected ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: 0,
+            top: 0,
+            child: CustomPaint(
+              size: const Size(24, 24),
+              painter: _CornerFoldPainter(colors.last),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: colors,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Icon(
+                      _iconValue(voucher),
+                      color: AppColors.white,
+                      size: 30,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _textValue(voucher, 'title'),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 12,
+                          height: 1.2,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        _textValue(voucher, 'description'),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        _textValue(voucher, 'code'),
+                        style: const TextStyle(
+                          color: AppColors.colorPrimary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 68,
+                  height: 32,
+                  child: ElevatedButton(
+                    onPressed: () => _selectVoucher(index),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.colorPrimary,
+                      foregroundColor: AppColors.white,
+                      elevation: 0,
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      isSelected ? 'Da chon' : 'Chon',
+                      style: const TextStyle(
+                        color: AppColors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSubmitButton() {
     return SizedBox(
       width: double.infinity,
       height: 48,
       child: ElevatedButton(
-        onPressed: _submitPromotion,
+        onPressed: _submitting ? null : _submitPromotion,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.colorPrimary,
           foregroundColor: AppColors.white,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        child: const Text(
-          'ThÃªm',
-          style: TextStyle(
-            color: AppColors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
+        child: _submitting
+            ? const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.white,
+                ),
+              )
+            : const Text(
+                'Ap dung',
+                style: TextStyle(
+                  color: AppColors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
       ),
     );
   }
@@ -303,7 +604,7 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
         const Expanded(
           child: Center(
             child: Text(
-              'Thêm mã khuyến mãi',
+              'Them ma khuyen mai',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
@@ -317,195 +618,13 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
     );
   }
 
-  Widget _buildCodeField() {
-    return TextField(
-      controller: _codeController,
-      style: const TextStyle(
-        color: AppColors.textPrimary,
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: AppColors.colorBg,
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 13,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(2),
-          borderSide: const BorderSide(color: AppColors.iconMuted),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(2),
-          borderSide: const BorderSide(color: AppColors.colorPrimary),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVoucherCard(int index) {
-    final voucher = _vouchers[index];
-    final colors = voucher['colors'] as List<Color>;
-    final isSelected = _selectedVoucherIndex == index;
-
-    return Container(
-      height: 80,
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isSelected ? AppColors.colorPrimary : Colors.transparent,
-          width: 1.4,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: 0,
-            top: 0,
-            child: CustomPaint(
-              size: const Size(20, 20),
-              painter: _CornerFoldPainter(voucher['cornerColor'] as Color),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(7),
-                  child: Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: colors,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: Icon(
-                      voucher['icon'] as IconData,
-                      color: AppColors.white,
-                      size: 27,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          voucher['title'] as String,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 10,
-                            height: 1.15,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          voucher['description'] as String,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 8.5,
-                            height: 1.18,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 58,
-                  width: 1,
-                  child: CustomPaint(painter: _DashedLinePainter()),
-                ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  width: 52,
-                  height: 28,
-                  child: ElevatedButton(
-                    onPressed: () => _selectVoucher(index),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.colorPrimary,
-                      foregroundColor: AppColors.white,
-                      elevation: 0,
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: Text(
-                      isSelected ? 'Đã chọn' : 'Chọn',
-                      style: const TextStyle(
-                        color: AppColors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildBellButton(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.of(context).pushNamed('/notification'),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const Icon(
-            Icons.notifications_none,
-            size: 22,
-            color: AppColors.textPrimary,
-          ),
-          Positioned(
-            right: -2,
-            top: -4,
-            child: Container(
-              width: 14,
-              height: 14,
-              decoration: const BoxDecoration(
-                color: Colors.red,
-                shape: BoxShape.circle,
-              ),
-              child: const Center(
-                child: Text(
-                  '1',
-                  style: TextStyle(
-                    color: AppColors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+      child: const Icon(
+        Icons.notifications_none,
+        size: 22,
+        color: AppColors.textPrimary,
       ),
     );
   }
@@ -513,26 +632,22 @@ class _AddPromotionScreenState extends State<AddPromotionScreen> {
   static Widget _buildAvatar({required double size}) {
     return CurrentUserAvatar(size: size);
   }
-}
 
-class _DashedLinePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.iconMuted
-      ..strokeWidth = 1;
-    const dashHeight = 4.0;
-    const dashGap = 4.0;
-    var y = 0.0;
-
-    while (y < size.height) {
-      canvas.drawLine(Offset(0, y), Offset(0, y + dashHeight), paint);
-      y += dashHeight + dashGap;
-    }
+  String _textValue(Map<String, dynamic> data, String key) {
+    final value = data[key];
+    return value == null ? '' : value.toString();
   }
 
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  IconData _iconValue(Map<String, dynamic> data) {
+    final value = data['icon'];
+    return value is IconData ? value : Icons.confirmation_number_outlined;
+  }
+
+  List<Color> _colorsValue(Map<String, dynamic> data) {
+    final value = data['colors'];
+    if (value is List<Color> && value.length >= 2) return value;
+    return const [Color(0xFFE9C088), Color(0xFFB95D34)];
+  }
 }
 
 class _CornerFoldPainter extends CustomPainter {

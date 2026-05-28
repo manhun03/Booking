@@ -2,10 +2,13 @@ package com.doan.hotelparking.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.doan.hotelparking.service.AiChatProxyService;
+import com.doan.hotelparking.service.LocalAiChatService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -13,14 +16,23 @@ import java.util.Map;
 @RequestMapping("/api/ai-chat")
 public class AiChatController {
     private final AiChatProxyService aiChat;
+    private final LocalAiChatService localAiChat;
 
-    public AiChatController(AiChatProxyService aiChat) {
+    public AiChatController(AiChatProxyService aiChat, LocalAiChatService localAiChat) {
         this.aiChat = aiChat;
+        this.localAiChat = localAiChat;
     }
 
     @GetMapping("/health")
     public JsonNode health() {
-        return aiChat.get("/health", null);
+        try {
+            return aiChat.get("/health", null);
+        } catch (ResponseStatusException ex) {
+            if (ex.getStatusCode().is5xxServerError()) {
+                return localAiChat.health();
+            }
+            throw ex;
+        }
     }
 
     @PostMapping("/threads")
@@ -71,6 +83,13 @@ public class AiChatController {
     @PreAuthorize("isAuthenticated()")
     public JsonNode chat(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
                          @RequestBody Map<String, Object> body) {
-        return aiChat.post("/chat", authorization, body);
+        try {
+            return aiChat.post("/chat", authorization, body);
+        } catch (ResponseStatusException ex) {
+            if (ex.getStatusCode().isSameCodeAs(HttpStatusCode.valueOf(502))) {
+                return localAiChat.chat(body);
+            }
+            throw ex;
+        }
     }
 }

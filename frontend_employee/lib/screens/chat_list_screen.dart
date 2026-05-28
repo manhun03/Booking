@@ -1,74 +1,180 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-class ChatListScreen extends StatelessWidget {
+import '../services/auth_service.dart';
+import '../services/chat_socket.dart';
+import '../services/owner_api_service.dart';
+import '../utils/constants.dart';
+import '../utils/display_format.dart';
+
+class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
 
-  final Color primaryBlue = const Color(0xFF3F63B5);
+  @override
+  State<ChatListScreen> createState() => _ChatListScreenState();
+}
+
+class _ChatListScreenState extends State<ChatListScreen> {
+  static const Color _primaryBlue = Color(0xFF3F63B5);
+  final OwnerApiService _api = OwnerApiService();
+
+  List<Map<String, dynamic>> _conversations = const [];
+  bool _loading = true;
+  String? _error;
+  ChatSocketConnection? _socket;
+  StreamSubscription<Map<String, dynamic>>? _socketSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  @override
+  void dispose() {
+    _socketSubscription?.cancel();
+    _socket?.close();
+    super.dispose();
+  }
+
+  Future<void> _init() async {
+    await AuthService().restoreSession();
+    _connectSocket();
+    await _load();
+  }
+
+  void _connectSocket() {
+    if (!kIsWeb) return;
+    final token = AuthService().currentSession?.accessToken;
+    if (token == null || token.trim().isEmpty || _socket != null) return;
+
+    final socket = connectChatSocket(
+      socketUrl: AppConstants.chatWebSocketUrl,
+      accessToken: token,
+    );
+    _socket = socket;
+    _socketSubscription = socket.messages.listen(
+      (_) => unawaited(_load(silent: true)),
+      onError: (_) {},
+    );
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
+    try {
+      final conversations = await _api.fetchConversations();
+      if (!mounted) return;
+      setState(() {
+        _conversations = conversations;
+        _loading = false;
+        _error = null;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.message;
+      });
+    }
+  }
+
+  Future<void> _open(Map<String, dynamic> conversation) async {
+    await Navigator.pushNamed(context, '/chat-detail', arguments: conversation);
+    if (mounted) _load();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200],
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 450),
-          child: Container(
-            decoration: BoxDecoration(boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20)]),
-            child: Scaffold(
-              backgroundColor: Colors.white,
-              appBar: AppBar(
-                backgroundColor: Colors.white,
-                elevation: 0,
-                leading: const BackButton(color: Colors.black87),
-                title: const Text('Tin nhắn hỗ trợ', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 18)),
-              ),
-              body: ListView(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        title: const Text('Tin nhan ho tro'),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildChatItem(context, 'Trần Hoàng Nam', 'Khách sạn có dịch vụ đưa đón sân bay không ạ?', '14:30', true),
-                  const Divider(height: 1),
-                  _buildChatItem(context, 'Nguyễn Thu Thảo', 'Vâng, cảm ơn admin.', 'Hôm qua', false),
+                  Text(_error!, style: const TextStyle(color: Colors.red)),
+                  TextButton(onPressed: _load, child: const Text('Thu lai')),
                 ],
               ),
+            )
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: _conversations.isEmpty
+                  ? ListView(
+                      children: [
+                        SizedBox(height: 180),
+                        Center(child: Text('Chua co cuoc hoi thoai nao.')),
+                      ],
+                    )
+                  : ListView.separated(
+                      itemCount: _conversations.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (context, index) =>
+                          _conversation(_conversations[index]),
+                    ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
-  Widget _buildChatItem(BuildContext context, String name, String lastMessage, String time, bool isUnread) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => Navigator.pushNamed(context, '/chat-detail'),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Row(
-            children: [
-              CircleAvatar(radius: 24, backgroundImage: NetworkImage('https://i.pravatar.cc/150?u=$name')),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name, style: TextStyle(fontWeight: isUnread ? FontWeight.bold : FontWeight.w600, fontSize: 16)),
-                    const SizedBox(height: 4),
-                    Text(lastMessage, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: isUnread ? Colors.black87 : Colors.black54, fontSize: 13, fontWeight: isUnread ? FontWeight.bold : FontWeight.normal)),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(time, style: TextStyle(color: isUnread ? primaryBlue : Colors.black45, fontSize: 12, fontWeight: isUnread ? FontWeight.bold : FontWeight.normal)),
-                  const SizedBox(height: 8),
-                  if (isUnread)
-                    Container(width: 10, height: 10, decoration: BoxDecoration(color: primaryBlue, shape: BoxShape.circle)),
-                ],
-              )
-            ],
-          ),
+  Widget _conversation(Map<String, dynamic> conversation) {
+    final unread = intValue(conversation['unreadCount']);
+    final name = textValue(conversation['displayName'], 'Khach hang');
+    return ListTile(
+      onTap: () => _open(conversation),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      leading: CircleAvatar(
+        backgroundColor: const Color(0xFFE7EDFB),
+        child: Text(
+          name.substring(0, 1).toUpperCase(),
+          style: const TextStyle(color: _primaryBlue),
         ),
+      ),
+      title: Text(
+        name,
+        style: TextStyle(
+          fontWeight: unread > 0 ? FontWeight.bold : FontWeight.w600,
+        ),
+      ),
+      subtitle: Text(
+        textValue(conversation['lastMessage'], 'Chua co tin nhan'),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            formatDate(conversation['lastMessageAt'], withTime: true),
+            style: const TextStyle(color: Colors.black45, fontSize: 11),
+          ),
+          if (unread > 0) ...[
+            const SizedBox(height: 5),
+            CircleAvatar(
+              radius: 10,
+              backgroundColor: _primaryBlue,
+              child: Text(
+                '$unread',
+                style: const TextStyle(color: Colors.white, fontSize: 10),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

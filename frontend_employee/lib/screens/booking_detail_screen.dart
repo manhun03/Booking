@@ -1,195 +1,349 @@
 import 'package:flutter/material.dart';
 
-class BookingDetailScreen extends StatelessWidget {
-  const BookingDetailScreen({super.key});
+import '../services/auth_service.dart';
+import '../services/owner_api_service.dart';
+import '../utils/display_format.dart';
 
-  final Color primaryBlue = const Color(0xFF3F63B5);
-  final String status = 'pending'; // Đổi thành 'confirmed', 'checked_in' để test UI các nút
+class BookingDetailScreen extends StatefulWidget {
+  const BookingDetailScreen({super.key, required this.bookingId});
+
+  final int? bookingId;
+
+  @override
+  State<BookingDetailScreen> createState() => _BookingDetailScreenState();
+}
+
+class _BookingDetailScreenState extends State<BookingDetailScreen> {
+  static const Color _primaryBlue = Color(0xFF3F63B5);
+  final OwnerApiService _api = OwnerApiService();
+
+  Map<String, dynamic>? _booking;
+  bool _loading = true;
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (widget.bookingId == null) {
+      setState(() {
+        _error = 'Khong tim thay ma booking.';
+        _loading = false;
+      });
+      return;
+    }
+    try {
+      final booking = await _api.fetchBooking(widget.bookingId!);
+      if (!mounted) return;
+      setState(() {
+        _booking = booking;
+        _loading = false;
+        _error = null;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.message;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _action(
+    Future<Map<String, dynamic>> Function(int id) call,
+  ) async {
+    final id = widget.bookingId;
+    if (id == null || _submitting) return;
+    setState(() => _submitting = true);
+    try {
+      final updated = await call(id);
+      if (!mounted) return;
+      setState(() => _booking = updated);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Da cap nhat booking.')));
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  void _openCustomerChat() {
+    final booking = _booking;
+    if (booking == null) return;
+
+    final customerId = intValue(booking['customerId']);
+    if (customerId <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Khong tim thay tai khoan khach hang.')),
+      );
+      return;
+    }
+
+    Navigator.pushNamed(
+      context,
+      '/chat-detail',
+      arguments: {
+        'userId': customerId,
+        'displayName': textValue(booking['customerName'], 'Khach hang'),
+        'email': textValue(booking['customerEmail'], ''),
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200],
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 450),
-          child: Container(
-            decoration: BoxDecoration(boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20)]),
-            child: Scaffold(
-              backgroundColor: const Color(0xFFF8F9FA),
-              appBar: AppBar(
-                backgroundColor: Colors.white,
-                elevation: 0,
-                leading: const BackButton(color: Colors.black87),
-                title: const Text('Chi tiết Booking', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 18)),
-              ),
-              body: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header Mã Booking
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Mã Booking: #2221050704', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        _buildStatusBadge(status),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Thông tin khách hàng
-                    const Text('THÔNG TIN KHÁCH HÀNG', style: TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.black12)),
-                      child: Column(
-                        children: [
-                          _buildDetailRow(Icons.person_outline, 'Họ và tên', 'Trần Hoàng Nam'),
-                          const Divider(height: 24),
-                          _buildDetailRow(Icons.phone_outlined, 'Số điện thoại', '090 123 4567'),
-                          const Divider(height: 24),
-                          _buildDetailRow(Icons.email_outlined, 'Email', 'nam.tran@email.com'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Thông tin nhận phòng
-                    const Text('CHI TIẾT ĐẶT PHÒNG', style: TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.black12)),
-                      child: Column(
-                        children: [
-                          _buildDetailRow(Icons.hotel_outlined, 'Phòng', 'Deluxe City View (302)'),
-                          const Divider(height: 24),
-                          _buildDetailRow(Icons.people_outline, 'Số lượng khách', '2 Người lớn'),
-                          const Divider(height: 24),
-                          _buildDetailRow(Icons.login, 'Nhận phòng', '14:00 - 12/10/2026'),
-                          const Divider(height: 24),
-                          _buildDetailRow(Icons.logout, 'Trả phòng', '12:00 - 14/10/2026'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Thông tin thanh toán
-                    const Text('CHI TIẾT THANH TOÁN', style: TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.black12)),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Trạng thái', style: TextStyle(color: Colors.black54, fontSize: 14)),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-                                child: const Text('ĐÃ THANH TOÁN', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
-                              )
-                            ],
-                          ),
-                          const Divider(height: 24),
-                          const Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Tiền phòng (2 đêm)', style: TextStyle(color: Colors.black54, fontSize: 14)),
-                              Text('3.000.000 đ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          const Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Thuế & Phí', style: TextStyle(color: Colors.black54, fontSize: 14)),
-                              Text('500.000 đ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            ],
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 12.0),
-                            child: Divider(color: Colors.black26, thickness: 1),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('TỔNG CỘNG', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                              Text('3.500.000 đ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: primaryBlue)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                  ],
-                ),
-              ),
-              bottomNavigationBar: _buildBottomActions(context, status),
-            ),
-          ),
-        ),
+      backgroundColor: const Color(0xFFF5F7FB),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        title: const Text('Chi tiet Booking'),
+        leading: BackButton(onPressed: () => Navigator.pop(context, true)),
       ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Text(_error!, style: const TextStyle(color: Colors.red)),
+            )
+          : _body(),
+      bottomNavigationBar: _booking == null ? null : _actions(),
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String title, String value) {
-    return Row(
+  Widget _body() {
+    final booking = _booking!;
+    final status = textValue(booking['status']);
+    return ListView(
+      padding: const EdgeInsets.all(20),
       children: [
-        Icon(icon, color: Colors.black45, size: 20),
-        const SizedBox(width: 12),
-        Text(title, style: const TextStyle(color: Colors.black54, fontSize: 14)),
-        const Spacer(),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        Row(
+          children: [
+            Text(
+              'Booking #${intValue(booking['id'])}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const Spacer(),
+            _badge(status),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _section('THONG TIN KHACH HANG', [
+          _row(
+            Icons.person_outline,
+            'Ho ten',
+            textValue(booking['customerName'], 'Khach hang'),
+          ),
+          _row(
+            Icons.phone_outlined,
+            'Dien thoai',
+            textValue(booking['customerPhone']),
+          ),
+          _row(
+            Icons.email_outlined,
+            'Email',
+            textValue(booking['customerEmail']),
+          ),
+          _row(
+            Icons.location_on_outlined,
+            'Dia chi',
+            textValue(booking['customerAddress']),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 44,
+          child: OutlinedButton.icon(
+            onPressed: _openCustomerChat,
+            icon: const Icon(Icons.chat_bubble_outline, size: 18),
+            label: const Text('Nhan tin voi khach hang'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _primaryBlue,
+              side: const BorderSide(color: _primaryBlue),
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        _section('CHI TIET DAT PHONG', [
+          _row(
+            Icons.domain_outlined,
+            'Khach san',
+            textValue(booking['hotelName']),
+          ),
+          _row(Icons.bed_outlined, 'Phong', textValue(booking['roomNumber'])),
+          _row(
+            Icons.people_outline,
+            'So khach',
+            '${intValue(booking['guestCount'])}',
+          ),
+          _row(
+            Icons.login,
+            'Nhan phong',
+            formatDate(booking['checkInDate'], withTime: true),
+          ),
+          _row(
+            Icons.logout,
+            'Tra phong',
+            formatDate(booking['checkOutDate'], withTime: true),
+          ),
+        ]),
+        const SizedBox(height: 18),
+        _section('THANH TOAN', [
+          _row(
+            Icons.receipt_long_outlined,
+            'Don gia',
+            formatMoney(booking['roomUnitPrice']),
+          ),
+          _row(
+            Icons.nightlight_outlined,
+            'So dem',
+            '${intValue(booking['nightCount'])}',
+          ),
+          _row(
+            Icons.payments_outlined,
+            'Da thanh toan',
+            formatMoney(booking['paidAmount']),
+          ),
+          _row(
+            Icons.calculate_outlined,
+            'Tong cong',
+            formatMoney(booking['totalAmount']),
+            strong: true,
+          ),
+        ]),
       ],
     );
   }
 
-  Widget _buildStatusBadge(String status) {
-    Color bgColor; Color textColor; String text;
-    switch (status) {
-      case 'pending': bgColor = Colors.orange.withValues(alpha: 0.1); textColor = Colors.orange; text = 'CHỜ DUYỆT'; break;
-      case 'confirmed': bgColor = primaryBlue.withValues(alpha: 0.1); textColor = primaryBlue; text = 'SẮP ĐẾN'; break;
-      case 'checked_in': bgColor = Colors.green.withValues(alpha: 0.1); textColor = Colors.green; text = 'ĐANG Ở'; break;
-      default: bgColor = Colors.grey.withValues(alpha: 0.2); textColor = Colors.black54; text = 'HOÀN TẤT';
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(6)),
-      child: Text(text, style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.bold)),
+  Widget _section(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.black54,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          elevation: 0,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              children: [
+                for (var i = 0; i < children.length; i++) ...[
+                  children[i],
+                  if (i != children.length - 1) const Divider(height: 22),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildBottomActions(BuildContext context, String status) {
-    if (status == 'pending') {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))]),
+  Widget _row(
+    IconData icon,
+    String label,
+    String value, {
+    bool strong = false,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 19, color: Colors.black45),
+        const SizedBox(width: 9),
+        Text(label, style: const TextStyle(color: Colors.black54)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: strong ? _primaryBlue : Colors.black87,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _badge(String status) {
+    final color = switch (status) {
+      'PENDING' => Colors.orange,
+      'CONFIRMED' => _primaryBlue,
+      'CHECKED_IN' => Colors.green,
+      'COMPLETED' || 'CHECKED_OUT' => Colors.grey,
+      _ => Colors.red,
+    };
+    return Chip(
+      label: Text(status),
+      side: BorderSide.none,
+      labelStyle: TextStyle(color: color, fontSize: 11),
+      backgroundColor: color.withValues(alpha: 0.12),
+    );
+  }
+
+  Widget? _actions() {
+    final status = textValue(_booking!['status']);
+    if (status == 'PENDING') {
+      return _buttonBar([
+        OutlinedButton(
+          onPressed: _submitting ? null : () => _action(_api.rejectBooking),
+          child: const Text('Tu choi'),
+        ),
+        ElevatedButton(
+          onPressed: _submitting ? null : () => _action(_api.confirmBooking),
+          child: const Text('Xac nhan'),
+        ),
+      ]);
+    }
+    if (status == 'CONFIRMED') {
+      return _buttonBar([
+        ElevatedButton(
+          onPressed: _submitting ? null : () => _action(_api.checkInBooking),
+          child: const Text('Check-in'),
+        ),
+      ]);
+    }
+    if (status == 'CHECKED_IN') {
+      return _buttonBar([
+        ElevatedButton(
+          onPressed: _submitting ? null : () => _action(_api.checkOutBooking),
+          child: const Text('Check-out'),
+        ),
+      ]);
+    }
+    return null;
+  }
+
+  Widget _buttonBar(List<Widget> buttons) {
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        color: Colors.white,
         child: Row(
           children: [
-            Expanded(child: OutlinedButton(onPressed: () {}, style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), foregroundColor: Colors.red), child: const Text('Từ chối', style: TextStyle(fontWeight: FontWeight.bold)))),
-            const SizedBox(width: 16),
-            Expanded(child: ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), backgroundColor: primaryBlue, foregroundColor: Colors.white), child: const Text('Xác nhận', style: TextStyle(fontWeight: FontWeight.bold)))),
+            for (var i = 0; i < buttons.length; i++) ...[
+              Expanded(child: buttons[i]),
+              if (i != buttons.length - 1) const SizedBox(width: 12),
+            ],
           ],
         ),
-      );
-    } else if (status == 'confirmed') {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))]),
-        child: SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), backgroundColor: Colors.green, foregroundColor: Colors.white), child: const Text('Thực hiện Check-in', style: TextStyle(fontWeight: FontWeight.bold)))),
-      );
-    } else if (status == 'checked_in') {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))]),
-        child: SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), backgroundColor: Colors.orange, foregroundColor: Colors.white), child: const Text('Thực hiện Check-out', style: TextStyle(fontWeight: FontWeight.bold)))),
-      );
-    }
-    return const SizedBox.shrink();
+      ),
+    );
   }
 }

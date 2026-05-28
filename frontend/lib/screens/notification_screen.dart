@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
@@ -12,56 +13,104 @@ class NotificationScreen extends StatefulWidget {
 }
 
 class _NotificationScreenState extends State<NotificationScreen> {
+  final ApiService _api = ApiService();
   int _selectedIndex = 0;
+  bool _loading = true;
+  bool _markingRead = false;
+  final Set<int> _readingIds = <int>{};
+  String? _error;
+  List<Map<String, dynamic>> _notifications = [];
+  List<Map<String, dynamic>> _deals = [];
+  List<Map<String, dynamic>> _messages = [];
 
-  static const List<Map<String, dynamic>> _deals = [
-    {
-      'title': 'Giảm giá tại Việt Nam trong thời gian giới hạn',
-      'subtitle':
-          'Giảm tới 40% khi đặt phòng tại Việt Nam, áp dụng cho các khách sạn tham gia chương trình.',
-      'colors': [Color(0xFFE9C088), Color(0xFFB95D34)],
-      'icon': Icons.apartment,
-      'time': '10 phút',
-    },
-    {
-      'title': 'Tiết kiệm đến 20% cho kỳ nghỉ cuối tuần',
-      'subtitle': 'Tận hưởng kỳ nghỉ đáng cấp với mức giá ưu đãi đặc biệt.',
-      'colors': [Color(0xFFFFB3C7), Color(0xFFE74C6A)],
-      'icon': Icons.local_offer,
-      'time': '1 giờ',
-    },
-    {
-      'title': 'Ưu đãi nội địa - giảm đến 25%',
-      'subtitle':
-          'Tận hưởng giá đặc biệt tại các khách sạn và khu nghỉ dưỡng địa phương.',
-      'colors': [Color(0xFF1FAA59), Color(0xFF74C67A)],
-      'icon': Icons.location_on,
-      'time': '3 giờ',
-    },
-  ];
+  int get _unreadCount {
+    final unreadNotifications =
+        _notifications.where((item) => item['read'] != true).length;
+    final unreadMessages = _messages.fold<int>(
+      0,
+      (total, item) => total + (_intValue(item['unread']) ?? 0),
+    );
+    return unreadNotifications + unreadMessages;
+  }
 
-  static const List<Map<String, String>> _messages = [
-    {
-      'name': 'Nguyễn Đoàn Quân',
-      'message': 'Tôi muốn hỏi bạn về thông tin đặt phòng cuối tuần này.',
-      'time': '2 giờ',
-    },
-    {
-      'name': 'Satoshi',
-      'message': 'Phòng 103 gặp sự cố, tôi cần hỗ trợ kiểm tra.',
-      'time': '1 giờ',
-    },
-    {
-      'name': 'Nguyễn Hoàng Hà',
-      'message': 'Tôi muốn đặt trước phòng suite cho 2 người.',
-      'time': '1 giờ',
-    },
-    {
-      'name': 'Nguyễn Phúc Tài',
-      'message': 'Tôi muốn hỏi cách thanh toán khi nhận phòng.',
-      'time': '1 giờ',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      await _api.restoreSession();
+      final results = await Future.wait([
+        _api.fetchNotifications(),
+        _api.fetchCoupons(),
+        _api.fetchChatConversations(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _notifications = results[0];
+        _deals = results[1];
+        _messages = results[2];
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _markAllRead() async {
+    if (_markingRead) return;
+    setState(() {
+      _markingRead = true;
+    });
+    try {
+      await _api.markAllNotificationsRead();
+      await _loadData();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _markingRead = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _markOneRead(Map<String, dynamic> notification) async {
+    final id = _intValue(notification['id']);
+    if (id == null ||
+        notification['read'] == true ||
+        _readingIds.contains(id)) {
+      return;
+    }
+    setState(() => _readingIds.add(id));
+    try {
+      await _api.markNotificationRead(id);
+      if (!mounted) return;
+      setState(() => notification['read'] = true);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    } finally {
+      if (mounted) setState(() => _readingIds.remove(id));
+    }
+  }
 
   void _onBottomNavTapped(int index) {
     setState(() {
@@ -94,9 +143,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
         children: [
           _buildTopBar(context),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(28, 14, 28, 18),
-              child: _buildMobileContent(context),
+            child: RefreshIndicator(
+              onRefresh: _loadData,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(28, 14, 28, 18),
+                child: _buildMobileContent(context),
+              ),
             ),
           ),
         ],
@@ -110,7 +163,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return WebAppShell(
       title: 'Notification',
       subtitle:
-          'Theo dõi ưu đãi mới, tin nhắn khách sạn và các cập nhật quan trọng từ StaySmart.',
+          'Theo doi uu dai moi, tin nhan khach san va cac cap nhat quan trong tu StaySmart.',
       selectedIndex: 0,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -147,30 +200,52 @@ class _NotificationScreenState extends State<NotificationScreen> {
       children: [
         _buildTitleRow(context),
         const SizedBox(height: 18),
-        const Text(
-          'Ưu đãi',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
+        if (_loading || _error != null)
+          _buildStateContent()
+        else ...[
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Thong bao cua ban',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _markingRead ? null : _markAllRead,
+                child: Text(_markingRead ? 'Dang xu ly...' : 'Doc tat ca'),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 12),
-        for (final deal in _deals) ...[
-          _buildDealCard(deal),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
+          _buildNotificationsList(),
+          const SizedBox(height: 20),
+          const Text(
+            'Uu dai',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildDealsList(),
+          const SizedBox(height: 18),
+          const Text(
+            'Tin nhan',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildMessagesCard(),
         ],
-        const SizedBox(height: 4),
-        const Text(
-          'Tin Nhắn',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 12),
-        _buildMessagesCard(),
       ],
     );
   }
@@ -195,7 +270,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
           const SizedBox(height: 18),
           const Text(
-            'Trung tâm thông báo',
+            'Trung tam thong bao',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
@@ -204,7 +279,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Tổng hợp ưu đãi và tin nhắn mới nhất để bạn không bỏ lỡ thông tin đặt phòng.',
+            'Du lieu duoc lay tu notifications, coupons va messages tren backend.',
             style: TextStyle(
               fontSize: 13,
               height: 1.45,
@@ -213,23 +288,30 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
           const SizedBox(height: 22),
           _buildSummaryTile(
+            icon: Icons.notifications_none,
+            label: 'Thong bao',
+            value: '${_notifications.length}',
+            color: const Color(0xFF7C3AED),
+          ),
+          const SizedBox(height: 10),
+          _buildSummaryTile(
             icon: Icons.local_offer_outlined,
-            label: 'Ưu đãi',
+            label: 'Uu dai',
             value: '${_deals.length}',
             color: AppColors.colorPrimary,
           ),
           const SizedBox(height: 10),
           _buildSummaryTile(
             icon: Icons.mail_outline,
-            label: 'Tin nhắn',
+            label: 'Tin nhan',
             value: '${_messages.length}',
             color: const Color(0xFF22C55E),
           ),
           const SizedBox(height: 10),
           _buildSummaryTile(
             icon: Icons.mark_email_unread_outlined,
-            label: 'Chưa đọc',
-            value: '5',
+            label: 'Chua doc',
+            value: '$_unreadCount',
             color: const Color(0xFFD97706),
           ),
         ],
@@ -238,6 +320,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   Widget _buildDesktopContentPanel() {
+    if (_loading || _error != null) {
+      return WebPanel(child: _buildStateContent());
+    }
+
     return Column(
       children: [
         WebPanel(
@@ -248,7 +334,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 children: [
                   const Expanded(
                     child: Text(
-                      'Ưu đãi mới',
+                      'Thong bao cua ban',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
@@ -257,32 +343,20 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () {},
-                    child: const Text('Đánh dấu đã đọc'),
+                    onPressed: _markingRead ? null : _markAllRead,
+                    child: Text(
+                      _markingRead ? 'Dang xu ly...' : 'Danh dau da doc',
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Tai lai',
+                    onPressed: _loadData,
+                    icon: const Icon(Icons.refresh),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final columns = constraints.maxWidth >= 760 ? 2 : 1;
-                  final spacing = columns == 2 ? 14.0 : 0.0;
-                  final itemWidth =
-                      (constraints.maxWidth - spacing) / columns.toDouble();
-
-                  return Wrap(
-                    spacing: spacing,
-                    runSpacing: 14,
-                    children: [
-                      for (final deal in _deals)
-                        SizedBox(
-                          width: itemWidth,
-                          child: _buildDealCard(deal, wide: true),
-                        ),
-                    ],
-                  );
-                },
-              ),
+              _buildNotificationsList(wide: true),
             ],
           ),
         ),
@@ -292,7 +366,25 @@ class _NotificationScreenState extends State<NotificationScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Tin nhắn gần đây',
+                'Uu dai moi',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildDealsList(wide: true),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        WebPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Tin nhan gan day',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
@@ -305,6 +397,231 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStateContent() {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 36),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline, color: AppColors.colorPrimary),
+          const SizedBox(height: 10),
+          const Text(
+            'Khong tai duoc thong bao',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _error ?? '',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton(onPressed: _loadData, child: const Text('Thu lai')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationsList({bool wide = false}) {
+    if (_notifications.isEmpty) {
+      return _buildEmptyCard('Ban chua co thong bao nao.');
+    }
+
+    return Column(
+      children: [
+        for (var index = 0; index < _notifications.length; index++) ...[
+          _buildNotificationItem(_notifications[index], wide: wide),
+          if (index < _notifications.length - 1)
+            SizedBox(height: wide ? 10 : 12),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildNotificationItem(
+    Map<String, dynamic> notification, {
+    bool wide = false,
+  }) {
+    final id = _intValue(notification['id']);
+    final read = notification['read'] == true;
+    final busy = id != null && _readingIds.contains(id);
+    final palette = _colorsValue(notification);
+    return Material(
+      color: read ? AppColors.white : palette.first.withValues(alpha: 0.06),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: read || busy ? null : () => _markOneRead(notification),
+        child: Container(
+          padding: EdgeInsets.all(wide ? 16 : 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: read
+                  ? AppColors.divider
+                  : palette.first.withValues(alpha: 0.18),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: wide ? 48 : 42,
+                height: wide ? 48 : 42,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: palette),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _iconValue(notification),
+                  color: AppColors.white,
+                  size: wide ? 24 : 21,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _textValue(notification, 'title'),
+                            style: TextStyle(
+                              fontSize: wide ? 14 : 13,
+                              fontWeight:
+                                  read ? FontWeight.w700 : FontWeight.w900,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        if (!read)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppColors.colorPrimary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      _textValue(notification, 'message'),
+                      maxLines: wide ? 3 : 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Row(
+                      children: [
+                        Text(
+                          _textValue(notification, 'time'),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (!read)
+                          Text(
+                            busy ? 'Dang xu ly...' : 'Cham de danh dau da doc',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.colorPrimary,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDealsList({bool wide = false}) {
+    if (_deals.isEmpty) {
+      return _buildEmptyCard('Chua co uu dai dang hoat dong.');
+    }
+
+    if (!wide) {
+      return Column(
+        children: [
+          for (final deal in _deals) ...[
+            _buildDealCard(deal),
+            const SizedBox(height: 14),
+          ],
+        ],
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 760 ? 2 : 1;
+        final spacing = columns == 2 ? 14.0 : 0.0;
+        final itemWidth = (constraints.maxWidth - spacing) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: 14,
+          children: [
+            for (final deal in _deals)
+              SizedBox(
+                width: itemWidth,
+                child: _buildDealCard(deal, wide: true),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyCard(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: AppColors.textSecondary),
+      ),
     );
   }
 
@@ -402,18 +719,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
           ),
         ),
-        SizedBox(
-          width: 28,
-          height: 28,
-          child: IconButton(
-            padding: EdgeInsets.zero,
-            icon: const Icon(
-              Icons.filter_list,
-              size: 18,
-              color: AppColors.colorPrimary,
-            ),
-            onPressed: () {},
+        IconButton(
+          padding: EdgeInsets.zero,
+          icon: const Icon(
+            Icons.refresh,
+            size: 18,
+            color: AppColors.colorPrimary,
           ),
+          onPressed: _loadData,
         ),
       ],
     );
@@ -465,34 +778,20 @@ class _NotificationScreenState extends State<NotificationScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _textValue(deal, 'title'),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: wide ? 13 : 11,
-                          height: 1.25,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                    if (wide)
-                      Text(
-                        _textValue(deal, 'time'),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                  ],
+                Text(
+                  _textValue(deal, 'title'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: wide ? 13 : 11,
+                    height: 1.25,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _textValue(deal, 'subtitle'),
+                  _textValue(deal, 'description'),
                   maxLines: wide ? 3 : 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -501,16 +800,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     color: AppColors.textPrimary,
                   ),
                 ),
-                if (!wide) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    _textValue(deal, 'time'),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textSecondary,
-                    ),
+                const SizedBox(height: 6),
+                Text(
+                  _textValue(deal, 'code'),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.colorPrimary,
                   ),
-                ],
+                ),
               ],
             ),
           ),
@@ -520,6 +818,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   Widget _buildMessagesCard({bool wide = false}) {
+    if (_messages.isEmpty) {
+      return _buildEmptyCard('Chua co tin nhan gan day.');
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -545,28 +847,59 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   Widget _buildMessageItem(
-    Map<String, String> message, {
+    Map<String, dynamic> message, {
     bool wide = false,
   }) {
     return InkWell(
-      onTap: () => Navigator.of(context).pushNamed('/message-chat'),
+      onTap: () => Navigator.of(context).pushNamed(
+        '/message-chat',
+        arguments: message,
+      ),
       child: Padding(
         padding: EdgeInsets.fromLTRB(12, wide ? 12 : 9, 12, wide ? 12 : 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: wide ? 50 : 46,
-              height: wide ? 50 : 46,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFFF0F2F5),
-              ),
-              child: const Icon(
-                Icons.person_outline,
-                color: AppColors.iconMuted,
-                size: 22,
-              ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: wide ? 50 : 46,
+                  height: wide ? 50 : 46,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFFF0F2F5),
+                  ),
+                  child: const Icon(
+                    Icons.person_outline,
+                    color: AppColors.iconMuted,
+                    size: 22,
+                  ),
+                ),
+                if ((_intValue(message['unread']) ?? 0) > 0)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: const BoxDecoration(
+                        color: AppColors.colorPrimary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${_intValue(message['unread'])}',
+                          style: const TextStyle(
+                            color: AppColors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -577,7 +910,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          message['name'] ?? '',
+                          _textValue(message, 'name'),
                           style: TextStyle(
                             fontSize: wide ? 14 : 13,
                             fontWeight: FontWeight.w800,
@@ -586,7 +919,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         ),
                       ),
                       Text(
-                        message['time'] ?? '',
+                        _textValue(message, 'time'),
                         style: const TextStyle(
                           fontSize: 10,
                           color: AppColors.textSecondary,
@@ -596,7 +929,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    message['message'] ?? '',
+                    _textValue(message, 'message'),
                     maxLines: wide ? 2 : 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -678,28 +1011,29 @@ class _NotificationScreenState extends State<NotificationScreen> {
             size: 22,
             color: AppColors.textPrimary,
           ),
-          Positioned(
-            right: -2,
-            top: -4,
-            child: Container(
-              width: 14,
-              height: 14,
-              decoration: const BoxDecoration(
-                color: Colors.red,
-                shape: BoxShape.circle,
-              ),
-              child: const Center(
-                child: Text(
-                  '1',
-                  style: TextStyle(
-                    color: AppColors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
+          if (_unreadCount > 0)
+            Positioned(
+              right: -2,
+              top: -4,
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    _unreadCount > 9 ? '9+' : '$_unreadCount',
+                    style: const TextStyle(
+                      color: AppColors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -725,5 +1059,12 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final value = data['colors'];
     if (value is List<Color> && value.length >= 2) return value;
     return const [Color(0xFFE9C088), Color(0xFFB95D34)];
+  }
+
+  int? _intValue(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 }

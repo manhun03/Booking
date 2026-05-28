@@ -14,6 +14,7 @@ export 'booking_detail_screen.dart';
 export 'change_booking_date_screen.dart';
 export 'change_booking_time_screen.dart';
 export 'cancel_booking_screen.dart';
+export 'review_booking_screen.dart';
 export 'booking_form_screen.dart';
 export 'payment_information_screen.dart';
 export 'payment_card_screen.dart';

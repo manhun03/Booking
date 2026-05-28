@@ -15,6 +15,8 @@ import com.doan.hotelparking.security.HasPermission;
 import com.doan.hotelparking.service.CurrentUserService;
 import com.doan.hotelparking.service.DtoMapper;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -26,64 +28,79 @@ final class MiscControllers {
 
 @RestController
 @RequestMapping("/api/notifications")
-class NotificationController extends CrudController<Notification> {
+class NotificationController {
     private final NotificationRepository notifications;
     private final CurrentUserService currentUser;
     private final DtoMapper mapper;
 
     NotificationController(NotificationRepository repository, CurrentUserService currentUser, DtoMapper mapper) {
-        super(repository);
         this.notifications = repository;
         this.currentUser = currentUser;
         this.mapper = mapper;
     }
 
     @GetMapping("/my")
+    @Transactional(readOnly = true)
     ApiResponse<java.util.List<NotificationDto>> myNotifications() {
         return ApiResponse.ok(notifications.findByUserIdOrderByCreatedAtDesc(currentUser.requireUserId()).stream()
                 .map(mapper::toNotificationDto)
                 .toList());
     }
 
-    @Override
     @GetMapping
+    @PreAuthorize("hasRole('Admin')")
+    @Transactional(readOnly = true)
     public ApiResponse<java.util.List<NotificationDto>> getAll() {
         return ApiResponse.ok(notifications.findAll().stream()
                 .map(mapper::toNotificationDto)
                 .toList());
     }
 
-    @Override
     @GetMapping("/{id}")
+    @Transactional(readOnly = true)
     public ApiResponse<NotificationDto> getById(@PathVariable Integer id) {
-        return ApiResponse.ok(notifications.findById(id)
-                .map(mapper::toNotificationDto)
-                .orElseThrow(() -> new IllegalArgumentException("Notification not found")));
+        var notification = requireVisibleNotification(id);
+        return ApiResponse.ok(mapper.toNotificationDto(notification));
     }
 
     @PostMapping("/{id}/read")
+    @Transactional
     ApiResponse<NotificationDto> markRead(@PathVariable Integer id) {
-        var notification = notifications.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
-        if (!notification.getUser().getId().equals(currentUser.requireUserId())) {
-            throw new IllegalArgumentException("Notification not found");
-        }
+        var notification = requireVisibleNotification(id);
         notification.setRead(true);
         notification.setReadAt(Instant.now());
         return ApiResponse.ok("Marked as read", mapper.toNotificationDto(notifications.save(notification)));
     }
 
     @PostMapping("/read-all")
+    @Transactional
     ApiResponse<Integer> markAllRead() {
         var items = notifications.findByUserIdOrderByCreatedAtDesc(currentUser.requireUserId());
+        var updatedCount = 0;
         for (var item : items) {
             if (!item.isRead()) {
                 item.setRead(true);
                 item.setReadAt(Instant.now());
+                updatedCount++;
             }
         }
         notifications.saveAll(items);
-        return ApiResponse.ok("Marked all as read", items.size());
+        return ApiResponse.ok("Marked all as read", updatedCount);
+    }
+
+    private Notification requireVisibleNotification(Integer id) {
+        var notification = notifications.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
+        if (!notification.getUser().getId().equals(currentUser.requireUserId()) && !isAdmin()) {
+            throw new IllegalArgumentException("Notification not found");
+        }
+        return notification;
+    }
+
+    private boolean isAdmin() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_Admin".equals(authority.getAuthority()));
     }
 }
 

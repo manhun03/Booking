@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'screens/admin_dashboard_screen.dart';
+import 'screens/admin_extended_screens.dart';
+import 'screens/admin_portal_screens.dart';
+import 'screens/auth_gate_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/forgot_password_screen.dart';
@@ -40,8 +44,22 @@ class StaySmartApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => const WelcomeScreen(),
+        '/': (context) => const AuthGateScreen(),
+        '/welcome': (context) => const WelcomeScreen(),
         '/login': (context) => const LoginScreen(),
+        '/admin-dashboard': (context) => const AdminDashboardScreen(),
+        '/admin-users': (context) => const AdminUserManagementScreen(),
+        '/admin-roles': (context) => const AdminRolePermissionScreen(),
+        '/admin-hotels': (context) => const AdminHotelManagementScreen(),
+        '/admin-bookings': (context) => const AdminBookingManagementScreen(),
+        '/admin-payments': (context) => const AdminPaymentManagementScreen(),
+        '/admin-reviews': (context) => const AdminReviewModerationScreen(),
+        '/admin-notifications': (context) =>
+            const AdminNotificationManagementScreen(),
+        '/admin-system-configs': (context) => const AdminSystemConfigScreen(),
+        '/admin-audit-logs': (context) => const AdminAuditLogScreen(),
+        '/admin-integrations': (context) =>
+            const AdminIntegrationHealthScreen(),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/otp': (context) => const OtpScreen(),
         '/reset-password': (context) => const ResetPasswordScreen(),
@@ -50,18 +68,40 @@ class StaySmartApp extends StatelessWidget {
         '/revenue-detail': (context) => const RevenueDetailScreen(),
 
         '/hotel-list': (context) => const HotelListScreen(),
-        '/hotel-form': (context) => const HotelFormScreen(),
-        '/room-list': (context) => const RoomListScreen(),
-        '/room-form': (context) => const RoomFormScreen(),
+        '/hotel-form': (context) => HotelFormScreen(
+          hotel:
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?,
+        ),
+        '/room-list': (context) => RoomListScreen(
+          hotel:
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?,
+        ),
+        '/room-form': (context) {
+          final arguments =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
+          return RoomFormScreen(
+            room: arguments?['room'] as Map<String, dynamic>?,
+            initialHotel: arguments?['hotel'] as Map<String, dynamic>?,
+          );
+        },
 
-        '/booking': (context) => const BookingManagementScreen(),        
-        '/booking-detail': (context) => const BookingDetailScreen(),
+        '/booking': (context) => const BookingManagementScreen(),
+        '/booking-detail': (context) => BookingDetailScreen(
+          bookingId: ModalRoute.of(context)?.settings.arguments as int?,
+        ),
         '/transaction': (context) => const TransactionHistoryScreen(),
 
         '/notifications': (context) => const NotificationScreen(),
         '/reviews': (context) => const ReviewListScreen(),
         '/chats': (context) => const ChatListScreen(),
-        '/chat-detail': (context) => const ChatDetailScreen(),
+        '/chat-detail': (context) => ChatDetailScreen(
+          conversation:
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?,
+        ),
 
         '/settings': (context) => const SettingsMenuScreen(),
         '/policy-config': (context) => const PolicyConfigScreen(),
