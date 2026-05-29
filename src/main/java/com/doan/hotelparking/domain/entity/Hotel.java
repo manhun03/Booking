@@ -23,7 +23,7 @@ public class Hotel {
     @JoinColumn(name = "OwnerId")
     private User owner;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "WardId")
     private Ward ward;
 
@@ -48,10 +48,10 @@ public class Hotel {
     @Column(name = "UpdatedAt")
     private Instant updatedAt;
 
-    @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "hotel")
     private Set<Room> rooms = new HashSet<>();
 
-    @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "hotel")
     private Set<HotelImage> hotelImages = new HashSet<>();
 
     @PrePersist

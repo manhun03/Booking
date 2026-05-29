@@ -1,16 +1,18 @@
 package com.doan.hotelparking.controller;
 
 import com.doan.hotelparking.common.ApiResponse;
+import com.doan.hotelparking.domain.entity.Booking;
+import com.doan.hotelparking.domain.entity.ChatMessage;
 import com.doan.hotelparking.domain.entity.Coupon;
-import com.doan.hotelparking.dto.chat.ChatMessageRequests.SendChatMessageRequest;
-import com.doan.hotelparking.dto.common.SimpleDtos.ChatConversationDto;
+import com.doan.hotelparking.domain.entity.User;
 import com.doan.hotelparking.dto.common.SimpleDtos.ChatMessageDto;
 import com.doan.hotelparking.repository.AuditLogRepository;
+import com.doan.hotelparking.repository.ChatMessageRepository;
 import com.doan.hotelparking.repository.CouponRepository;
 import com.doan.hotelparking.service.AuditService;
-import com.doan.hotelparking.service.ChatMessageService;
 import com.doan.hotelparking.service.CurrentUserService;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import com.doan.hotelparking.service.DtoMapper;
+import jakarta.validation.constraints.NotBlank;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,66 +26,12 @@ final class BusinessExtensionsController {
 
 @RestController
 @RequestMapping("/api/coupons")
-class CouponController {
+class CouponController extends CrudController<Coupon> {
     private final CouponRepository coupons;
 
     CouponController(CouponRepository repository) {
+        super(repository);
         this.coupons = repository;
-    }
-
-    @GetMapping
-    @PreAuthorize("hasRole('Admin')")
-    ApiResponse<List<Coupon>> all() {
-        return ApiResponse.ok(coupons.findAll());
-    }
-
-    @GetMapping("/{id}")
-    @PreAuthorize("hasRole('Admin')")
-    ApiResponse<Coupon> byId(@PathVariable Integer id) {
-        return ApiResponse.ok(coupons.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Coupon not found")));
-    }
-
-    @PostMapping
-    @PreAuthorize("hasRole('Admin')")
-    ApiResponse<Coupon> create(@RequestBody Coupon request) {
-        return ApiResponse.ok("Created", coupons.save(request));
-    }
-
-    @PutMapping("/{id}")
-    @PreAuthorize("hasRole('Admin')")
-    ApiResponse<Coupon> update(@PathVariable Integer id, @RequestBody Coupon request) {
-        var coupon = coupons.findById(id).orElseThrow(() -> new IllegalArgumentException("Coupon not found"));
-        coupon.setCode(request.getCode());
-        coupon.setDescription(request.getDescription());
-        coupon.setDiscountType(request.getDiscountType());
-        coupon.setDiscountValue(request.getDiscountValue());
-        coupon.setMaxDiscountAmount(request.getMaxDiscountAmount());
-        coupon.setMinOrderAmount(request.getMinOrderAmount());
-        coupon.setStartAt(request.getStartAt());
-        coupon.setEndAt(request.getEndAt());
-        coupon.setMaxUses(request.getMaxUses());
-        coupon.setUsedCount(request.getUsedCount());
-        coupon.setActive(request.isActive());
-        return ApiResponse.ok("Updated", coupons.save(coupon));
-    }
-
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('Admin')")
-    ApiResponse<Void> delete(@PathVariable Integer id) {
-        coupons.deleteById(id);
-        return ApiResponse.ok("Deleted", null);
-    }
-
-    @GetMapping("/active")
-    ApiResponse<List<Coupon>> active() {
-        var now = Instant.now();
-        return ApiResponse.ok(coupons.findAll().stream()
-                .filter(Coupon::isActive)
-                .filter(coupon -> coupon.getStartAt() == null || !now.isBefore(coupon.getStartAt()))
-                .filter(coupon -> coupon.getEndAt() == null || !now.isAfter(coupon.getEndAt()))
-                .filter(coupon -> coupon.getMaxUses() == null || coupon.getUsedCount() < coupon.getMaxUses())
-                .toList());
     }
 
     @GetMapping("/validate")
@@ -112,57 +60,60 @@ class CouponController {
 @RestController
 @RequestMapping("/api/messages")
 class ChatController {
-    private final ChatMessageService chatMessages;
+    private final ChatMessageRepository messages;
     private final CurrentUserService currentUser;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final DtoMapper mapper;
 
-    ChatController(ChatMessageService chatMessages, CurrentUserService currentUser, SimpMessagingTemplate messagingTemplate) {
-        this.chatMessages = chatMessages;
+    ChatController(ChatMessageRepository messages, CurrentUserService currentUser, DtoMapper mapper) {
+        this.messages = messages;
         this.currentUser = currentUser;
-        this.messagingTemplate = messagingTemplate;
-    }
-
-    @GetMapping("/conversations")
-    ApiResponse<List<ChatConversationDto>> conversations() {
-        return ApiResponse.ok(chatMessages.conversations(currentUser.requireUserId()));
-    }
-
-    @GetMapping("/contacts")
-    ApiResponse<List<ChatConversationDto>> contacts() {
-        return ApiResponse.ok(chatMessages.contacts(currentUser.requireUserId()));
+        this.mapper = mapper;
     }
 
     @GetMapping("/conversation/{otherUserId}")
     ApiResponse<List<ChatMessageDto>> conversation(@PathVariable Integer otherUserId) {
-        return ApiResponse.ok(chatMessages.conversation(currentUser.requireUserId(), otherUserId));
+        return ApiResponse.ok(messages.conversation(currentUser.requireUserId(), otherUserId).stream()
+                .map(mapper::toChatMessageDto)
+                .toList());
     }
 
     @GetMapping("/unread")
     ApiResponse<List<ChatMessageDto>> unread() {
-        return ApiResponse.ok(chatMessages.unread(currentUser.requireUserId()));
+        return ApiResponse.ok(messages.findByReceiverIdAndReadFalseOrderByCreatedAtDesc(currentUser.requireUserId()).stream()
+                .map(mapper::toChatMessageDto)
+                .toList());
     }
 
     @PostMapping
     ApiResponse<ChatMessageDto> send(@RequestBody SendMessageRequest request) {
-        var message = chatMessages.send(currentUser.requireUserId(),
-                new SendChatMessageRequest(request.receiverId(), request.bookingId(), request.content()));
-        publishMessage(message);
-        return ApiResponse.ok("Message sent", message);
+        var sender = new User();
+        sender.setId(currentUser.requireUserId());
+        var receiver = new User();
+        receiver.setId(request.receiverId());
+        var message = new ChatMessage();
+        message.setSender(sender);
+        message.setReceiver(receiver);
+        if (request.bookingId() != null) {
+            var booking = new Booking();
+            booking.setId(request.bookingId());
+            message.setBooking(booking);
+        }
+        message.setContent(request.content());
+        return ApiResponse.ok("Message sent", mapper.toChatMessageDto(messages.save(message)));
     }
 
     @PostMapping("/{id}/read")
     ApiResponse<ChatMessageDto> markRead(@PathVariable Integer id) {
-        var message = chatMessages.markRead(currentUser.requireUserId(), id);
-        publishMessage(message);
-        return ApiResponse.ok("Message read", message);
+        var message = messages.findById(id).orElseThrow(() -> new IllegalArgumentException("Message not found"));
+        if (!message.getReceiver().getId().equals(currentUser.requireUserId())) {
+            throw new IllegalArgumentException("Message not found");
+        }
+        message.setRead(true);
+        message.setReadAt(Instant.now());
+        return ApiResponse.ok("Message read", mapper.toChatMessageDto(messages.save(message)));
     }
 
-    record SendMessageRequest(Integer receiverId, Integer bookingId, String content) {}
-
-    private void publishMessage(ChatMessageDto message) {
-        messagingTemplate.convertAndSendToUser(message.senderId().toString(), "/queue/messages", message);
-        messagingTemplate.convertAndSendToUser(message.receiverId().toString(), "/queue/messages", message);
-    }
+    record SendMessageRequest(Integer receiverId, Integer bookingId, @NotBlank String content) {}
 }
 
 @RestController

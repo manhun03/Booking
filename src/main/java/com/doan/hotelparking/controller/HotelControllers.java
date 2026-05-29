@@ -6,8 +6,6 @@ import com.doan.hotelparking.domain.entity.FavoriteHotel;
 import com.doan.hotelparking.domain.entity.Hotel;
 import com.doan.hotelparking.domain.entity.HotelImage;
 import com.doan.hotelparking.domain.entity.User;
-import com.doan.hotelparking.domain.enums.HotelStatus;
-import com.doan.hotelparking.domain.enums.RoomStatus;
 import com.doan.hotelparking.dto.hotel.HotelDto;
 import com.doan.hotelparking.dto.hotel.FavoriteHotelDto;
 import com.doan.hotelparking.dto.hotel.HotelImageDto;
@@ -50,10 +48,7 @@ class HotelController {
     @Transactional(readOnly = true)
     ApiPagedResponse<HotelDto> getAll(@RequestParam(defaultValue = "1") int pageIndex,
                                       @RequestParam(defaultValue = "20") int pageSize) {
-        if (isOwnerOnly()) {
-            return ownerPagedHotels(pageIndex, pageSize);
-        }
-        var page = hotels.findVisible(PageRequest.of(Math.max(pageIndex, 1) - 1, Math.min(Math.max(pageSize, 1), 100)));
+        var page = hotels.findAll(PageRequest.of(Math.max(pageIndex, 1) - 1, Math.min(Math.max(pageSize, 1), 100)));
         return ApiPagedResponse.ok(page.getContent().stream().map(mapper::toHotelDto).toList(),
                 pageIndex, pageSize, page.getTotalElements());
     }
@@ -61,30 +56,14 @@ class HotelController {
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
     ApiResponse<HotelDto> getById(@PathVariable Integer id) {
-        var hotel = hotels.findVisibleById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
-        requireOwnerCanSeeHotel(hotel);
-        return ApiResponse.ok(mapper.toHotelDto(hotel));
-    }
-
-    @GetMapping("/owner")
-    @PreAuthorize("hasRole('Owner')")
-    @Transactional(readOnly = true)
-    ApiResponse<List<HotelDto>> ownerHotels() {
-        return ApiResponse.ok(hotels.findVisibleByOwnerId(currentUser.requireUserId()).stream()
-                .map(mapper::toHotelDto)
-                .toList());
+        return ApiResponse.ok(hotels.findById(id).map(mapper::toHotelDto)
+                .orElseThrow(() -> new IllegalArgumentException("Hotel not found")));
     }
 
     @PostMapping
     @PreAuthorize("hasRole('Admin')")
     @HasPermission("hotel.manage")
     ApiResponse<HotelDto> create(@RequestBody Hotel hotel) {
-        var admin = new User();
-        admin.setId(currentUser.requireUserId());
-        hotel.setOwner(admin);
-        hotel.setCreatedAt(Instant.now());
-        hotel.setUpdatedAt(Instant.now());
         return ApiResponse.ok("Created", mapper.toHotelDto(hotels.save(hotel)));
     }
 
@@ -94,16 +73,29 @@ class HotelController {
         var owner = new User();
         owner.setId(currentUser.requireUserId());
         hotel.setOwner(owner);
-        hotel.setStatus(HotelStatus.PENDING_APPROVAL);
         return ApiResponse.ok("Created", mapper.toHotelDto(hotels.save(hotel)));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('Admin')")
     @HasPermission("hotel.manage")
-    @Transactional
     ApiResponse<HotelDto> update(@PathVariable Integer id, @RequestBody Hotel request) {
-        var hotel = hotels.findVisibleById(id).orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
+        var hotel = hotels.findById(id).orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
+        hotel.setName(request.getName());
+        hotel.setStreet(request.getStreet());
+        hotel.setPhone(request.getPhone());
+        hotel.setDescription(request.getDescription());
+        hotel.setUpdatedAt(Instant.now());
+        return ApiResponse.ok("Updated", mapper.toHotelDto(hotels.save(hotel)));
+    }
+
+    @PutMapping("/owner/{id}")
+    @PreAuthorize("hasRole('Owner')")
+    ApiResponse<HotelDto> updateOwnerHotel(@PathVariable Integer id, @RequestBody Hotel request) {
+        var hotel = hotels.findById(id).orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
+        if (hotel.getOwner() == null || !hotel.getOwner().getId().equals(currentUser.requireUserId())) {
+            throw new IllegalArgumentException("Hotel not found");
+        }
         hotel.setName(request.getName());
         hotel.setStreet(request.getStreet());
         hotel.setPhone(request.getPhone());
@@ -113,35 +105,11 @@ class HotelController {
         return ApiResponse.ok("Updated", mapper.toHotelDto(hotels.save(hotel)));
     }
 
-    @PutMapping("/owner/{id}")
-    @PreAuthorize("hasRole('Owner')")
-    ApiResponse<HotelDto> updateOwnerHotel(@PathVariable Integer id, @RequestBody Hotel request) {
-        var hotel = hotels.findVisibleById(id).orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
-        if (hotel.getOwner() == null || !hotel.getOwner().getId().equals(currentUser.requireUserId())) {
-            throw new IllegalArgumentException("Hotel not found");
-        }
-        hotel.setName(request.getName());
-        hotel.setStreet(request.getStreet());
-        hotel.setPhone(request.getPhone());
-        hotel.setDescription(request.getDescription());
-        hotel.setUpdatedAt(Instant.now());
-        return ApiResponse.ok("Updated", mapper.toHotelDto(hotels.save(hotel)));
-    }
-
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('Admin')")
     @HasPermission("hotel.manage")
-    @Transactional
     ApiResponse<Void> delete(@PathVariable Integer id) {
-        var hotel = hotels.findVisibleDetailedById(id).orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
-        hotel.setDeleted(true);
-        hotel.setStatus(HotelStatus.INACTIVE);
-        hotel.setUpdatedAt(Instant.now());
-        hotel.getRooms().forEach(room -> {
-            room.setDeleted(true);
-            room.setStatus(RoomStatus.UNAVAILABLE);
-        });
-        hotels.save(hotel);
+        hotels.deleteById(id);
         return ApiResponse.ok("Deleted", null);
     }
 
@@ -149,20 +117,15 @@ class HotelController {
     @Transactional(readOnly = true)
     ApiPagedResponse<HotelDto> allWithProvince(@RequestParam(defaultValue = "1") int pageIndex,
                                                @RequestParam(defaultValue = "20") int pageSize) {
-        if (isOwnerOnly()) {
-            return ownerPagedHotels(pageIndex, pageSize);
-        }
-        var page = hotels.findVisible(PageRequest.of(Math.max(pageIndex, 1) - 1, Math.min(Math.max(pageSize, 1), 100)));
+        var page = hotels.findAll(PageRequest.of(Math.max(pageIndex, 1) - 1, Math.min(Math.max(pageSize, 1), 100)));
         return ApiPagedResponse.ok(page.getContent().stream().map(mapper::toHotelDto).toList(),
                 pageIndex, pageSize, page.getTotalElements());
     }
 
     @GetMapping("/{id}/with-location")
     ApiResponse<HotelDto> withLocation(@PathVariable Integer id) {
-        var hotel = hotels.findVisibleDetailedById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
-        requireOwnerCanSeeHotel(hotel);
-        return ApiResponse.ok(mapper.toHotelDto(hotel));
+        return ApiResponse.ok(hotels.findDetailedById(id).map(mapper::toHotelDto)
+                .orElseThrow(() -> new IllegalArgumentException("Hotel not found")));
     }
 
     @GetMapping("/search")
@@ -173,52 +136,12 @@ class HotelController {
         if (resolved == null || resolved.isBlank()) {
             throw new IllegalArgumentException("hotelName is required.");
         }
-        return ApiResponse.ok(hotels.findVisibleByName(resolved).stream()
-                .filter(this::canCurrentUserSeeHotel)
-                .map(mapper::toHotelDto)
-                .toList());
+        return ApiResponse.ok(hotels.findByNameContainingIgnoreCase(resolved).stream().map(mapper::toHotelDto).toList());
     }
 
     @GetMapping("/by-province")
     ApiResponse<List<HotelDto>> byProvince(@RequestParam String province) {
-        return ApiResponse.ok(hotels.findVisibleByProvinceName(province).stream()
-                .filter(this::canCurrentUserSeeHotel)
-                .map(mapper::toHotelDto)
-                .toList());
-    }
-
-    private ApiPagedResponse<HotelDto> ownerPagedHotels(int pageIndex, int pageSize) {
-        var items = hotels.findVisibleByOwnerId(currentUser.requireUserId()).stream()
-                .map(mapper::toHotelDto)
-                .toList();
-        var size = Math.min(Math.max(pageSize, 1), 100);
-        var index = Math.max(pageIndex, 1);
-        var from = Math.min((index - 1) * size, items.size());
-        var to = Math.min(from + size, items.size());
-        return ApiPagedResponse.ok(items.subList(from, to), index, size, items.size());
-    }
-
-    private void requireOwnerCanSeeHotel(Hotel hotel) {
-        if (!canCurrentUserSeeHotel(hotel)) {
-            throw new IllegalArgumentException("Hotel not found");
-        }
-    }
-
-    private boolean canCurrentUserSeeHotel(Hotel hotel) {
-        if (!isOwnerOnly()) {
-            return true;
-        }
-        return hotel.getOwner() != null && hotel.getOwner().getId().equals(currentUser.requireUserId());
-    }
-
-    private boolean isOwnerOnly() {
-        return hasRole("Owner") && !hasRole("Admin");
-    }
-
-    private boolean hasRole(String role) {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication != null && authentication.getAuthorities().stream()
-                .anyMatch(authority -> ("ROLE_" + role).equals(authority.getAuthority()));
+        return ApiResponse.ok(hotels.findByWardProvinceNameContainingIgnoreCase(province).stream().map(mapper::toHotelDto).toList());
     }
 }
 
@@ -271,9 +194,6 @@ class HotelImageController {
 
     @GetMapping
     public ApiResponse<List<HotelImageDto>> getImages(@PathVariable Integer hotelId) {
-        if (isOwnerOnly()) {
-            requireOwnedHotel(hotelId);
-        }
         return ApiResponse.ok(images.findByHotelIdOrderByPrimaryImageDescSortOrderAsc(hotelId).stream()
                 .map(mapper::toHotelImageDto)
                 .toList());
@@ -281,9 +201,6 @@ class HotelImageController {
 
     @GetMapping("/ordered")
     ApiResponse<List<HotelImageDto>> ordered(@PathVariable Integer hotelId) {
-        if (isOwnerOnly()) {
-            requireOwnedHotel(hotelId);
-        }
         return ApiResponse.ok(images.findByHotelIdOrderByPrimaryImageDescSortOrderAsc(hotelId).stream()
                 .map(mapper::toHotelImageDto)
                 .toList());
@@ -320,13 +237,6 @@ class HotelImageController {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication != null && authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_Admin".equals(authority.getAuthority()));
-    }
-
-    private boolean isOwnerOnly() {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication != null
-                && authentication.getAuthorities().stream().anyMatch(authority -> "ROLE_Owner".equals(authority.getAuthority()))
-                && authentication.getAuthorities().stream().noneMatch(authority -> "ROLE_Admin".equals(authority.getAuthority()));
     }
 }
 

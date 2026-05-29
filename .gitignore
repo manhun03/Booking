@@ -50,6 +50,8 @@ jacoco.exec
 # Docker/local data
 minio-data/
 data/
-uploads/
-*.bak
 
+# Database exports/backups
+exports/*.bak
+exports/*.bacpac
+exports/*.sql

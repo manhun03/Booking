@@ -1,11 +1,7 @@
-SET QUOTED_IDENTIFIER ON;
-GO
-
 IF COL_LENGTH('[User]', 'EmailVerified') IS NULL
 BEGIN
     ALTER TABLE [User] ADD [EmailVerified] bit NOT NULL CONSTRAINT DF_User_EmailVerified DEFAULT 0;
 END;
-GO
 
 IF OBJECT_ID('AuthToken', 'U') IS NULL
 BEGIN

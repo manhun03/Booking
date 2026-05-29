@@ -5,7 +5,6 @@ import com.doan.hotelparking.domain.entity.FcmToken;
 import com.doan.hotelparking.common.ApiResponse;
 import com.doan.hotelparking.common.ApiPagedResponse;
 import com.doan.hotelparking.dto.user.UpdateFcmTokenRequest;
-import com.doan.hotelparking.dto.user.UpdateProfileRequest;
 import com.doan.hotelparking.dto.user.UserDto;
 import com.doan.hotelparking.repository.FcmTokenRepository;
 import com.doan.hotelparking.repository.UserRepository;
@@ -63,25 +62,6 @@ public class UserController {
         var page = users.findAll(PageRequest.of(Math.max(pageIndex, 1) - 1, Math.min(Math.max(pageSize, 1), 100)));
         return ApiPagedResponse.ok(page.getContent().stream().map(mapper::toUserDto).toList(),
                 pageIndex, pageSize, page.getTotalElements());
-    }
-
-    @GetMapping("/me")
-    public ApiResponse<UserDto> me() {
-        var user = users.findById(currentUser.requireUserId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        return ApiResponse.ok(mapper.toUserDto(user));
-    }
-
-    @PutMapping("/me")
-    public ApiResponse<UserDto> updateMe(@RequestBody UpdateProfileRequest request) {
-        var user = users.findById(currentUser.requireUserId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        user.setFirstName(clean(request.firstName()));
-        user.setLastName(clean(request.lastName()));
-        user.setPhone(clean(request.phone()));
-        user.setAvatarUrl(clean(request.avatarUrl()));
-        user.setUpdatedAt(Instant.now());
-        return ApiResponse.ok("Updated", mapper.toUserDto(users.save(user)));
     }
 
     @GetMapping("/{id}")
@@ -172,13 +152,5 @@ public class UserController {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication != null && authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_Admin".equals(authority.getAuthority()));
-    }
-
-    private String clean(String value) {
-        if (value == null) {
-            return null;
-        }
-        var cleaned = value.trim();
-        return cleaned.isEmpty() ? null : cleaned;
     }
 }

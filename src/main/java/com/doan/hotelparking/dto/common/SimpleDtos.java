@@ -32,15 +32,6 @@ public final class SimpleDtos {
             Instant readAt) {
     }
 
-    public record ChatConversationDto(
-            Integer userId,
-            String displayName,
-            String email,
-            String lastMessage,
-            int unreadCount,
-            Instant lastMessageAt) {
-    }
-
     public record PaymentDto(
             Integer id,
             Integer bookingId,

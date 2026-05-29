@@ -1,0 +1,181 @@
+HOW TO RUN - JAVA BACKEND
+=========================
+
+Backend folder:
+
+F:\Downloads\AI-integrated-hotel-booking-app-main\AI-integrated-hotel-booking-app-main\java-hotel-booking-api
+
+
+1. Start SQL Server
+-------------------
+
+SQL Server must be running with:
+
+Host: localhost
+Port: 1433
+Database: DoAnHotelParkingDb
+Username: sa
+Password: 123456
+
+
+2. Start MinIO
+--------------
+
+Option A: use existing Docker container:
+
+powershell
+---------
+docker start hotelparking-minio
+---------
+
+Option B: create and run MinIO container:
+
+powershell
+---------
+docker run -d --name hotelparking-minio `
+  -p 9000:9000 -p 9001:9001 `
+  -e MINIO_ROOT_USER=minioadmin `
+  -e MINIO_ROOT_PASSWORD=minioadmin `
+  quay.io/minio/minio server /data --console-address ":9001"
+---------
+
+MinIO URLs:
+
+API: http://localhost:9000
+Console: http://localhost:9001
+Username: minioadmin
+Password: minioadmin
+Bucket: hotel-images
+
+The backend auto-creates the bucket if it does not exist.
+
+
+3. Configure optional services
+------------------------------
+
+SMTP email:
+
+powershell
+---------
+$env:MAIL_HOST="smtp.gmail.com"
+$env:MAIL_PORT="587"
+$env:MAIL_USERNAME="your-email@gmail.com"
+$env:MAIL_PASSWORD="your-app-password"
+$env:MAIL_HEALTH_ENABLED="true"
+---------
+
+VNPay:
+
+powershell
+---------
+$env:VNPAY_PAY_URL="https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+$env:VNPAY_RETURN_URL="http://localhost:8080/api/payments/vnpay-return"
+$env:VNPAY_TMN_CODE="your-vnpay-tmn-code"
+$env:VNPAY_HASH_SECRET="your-vnpay-hash-secret"
+---------
+
+Google login:
+
+powershell
+---------
+$env:GOOGLE_CLIENT_ID="883824205385-182f65ondho5qnima9ladd5j7qk2b40h.apps.googleusercontent.com"
+---------
+
+For Google Cloud Console, add this origin:
+
+http://localhost:8081
+
+
+4. Run backend by Maven
+-----------------------
+
+powershell
+---------
+cd F:\Downloads\AI-integrated-hotel-booking-app-main\AI-integrated-hotel-booking-app-main\java-hotel-booking-api
+mvn spring-boot:run
+---------
+
+
+5. Run backend by jar
+---------------------
+
+Build first:
+
+powershell
+---------
+cd F:\Downloads\AI-integrated-hotel-booking-app-main\AI-integrated-hotel-booking-app-main\java-hotel-booking-api
+mvn clean package -DskipTests
+---------
+
+Run jar:
+
+powershell
+---------
+java -jar target\hotel-booking-api-0.1.0.jar
+---------
+
+
+6. Backend URLs
+---------------
+
+API base URL:
+
+http://localhost:8080
+
+Swagger UI:
+
+http://localhost:8080/swagger-ui/index.html
+
+OpenAPI JSON:
+
+http://localhost:8080/v3/api-docs
+
+Health:
+
+http://localhost:8080/actuator/health
+
+
+7. Demo accounts
+----------------
+
+Admin:
+admin@hotel.local
+Password@123
+
+Owner:
+owner@hotel.local
+Password@123
+
+Customer:
+customer.demo@hotel.local
+Password@123
+
+
+8. Quick API test
+-----------------
+
+powershell
+---------
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/auth/login" `
+  -Method Post `
+  -ContentType "application/json" `
+  -Body '{"email":"admin@hotel.local","password":"Password@123"}'
+---------
+
+Health:
+
+powershell
+---------
+Invoke-RestMethod -Uri "http://localhost:8080/actuator/health"
+---------
+
+
+9. Stop backend
+---------------
+
+powershell
+---------
+$p = (Get-NetTCPConnection -LocalPort 8080 -State Listen).OwningProcess
+Stop-Process -Id $p -Force
+---------

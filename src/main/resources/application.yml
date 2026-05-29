@@ -1,13 +1,13 @@
 server:
-  port: 8085
+  port: 8080
 
 spring:
   application:
     name: hotel-booking-api
   datasource:
-    url: ${DB_URL:jdbc:sqlserver://localhost;instanceName=SQLEXPRESS;databaseName=DoAnHotelParkingDb;encrypt=false;trustServerCertificate=true}
-    username: ${DB_USERNAME:sa}
-    password: ${DB_PASSWORD:12345678}
+    url: jdbc:sqlserver://localhost:1433;databaseName=DoAnHotelParkingDb;encrypt=true;trustServerCertificate=true
+    username: sa
+    password: 123456
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
   jpa:
     hibernate:
@@ -38,7 +38,7 @@ app:
   jwt:
     issuer: DoAn.HotelParking
     audience: DoAn.HotelParking.Client
-    secret-key: ${JWT_SECRET_KEY:change-me-before-production-please-use-env-secret-key}
+    secret-key: DoAn.HotelParking.Super.Secret.Key.2026
     access-token-expiration-minutes: 60
   minio:
     endpoint: http://localhost:9000
@@ -57,7 +57,7 @@ app:
   payment:
     vnpay:
       pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-      return-url: ${VNPAY_RETURN_URL:http://localhost:8085/api/payments/vnpay-return}
+      return-url: ${VNPAY_RETURN_URL:http://localhost:8080/api/payments/vnpay-return}
       tmn-code: ${VNPAY_TMN_CODE:}
       hash-secret: ${VNPAY_HASH_SECRET:}
 

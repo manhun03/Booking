@@ -9,7 +9,6 @@ public record UserDto(
         String email,
         String phone,
         String avatarUrl,
-        boolean emailVerified,
         String status,
         Instant createdAt
 ) {

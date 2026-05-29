@@ -50,9 +50,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
 
 final class BookingControllers {
     private BookingControllers() {
@@ -67,7 +64,6 @@ class BookingController {
     private final TimeSlotRepository timeSlots;
     private final PaymentRepository payments;
     private final OwnerSettingRepository ownerSettings;
-    private final ReviewRepository reviews;
     private final CurrentUserService currentUser;
     private final DtoMapper mapper;
     private final NotificationService notificationService;
@@ -77,7 +73,6 @@ class BookingController {
                       TimeSlotRepository timeSlots,
                       PaymentRepository payments,
                       OwnerSettingRepository ownerSettings,
-                      ReviewRepository reviews,
                       CurrentUserService currentUser,
                       DtoMapper mapper,
                       NotificationService notificationService) {
@@ -86,7 +81,6 @@ class BookingController {
         this.timeSlots = timeSlots;
         this.payments = payments;
         this.ownerSettings = ownerSettings;
-        this.reviews = reviews;
         this.currentUser = currentUser;
         this.mapper = mapper;
         this.notificationService = notificationService;
@@ -109,12 +103,8 @@ class BookingController {
     @PreAuthorize("hasAnyRole('Admin','Owner')")
     @HasPermission("booking.read")
     ApiResponse<BookingDto> getById(@PathVariable Integer id) {
-        var booking = bookings.findDetailedById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        if (!isAdmin() && !booking.getRoom().getHotel().getOwner().getId().equals(currentUser.requireUserId())) {
-            throw new IllegalArgumentException("Booking not found");
-        }
-        return ApiResponse.ok(mapper.toBookingDto(booking));
+        return ApiResponse.ok(bookings.findDetailedById(id).map(mapper::toBookingDto)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found")));
     }
 
     @PostMapping
@@ -166,10 +156,7 @@ class BookingController {
                                             @RequestParam(defaultValue = "1") int pageIndex,
                                             @RequestParam(defaultValue = "20") int pageSize) {
         var resolvedUserId = userId == null ? currentUser.requireUserId() : userId;
-        var items = bookings.findDetailedByCustomerId(resolvedUserId).stream()
-                .map(booking -> mapper.toBookingDto(booking,
-                        reviews.existsByBookingIdAndCustomerId(booking.getId(), resolvedUserId)))
-                .toList();
+        var items = bookings.findDetailedByCustomerId(resolvedUserId).stream().map(mapper::toBookingDto).toList();
         var from = Math.min((Math.max(pageIndex, 1) - 1) * pageSize, items.size());
         var to = Math.min(from + pageSize, items.size());
         return ApiPagedResponse.ok(items.subList(from, to), pageIndex, pageSize, items.size());
@@ -225,7 +212,6 @@ class BookingController {
         booking.setRoomUnitPrice(unitPrice);
         booking.setTotalAmount(totalAmount);
         booking.setPaidAmount(paidAmount);
-        booking.setCustomerAddress(request.customerAddress());
         booking.setNote(request.note());
         booking.setStatus(paidAmount.compareTo(totalAmount) >= 0 ? BookingStatus.CONFIRMED : BookingStatus.PENDING);
         booking.setCreatedAt(Instant.now());
@@ -267,14 +253,11 @@ class BookingController {
         booking.setCancelledBy(booking.getCustomer().getId());
         booking.setCancelReason(request == null ? null : request.reason());
         booking.setCancellationFee(calculateCancellationFee(booking));
-        refundPaymentsForClosedBooking(booking, "Booking cancelled");
         booking.setCancelledAt(Instant.now());
         booking.setUpdatedAt(Instant.now());
         var saved = bookings.save(booking);
         notificationService.create(booking.getRoom().getHotel().getOwner().getId(), "Booking cancelled",
                 "Booking #" + booking.getId() + " was cancelled.", NotificationType.BOOKING, "Booking", booking.getId());
-        notificationService.create(booking.getCustomer().getId(), "Booking cancelled",
-                "Your booking #" + booking.getId() + " has been cancelled.", NotificationType.BOOKING, "Booking", booking.getId());
         return ApiResponse.ok("Booking cancelled", mapper.toBookingDto(saved));
     }
 
@@ -305,7 +288,6 @@ class BookingController {
         booking.setStatus(BookingStatus.REJECTED);
         booking.setRejectedReason(request == null ? null : request.reason());
         booking.setRejectedAt(Instant.now());
-        refundPaymentsForClosedBooking(booking, "Booking rejected");
         booking.setUpdatedAt(Instant.now());
         var saved = bookings.save(booking);
         notificationService.create(booking.getCustomer().getId(), "Booking rejected",
@@ -416,49 +398,6 @@ class BookingController {
         return booking.getTotalAmount().multiply(BigDecimal.valueOf(0.1));
     }
 
-    private void refundPaymentsForClosedBooking(Booking booking, String reason) {
-        var paidAmount = money(booking.getPaidAmount());
-        var refundableBudget = paidAmount.subtract(money(booking.getCancellationFee())).max(BigDecimal.ZERO);
-
-        for (var payment : payments.findByBookingId(booking.getId())) {
-            if (payment.getStatus() == PaymentStatus.PENDING) {
-                payment.setStatus(PaymentStatus.FAILED);
-                payment.setFailureReason(reason);
-                payments.save(payment);
-                continue;
-            }
-
-            if (payment.getStatus() != PaymentStatus.COMPLETED
-                    && payment.getStatus() != PaymentStatus.PARTIALLY_REFUNDED) {
-                continue;
-            }
-
-            var refundableAmount = money(payment.getAmount()).subtract(money(payment.getRefundedAmount()));
-            if (refundableAmount.compareTo(BigDecimal.ZERO) <= 0 || refundableBudget.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
-
-            var amount = refundableAmount.min(refundableBudget);
-            payment.setRefundedAmount(money(payment.getRefundedAmount()).add(amount));
-            payment.setRefundedAt(Instant.now());
-            payment.setNote(reason);
-            payment.setStatus(payment.getRefundedAmount().compareTo(money(payment.getAmount())) >= 0
-                    ? PaymentStatus.REFUNDED
-                    : PaymentStatus.PARTIALLY_REFUNDED);
-            payments.save(payment);
-
-            paidAmount = paidAmount.subtract(amount).max(BigDecimal.ZERO);
-            refundableBudget = refundableBudget.subtract(amount).max(BigDecimal.ZERO);
-            booking.setPaidAmount(paidAmount);
-            notificationService.create(booking.getCustomer().getId(), "Payment refunded",
-                    "A refund was recorded for booking #" + booking.getId(), NotificationType.PAYMENT, "Payment", payment.getId());
-        }
-    }
-
-    private BigDecimal money(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
-    }
-
     private boolean isAdmin() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication != null && authentication.getAuthorities().stream()
@@ -511,60 +450,23 @@ class PaymentController {
     @PreAuthorize("hasAnyRole('Admin','Owner')")
     @Transactional(readOnly = true)
     ApiResponse<List<PaymentDto>> getAll() {
-        var items = isAdmin() ? payments.findAll() : payments.findByOwnerId(currentUser.requireUserId());
-        return ApiResponse.ok(items.stream().map(mapper::toPaymentDto).toList());
-    }
-
-    @GetMapping("/my")
-    @PreAuthorize("hasRole('Customer')")
-    @Transactional(readOnly = true)
-    ApiResponse<List<PaymentDto>> myPayments() {
-        var items = payments.findByBookingCustomerIdOrderByCreatedAtDesc(currentUser.requireUserId());
-        return ApiResponse.ok(items.stream().map(mapper::toPaymentDto).toList());
-    }
-
-    @GetMapping("/by-booking/{bookingId}")
-    @PreAuthorize("hasAnyRole('Admin','Owner','Customer')")
-    @Transactional(readOnly = true)
-    ApiResponse<List<PaymentDto>> byBooking(@PathVariable Integer bookingId) {
-        var booking = bookings.findDetailedById(bookingId)
-                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        var userId = currentUser.requireUserId();
-        var canAccess = booking.getCustomer().getId().equals(userId)
-                || booking.getRoom().getHotel().getOwner().getId().equals(userId);
-        if (!isAdmin() && !canAccess) {
-            throw new IllegalArgumentException("Booking not found");
-        }
-        return ApiResponse.ok(payments.findByBookingIdOrderByCreatedAtDesc(bookingId).stream()
-                .map(mapper::toPaymentDto)
-                .toList());
+        return ApiResponse.ok(payments.findAll().stream().map(mapper::toPaymentDto).toList());
     }
 
     @PostMapping("/initiate")
     @PreAuthorize("hasRole('Customer')")
     @Transactional
     ApiResponse<PaymentResult> initiate(@RequestBody InitiatePaymentRequest request) {
-        if (request == null || request.bookingId() == null) {
-            throw new IllegalArgumentException("Booking not found");
-        }
         var booking = bookings.findDetailedById(request.bookingId())
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
         if (!booking.getCustomer().getId().equals(currentUser.requireUserId())) {
             throw new IllegalArgumentException("Booking not found");
         }
-        if (booking.getStatus() == BookingStatus.CANCELLED
-                || booking.getStatus() == BookingStatus.REJECTED
-                || booking.getStatus() == BookingStatus.COMPLETED
-                || booking.getStatus() == BookingStatus.CHECKED_OUT) {
-            throw new IllegalArgumentException("Booking cannot be paid");
-        }
-        var amount = request.amount() == null
-                ? money(booking.getTotalAmount()).subtract(money(booking.getPaidAmount()))
-                : request.amount();
+        var amount = request.amount() == null ? booking.getTotalAmount().subtract(booking.getPaidAmount()) : request.amount();
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Payment amount must be greater than zero");
         }
-        if (money(booking.getPaidAmount()).add(amount).compareTo(money(booking.getTotalAmount())) > 0) {
+        if (booking.getPaidAmount().add(amount).compareTo(booking.getTotalAmount()) > 0) {
             throw new IllegalArgumentException("Payment amount exceeds remaining balance");
         }
         var tx = "PAY-" + booking.getId() + "-" + Instant.now().toEpochMilli();
@@ -587,27 +489,15 @@ class PaymentController {
     @GetMapping("/vnpay-return")
     @Transactional
     ApiResponse<PaymentDto> vnpayReturn(@RequestParam Map<String, String> params) {
-        return applyVnpayResult(params);
-    }
-
-    @GetMapping("/vnpay-ipn")
-    @Transactional
-    ApiResponse<PaymentDto> vnpayIpn(@RequestParam Map<String, String> params) {
-        return applyVnpayResult(params);
-    }
-
-    private ApiResponse<PaymentDto> applyVnpayResult(Map<String, String> params) {
         if (!verifyVnpaySignature(params)) {
             throw new IllegalArgumentException("Invalid VNPay signature");
         }
         var transactionCode = params.get("vnp_TxnRef");
         var responseCode = params.get("vnp_ResponseCode");
-        var transactionStatus = params.get("vnp_TransactionStatus");
         var gatewayTransactionId = params.get("vnp_TransactionNo");
-        var success = "00".equals(responseCode) && (transactionStatus == null || "00".equals(transactionStatus));
         return applyPaymentResult(transactionCode, gatewayTransactionId,
-                success ? "COMPLETED" : "FAILED",
-                success ? null : "VNPay response code: " + responseCode);
+                "00".equals(responseCode) ? "COMPLETED" : "FAILED",
+                "00".equals(responseCode) ? null : "VNPay response code: " + responseCode);
     }
 
     @PostMapping("/webhook")
@@ -620,68 +510,30 @@ class PaymentController {
                                                        String gatewayTransactionId,
                                                        String requestedStatus,
                                                        String failureReason) {
-        var payment = findPayment(transactionCode, gatewayTransactionId);
+        var payment = payments.findByTransactionCode(transactionCode)
+                .or(() -> gatewayTransactionId == null ? java.util.Optional.empty() : payments.findByGatewayTransactionId(gatewayTransactionId))
+                .orElseThrow(() -> new IllegalArgumentException("Payment not found"));
         var status = requestedStatus == null ? "" : requestedStatus.trim().toUpperCase();
         if ("COMPLETED".equals(status) || "SUCCESS".equals(status) || "PAID".equals(status)) {
-            if (payment.getStatus() == PaymentStatus.COMPLETED
-                    || payment.getStatus() == PaymentStatus.REFUNDED
-                    || payment.getStatus() == PaymentStatus.PARTIALLY_REFUNDED) {
-                if (!isBlank(gatewayTransactionId)) {
-                    payment.setGatewayTransactionId(gatewayTransactionId);
-                }
-                return ApiResponse.ok("Webhook processed", mapper.toPaymentDto(payments.save(payment)));
-            }
             payment.setStatus(PaymentStatus.COMPLETED);
             payment.setPaidAt(Instant.now());
             payment.setGatewayTransactionId(gatewayTransactionId);
             var booking = payment.getBooking();
-            var paidAmount = money(booking.getPaidAmount()).add(money(payment.getAmount()));
-            var totalAmount = money(booking.getTotalAmount());
-            booking.setPaidAmount(paidAmount.compareTo(totalAmount) > 0 ? totalAmount : paidAmount);
-            if (booking.getStatus() == BookingStatus.CANCELLED || booking.getStatus() == BookingStatus.REJECTED) {
-                refundPayment(payment, refundableAmount(payment), "Booking is not active", true);
-            } else {
-                if (booking.getPaidAmount().compareTo(totalAmount) >= 0) {
-                    booking.setStatus(BookingStatus.CONFIRMED);
-                }
-                notificationService.create(booking.getCustomer().getId(), "Payment completed",
-                        "Payment completed for booking #" + booking.getId(), NotificationType.PAYMENT, "Payment", payment.getId());
+            booking.setPaidAmount(booking.getPaidAmount().add(payment.getAmount()));
+            if (booking.getPaidAmount().compareTo(booking.getTotalAmount()) >= 0) {
+                booking.setStatus(BookingStatus.CONFIRMED);
             }
             booking.setUpdatedAt(Instant.now());
+            notificationService.create(booking.getCustomer().getId(), "Payment completed",
+                    "Payment completed for booking #" + booking.getId(), NotificationType.PAYMENT, "Payment", payment.getId());
         } else {
-            if (payment.getStatus() == PaymentStatus.COMPLETED
-                    || payment.getStatus() == PaymentStatus.REFUNDED
-                    || payment.getStatus() == PaymentStatus.PARTIALLY_REFUNDED) {
-                return ApiResponse.ok("Webhook processed", mapper.toPaymentDto(payment));
-            }
-            var wasFailed = payment.getStatus() == PaymentStatus.FAILED;
             payment.setStatus(PaymentStatus.FAILED);
             payment.setFailureReason(failureReason);
-            if (!wasFailed) {
-                var booking = payment.getBooking();
-                notificationService.create(booking.getCustomer().getId(), "Payment failed",
-                        "Payment for booking #" + booking.getId() + " was not successful.",
-                        NotificationType.PAYMENT, "Payment", payment.getId());
-            }
         }
         return ApiResponse.ok("Webhook processed", mapper.toPaymentDto(payments.save(payment)));
     }
 
-    private Payment findPayment(String transactionCode, String gatewayTransactionId) {
-        var byTransactionCode = isBlank(transactionCode)
-                ? java.util.Optional.<Payment>empty()
-                : payments.findByTransactionCode(transactionCode);
-        return byTransactionCode
-                .or(() -> isBlank(gatewayTransactionId)
-                        ? java.util.Optional.empty()
-                        : payments.findByGatewayTransactionId(gatewayTransactionId))
-                .orElseThrow(() -> new IllegalArgumentException("Payment not found"));
-    }
-
     private String buildCheckoutUrl(String provider, Payment payment, Booking booking) {
-        if ("MOCK".equalsIgnoreCase(provider)) {
-            return "mock://checkout/" + payment.getTransactionCode();
-        }
         if (!"VNPAY".equalsIgnoreCase(provider)) {
             throw new IllegalArgumentException("Unsupported payment provider: " + provider);
         }
@@ -759,35 +611,6 @@ class PaymentController {
         return value == null || value.isBlank();
     }
 
-    private BigDecimal money(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
-    }
-
-    private BigDecimal refundableAmount(Payment payment) {
-        return money(payment.getAmount()).subtract(money(payment.getRefundedAmount())).max(BigDecimal.ZERO);
-    }
-
-    private void refundPayment(Payment payment, BigDecimal amount, String reason, boolean notifyCustomer) {
-        if (amount.compareTo(BigDecimal.ZERO) <= 0 || amount.compareTo(refundableAmount(payment)) > 0) {
-            throw new IllegalArgumentException("Invalid refund amount");
-        }
-
-        var booking = payment.getBooking();
-        payment.setRefundedAmount(money(payment.getRefundedAmount()).add(amount));
-        payment.setRefundedAt(Instant.now());
-        payment.setNote(reason);
-        payment.setStatus(payment.getRefundedAmount().compareTo(money(payment.getAmount())) >= 0
-                ? PaymentStatus.REFUNDED
-                : PaymentStatus.PARTIALLY_REFUNDED);
-        booking.setPaidAmount(money(booking.getPaidAmount()).subtract(amount).max(BigDecimal.ZERO));
-        booking.setUpdatedAt(Instant.now());
-
-        if (notifyCustomer) {
-            notificationService.create(booking.getCustomer().getId(), "Payment refunded",
-                    "A refund was processed for booking #" + booking.getId(), NotificationType.PAYMENT, "Payment", payment.getId());
-        }
-    }
-
     @PostMapping("/{id}/refund")
     @PreAuthorize("hasAnyRole('Admin','Owner')")
     @Transactional
@@ -801,8 +624,18 @@ class PaymentController {
         if (payment.getStatus() != PaymentStatus.COMPLETED && payment.getStatus() != PaymentStatus.PARTIALLY_REFUNDED) {
             throw new IllegalArgumentException("Only completed payments can be refunded");
         }
-        var amount = request == null || request.amount() == null ? refundableAmount(payment) : request.amount();
-        refundPayment(payment, amount, request == null ? null : request.reason(), true);
+        var amount = request.amount() == null ? payment.getAmount().subtract(payment.getRefundedAmount()) : request.amount();
+        if (amount.compareTo(BigDecimal.ZERO) <= 0 || payment.getRefundedAmount().add(amount).compareTo(payment.getAmount()) > 0) {
+            throw new IllegalArgumentException("Invalid refund amount");
+        }
+        payment.setRefundedAmount(payment.getRefundedAmount().add(amount));
+        payment.setRefundedAt(Instant.now());
+        payment.setNote(request.reason());
+        payment.setStatus(payment.getRefundedAmount().compareTo(payment.getAmount()) >= 0 ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED);
+        booking.setPaidAmount(booking.getPaidAmount().subtract(amount).max(BigDecimal.ZERO));
+        booking.setUpdatedAt(Instant.now());
+        notificationService.create(booking.getCustomer().getId(), "Payment refunded",
+                "A refund was processed for booking #" + booking.getId(), NotificationType.PAYMENT, "Payment", payment.getId());
         return ApiResponse.ok("Refund processed", mapper.toPaymentDto(payments.save(payment)));
     }
 
@@ -818,15 +651,13 @@ class PaymentController {
 class ReviewController {
     private final ReviewRepository reviews;
     private final BookingRepository bookings;
-    private final HotelRepository hotels;
     private final CurrentUserService currentUser;
     private final NotificationService notificationService;
     private final DtoMapper mapper;
 
-    ReviewController(ReviewRepository repository, BookingRepository bookings, HotelRepository hotels, CurrentUserService currentUser, NotificationService notificationService, DtoMapper mapper) {
+    ReviewController(ReviewRepository repository, BookingRepository bookings, CurrentUserService currentUser, NotificationService notificationService, DtoMapper mapper) {
         this.reviews = repository;
         this.bookings = bookings;
-        this.hotels = hotels;
         this.currentUser = currentUser;
         this.notificationService = notificationService;
         this.mapper = mapper;
@@ -835,9 +666,6 @@ class ReviewController {
     @GetMapping("/by-hotel/{hotelId}")
     @Transactional(readOnly = true)
     ApiResponse<List<ReviewDto>> byHotel(@PathVariable Integer hotelId) {
-        if (isOwnerOnly()) {
-            requireOwnedHotel(hotelId);
-        }
         return ApiResponse.ok(reviews.findByRoomHotelId(hotelId).stream()
                 .filter(Review::isVisible)
                 .map(mapper::toReviewDto)
@@ -913,20 +741,6 @@ class ReviewController {
         review.setModeratedAt(Instant.now());
         return ApiResponse.ok("Review moderated", mapper.toReviewDto(reviews.save(review)));
     }
-
-    private void requireOwnedHotel(Integer hotelId) {
-        var hotel = hotels.findById(hotelId).orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
-        if (hotel.getOwner() == null || !hotel.getOwner().getId().equals(currentUser.requireUserId())) {
-            throw new IllegalArgumentException("Hotel not found");
-        }
-    }
-
-    private boolean isOwnerOnly() {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication != null
-                && authentication.getAuthorities().stream().anyMatch(authority -> "ROLE_Owner".equals(authority.getAuthority()))
-                && authentication.getAuthorities().stream().noneMatch(authority -> "ROLE_Admin".equals(authority.getAuthority()));
-    }
 }
 
 @RestController
@@ -949,26 +763,23 @@ class RoomController extends CrudController<Room> {
     @GetMapping
     @Transactional(readOnly = true)
     public ApiResponse<List<RoomDto>> getAll() {
-        return ApiResponse.ok(rooms.findVisible().stream().map(mapper::toRoomDto).toList());
+        return ApiResponse.ok(rooms.findAll().stream().map(mapper::toRoomDto).toList());
     }
 
     @GetMapping("/by-hotel")
     ApiResponse<List<RoomDto>> byHotel(@RequestParam Integer hotelId) {
-        if (isOwnerOnly()) {
-            requireOwnedHotel(hotelId);
-        }
-        return ApiResponse.ok(rooms.findVisibleByHotelId(hotelId).stream().map(mapper::toRoomDto).toList());
+        return ApiResponse.ok(rooms.findByHotelId(hotelId).stream().map(mapper::toRoomDto).toList());
     }
 
     @GetMapping("/by-room-type")
     ApiResponse<List<RoomDto>> byRoomType(@RequestParam Integer roomTypeId) {
-        return ApiResponse.ok(rooms.findVisibleByRoomTypeId(roomTypeId).stream().map(mapper::toRoomDto).toList());
+        return ApiResponse.ok(rooms.findByRoomTypeId(roomTypeId).stream().map(mapper::toRoomDto).toList());
     }
 
     @GetMapping("/owner")
     @PreAuthorize("hasRole('Owner')")
     ApiResponse<List<RoomDto>> ownerRooms() {
-        return ApiResponse.ok(rooms.findVisibleByHotelOwnerId(currentUser.requireUserId()).stream().map(mapper::toRoomDto).toList());
+        return ApiResponse.ok(rooms.findByHotelOwnerId(currentUser.requireUserId()).stream().map(mapper::toRoomDto).toList());
     }
 
     @PostMapping("/owner")
@@ -1016,13 +827,6 @@ class RoomController extends CrudController<Room> {
             throw new IllegalArgumentException("Hotel not found");
         }
     }
-
-    private boolean isOwnerOnly() {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication != null
-                && authentication.getAuthorities().stream().anyMatch(authority -> "ROLE_Owner".equals(authority.getAuthority()))
-                && authentication.getAuthorities().stream().noneMatch(authority -> "ROLE_Admin".equals(authority.getAuthority()));
-    }
 }
 
 @RestController
@@ -1047,13 +851,11 @@ class RoomTypeController extends CrudController<RoomType> {
 @RequestMapping("/api/time-slots")
 class TimeSlotController extends CrudController<TimeSlot> {
     private final TimeSlotRepository timeSlots;
-    private final BookingRepository bookings;
     private final DtoMapper mapper;
 
-    TimeSlotController(TimeSlotRepository repository, BookingRepository bookings, DtoMapper mapper) {
+    TimeSlotController(TimeSlotRepository repository, DtoMapper mapper) {
         super(repository);
         this.timeSlots = repository;
-        this.bookings = bookings;
         this.mapper = mapper;
     }
 
@@ -1067,36 +869,5 @@ class TimeSlotController extends CrudController<TimeSlot> {
     @Transactional(readOnly = true)
     ApiResponse<List<TimeSlotDto>> byRoom(@PathVariable Integer roomId) {
         return ApiResponse.ok(timeSlots.findByRoomId(roomId).stream().map(mapper::toTimeSlotDto).toList());
-    }
-
-    @GetMapping("/room/{roomId}/availability")
-    @Transactional(readOnly = true)
-    ApiResponse<List<RoomAvailabilityDateDto>> roomAvailability(@PathVariable Integer roomId,
-                                                                @RequestParam String from,
-                                                                @RequestParam String to,
-                                                                @RequestParam(required = false) Integer excludedBookingId) {
-        var start = LocalDate.parse(from);
-        var end = LocalDate.parse(to);
-        if (end.isBefore(start)) {
-            throw new IllegalArgumentException("Invalid availability date range");
-        }
-        if (start.plusDays(366).isBefore(end)) {
-            end = start.plusDays(366);
-        }
-
-        var items = new ArrayList<RoomAvailabilityDateDto>();
-        var cursor = start;
-        while (!cursor.isAfter(end)) {
-            var dayStart = cursor.atStartOfDay().toInstant(ZoneOffset.UTC);
-            var dayEnd = cursor.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-            var booked = bookings.hasOverlappingBooking(roomId, dayStart, dayEnd, excludedBookingId);
-            items.add(new RoomAvailabilityDateDto(cursor.toString(), !booked));
-            cursor = cursor.plusDays(1);
-        }
-
-        return ApiResponse.ok(items);
-    }
-
-    record RoomAvailabilityDateDto(String date, boolean available) {
     }
 }

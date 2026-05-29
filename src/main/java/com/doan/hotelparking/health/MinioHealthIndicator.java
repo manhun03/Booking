@@ -29,11 +29,9 @@ public class MinioHealthIndicator implements HealthIndicator {
                     .withDetail("bucketExists", exists)
                     .build();
         } catch (Exception ex) {
-            return Health.up()
+            return Health.down(ex)
                     .withDetail("endpoint", properties.endpoint())
                     .withDetail("bucket", properties.bucketName())
-                    .withDetail("available", false)
-                    .withDetail("reason", ex.getMessage())
                     .build();
         }
     }

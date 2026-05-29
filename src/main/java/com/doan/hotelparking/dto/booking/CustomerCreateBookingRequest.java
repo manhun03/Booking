@@ -12,7 +12,6 @@ public record CustomerCreateBookingRequest(
         @NotNull Instant checkOutDate,
         @Min(1) int guestCount,
         BigDecimal paidAmount,
-        String customerAddress,
         String note,
         String paymentMethod,
         String transactionCode,

@@ -5,8 +5,6 @@ import io.minio.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.UUID;
 
 @Service
@@ -21,12 +19,11 @@ public class ObjectStorageService {
     }
 
     public UploadedObject upload(MultipartFile file, String folder) {
-        var originalName = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
-        var extension = originalName.contains(".") ? originalName.substring(originalName.lastIndexOf('.')) : "";
-        extension = extension.matches("(?i)\\.[a-z0-9]{1,8}") ? extension : "";
-        var objectKey = folder + "/" + UUID.randomUUID() + extension;
         try {
             ensureBucketExists();
+            var originalName = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
+            var extension = originalName.contains(".") ? originalName.substring(originalName.lastIndexOf('.')) : "";
+            var objectKey = folder + "/" + UUID.randomUUID() + extension;
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket(properties.bucketName())
                     .object(objectKey)
@@ -35,7 +32,7 @@ public class ObjectStorageService {
                     .build());
             return new UploadedObject(objectKey, buildObjectUrl(objectKey));
         } catch (Exception ex) {
-            return uploadLocally(file, objectKey);
+            throw new IllegalArgumentException("Unable to upload file to MinIO: " + ex.getMessage(), ex);
         }
     }
 
@@ -46,7 +43,7 @@ public class ObjectStorageService {
                     .object(objectKey)
                     .build());
         } catch (Exception ex) {
-            deleteLocally(objectKey);
+            throw new IllegalArgumentException("Unable to delete file from MinIO: " + ex.getMessage(), ex);
         }
     }
 
@@ -69,32 +66,6 @@ public class ObjectStorageService {
                 ? properties.endpoint()
                 : properties.publicBaseUrl();
         return baseUrl.replaceAll("/+$", "") + "/" + properties.bucketName() + "/" + objectKey;
-    }
-
-    private UploadedObject uploadLocally(MultipartFile file, String objectKey) {
-        try {
-            var uploadRoot = Path.of("uploads").toAbsolutePath().normalize();
-            var target = uploadRoot.resolve(objectKey).normalize();
-            if (!target.startsWith(uploadRoot)) {
-                throw new IllegalArgumentException("Invalid upload path");
-            }
-            Files.createDirectories(target.getParent());
-            file.transferTo(target);
-            return new UploadedObject(objectKey, "/uploads/" + objectKey.replace("\\", "/"));
-        } catch (Exception ex) {
-            throw new IllegalArgumentException("Unable to upload file: " + ex.getMessage(), ex);
-        }
-    }
-
-    private void deleteLocally(String objectKey) {
-        try {
-            var uploadRoot = Path.of("uploads").toAbsolutePath().normalize();
-            var target = uploadRoot.resolve(objectKey).normalize();
-            if (target.startsWith(uploadRoot)) {
-                Files.deleteIfExists(target);
-            }
-        } catch (Exception ignored) {
-        }
     }
 
     public record UploadedObject(String objectKey, String url) {

@@ -63,9 +63,6 @@ public class DtoMapper {
                 room.getRoomNumber(),
                 room.getCapacity(),
                 room.getPrice(),
-                room.getAmenities(),
-                room.getSeasonalPrice(),
-                room.getPromotionPrice(),
                 room.getStatus() == null ? null : room.getStatus().name(),
                 room.isDeleted());
     }
@@ -81,23 +78,12 @@ public class DtoMapper {
     }
 
     public BookingDto toBookingDto(Booking booking) {
-        return toBookingDto(booking, false);
-    }
-
-    public BookingDto toBookingDto(Booking booking, boolean reviewed) {
         var room = booking.getRoom();
         var hotel = room == null ? null : room.getHotel();
-        var customer = booking.getCustomer();
-        var customerName = customer == null ? null :
-                ((customer.getLastName() == null ? "" : customer.getLastName()) + " " +
-                        (customer.getFirstName() == null ? "" : customer.getFirstName())).trim();
         return new BookingDto(
                 booking.getId(),
                 room == null ? null : room.getId(),
-                customer == null ? null : customer.getId(),
-                customerName,
-                customer == null ? null : customer.getEmail(),
-                customer == null ? null : customer.getPhone(),
+                booking.getCustomer() == null ? null : booking.getCustomer().getId(),
                 booking.getCheckInDate(),
                 booking.getCheckOutDate(),
                 booking.getNightCount(),
@@ -105,13 +91,10 @@ public class DtoMapper {
                 booking.getRoomUnitPrice(),
                 booking.getTotalAmount(),
                 booking.getPaidAmount(),
-                booking.getCustomerAddress(),
                 booking.getNote(),
                 booking.getStatus() == null ? null : booking.getStatus().name(),
-                reviewed,
                 room == null ? null : room.getRoomNumber(),
-                hotel == null ? null : hotel.getName(),
-                hotel == null || hotel.getOwner() == null ? null : hotel.getOwner().getId());
+                hotel == null ? null : hotel.getName());
     }
 
     public ProvinceDto toProvinceDto(Province province) {
@@ -167,7 +150,6 @@ public class DtoMapper {
                 user.getEmail(),
                 user.getPhone(),
                 user.getAvatarUrl(),
-                user.isEmailVerified(),
                 user.getStatus() == null ? null : user.getStatus().name(),
                 user.getCreatedAt());
     }

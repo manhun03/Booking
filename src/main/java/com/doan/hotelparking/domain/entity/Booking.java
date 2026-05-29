@@ -40,8 +40,6 @@ public class Booking {
     private BigDecimal totalAmount = BigDecimal.ZERO;
     @Column(name = "PaidAmount")
     private BigDecimal paidAmount = BigDecimal.ZERO;
-    @Column(name = "CustomerAddress")
-    private String customerAddress;
     @Column(name = "Note")
     private String note;
 

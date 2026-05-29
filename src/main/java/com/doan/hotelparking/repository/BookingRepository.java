@@ -11,19 +11,19 @@ import java.util.Optional;
 public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Booking> findByCustomerId(Integer customerId);
 
-    @EntityGraph(attributePaths = {"room", "room.hotel", "room.hotel.owner", "customer"})
+    @EntityGraph(attributePaths = {"room", "room.hotel", "customer"})
     @Query("select b from Booking b")
     List<Booking> findAllDetailed();
 
-    @EntityGraph(attributePaths = {"room", "room.hotel", "room.hotel.owner", "room.hotel.ward", "room.hotel.ward.province", "customer"})
+    @EntityGraph(attributePaths = {"room", "room.hotel", "room.hotel.ward", "room.hotel.ward.province"})
     @Query("select b from Booking b where b.customer.id = :customerId")
     List<Booking> findDetailedByCustomerId(Integer customerId);
 
-    @EntityGraph(attributePaths = {"room", "room.hotel", "room.hotel.owner", "customer"})
+    @EntityGraph(attributePaths = {"room", "room.hotel", "customer"})
     @Query("select b from Booking b where b.room.hotel.owner.id = :ownerId")
     List<Booking> findForOwner(Integer ownerId);
 
-    @EntityGraph(attributePaths = {"room", "room.hotel", "room.hotel.owner", "customer"})
+    @EntityGraph(attributePaths = {"room", "room.hotel", "customer"})
     @Query("select b from Booking b where b.id = :id")
     Optional<Booking> findDetailedById(Integer id);
 

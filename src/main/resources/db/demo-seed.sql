@@ -34,11 +34,6 @@ DECLARE @AdminId int = (SELECT Id FROM [User] WHERE Email = 'admin.demo@hotel.lo
 DECLARE @OwnerId int = (SELECT Id FROM [User] WHERE Email = 'owner.demo@hotel.local');
 DECLARE @CustomerId int = (SELECT Id FROM [User] WHERE Email = 'customer.demo@hotel.local');
 
-UPDATE [User]
-SET IsDeleted = 0, [Status] = 1, UpdatedAt = @Now
-WHERE Email IN ('admin.demo@hotel.local', 'owner.demo@hotel.local', 'customer.demo@hotel.local')
-  AND (IsDeleted <> 0 OR [Status] <> 1);
-
 IF NOT EXISTS (SELECT 1 FROM UserRole WHERE UserId = @AdminId AND RoleId = @AdminRoleId)
     INSERT INTO UserRole (UserId, RoleId, CreatedAt) VALUES (@AdminId, @AdminRoleId, @Now);
 IF NOT EXISTS (SELECT 1 FROM UserRole WHERE UserId = @OwnerId AND RoleId = @OwnerRoleId)
@@ -60,16 +55,6 @@ END;
 
 DECLARE @HotelActiveId int = (SELECT Id FROM Hotel WHERE [Name] = 'EasyStay Riverside Demo');
 DECLARE @HotelPendingId int = (SELECT Id FROM Hotel WHERE [Name] = 'EasyStay Ocean Demo');
-
-UPDATE Hotel
-SET OwnerId = @OwnerId,
-    [Status] = CASE WHEN Id = @HotelActiveId THEN 1 ELSE 2 END,
-    IsDeleted = 0,
-    UpdatedAt = @Now
-WHERE Id IN (@HotelActiveId, @HotelPendingId)
-  AND (OwnerId <> @OwnerId
-       OR [Status] <> CASE WHEN Id = @HotelActiveId THEN 1 ELSE 2 END
-       OR IsDeleted <> 0);
 
 IF NOT EXISTS (SELECT 1 FROM OwnerSetting WHERE OwnerId = @OwnerId)
 BEGIN
@@ -109,12 +94,6 @@ END;
 
 DECLARE @RoomA101 int = (SELECT Id FROM Room WHERE HotelId = @HotelActiveId AND RoomNumber = 'A101');
 DECLARE @RoomA201 int = (SELECT Id FROM Room WHERE HotelId = @HotelActiveId AND RoomNumber = 'A201');
-
-UPDATE Room
-SET [Status] = 1, IsDeleted = 0
-WHERE HotelId IN (@HotelActiveId, @HotelPendingId)
-  AND RoomNumber IN ('A101', 'A201', 'B101')
-  AND ([Status] <> 1 OR IsDeleted <> 0);
 
 IF NOT EXISTS (SELECT 1 FROM TimeSlot WHERE RoomId = @RoomA101 AND StartDate = '2026-06-01')
 BEGIN
