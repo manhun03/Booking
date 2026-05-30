@@ -146,6 +146,9 @@ class AuthService {
         logout();
         return false;
       }
+      if (_shouldRefreshSession(session)) {
+        await refreshSession();
+      }
 
       return true;
     } catch (_) {
@@ -175,10 +178,56 @@ class AuthService {
     return session;
   }
 
+  Future<AuthSession> refreshSession() async {
+    final refreshToken = _session?.refreshToken.trim();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      throw const ApiException('Phien dang nhap da het han.');
+    }
+
+    final uri = Uri.parse('${AppConstants.apiBaseUrl}/auth/refresh-token');
+    final response = await _client
+        .post(
+          uri,
+          headers: const {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'refreshToken': refreshToken}),
+        )
+        .timeout(AppConstants.apiTimeout);
+    final data = _handleResponse(response);
+    final session = _setSession(data);
+    if (!isStaff) {
+      logout();
+      throw const ApiException(
+        'Tai khoan nay khong co quyen truy cap cong quan tri.',
+      );
+    }
+    return session;
+  }
+
   Future<Map<String, dynamic>> fetchAdminDashboard() async {
     final data = await _get('/admin/dashboard');
     if (data is Map<String, dynamic>) return data;
     return const {};
+  }
+
+  Future<void> ensureActiveSession(String endpoint) async {
+    if (_isAuthEndpoint(endpoint)) return;
+
+    await restoreSession();
+    final session = _session;
+    if (session == null || session.accessToken.trim().isEmpty) {
+      throw const ApiException('Phien dang nhap da het han.');
+    }
+    if (!_shouldRefreshSession(session)) return;
+
+    try {
+      await refreshSession();
+    } catch (_) {
+      logout();
+      rethrow;
+    }
   }
 
   void logout() {
@@ -187,6 +236,7 @@ class AuthService {
   }
 
   Future<dynamic> _get(String endpoint) async {
+    await ensureActiveSession(endpoint);
     final uri = Uri.parse('${AppConstants.apiBaseUrl}$endpoint');
     final response = await _client
         .get(uri, headers: _headers)
@@ -198,6 +248,7 @@ class AuthService {
     String endpoint, {
     required Map<String, dynamic> body,
   }) async {
+    await ensureActiveSession(endpoint);
     final uri = Uri.parse('${AppConstants.apiBaseUrl}$endpoint');
     final response = await _client
         .post(uri, headers: _headers, body: jsonEncode(body))
@@ -272,6 +323,18 @@ class AuthService {
     _session = session;
     writeStoredSession(jsonEncode(session.toJson()));
     return session;
+  }
+
+  bool _shouldRefreshSession(AuthSession session) {
+    final expiresAt = session.accessTokenExpiresAt;
+    if (expiresAt == null) return false;
+    return DateTime.now().toUtc().isAfter(
+      expiresAt.toUtc().subtract(const Duration(minutes: 2)),
+    );
+  }
+
+  bool _isAuthEndpoint(String endpoint) {
+    return endpoint.startsWith('/auth/');
   }
 
   String _defaultErrorMessage(int statusCode) {

@@ -202,6 +202,7 @@ class OwnerApiService {
     String endpoint, {
     required Map<String, dynamic> body,
   }) async {
+    await AuthService().ensureActiveSession(endpoint);
     final uri = Uri.parse('${AppConstants.apiBaseUrl}$endpoint');
     final response = await _client
         .put(uri, headers: _headers, body: jsonEncode(body))
@@ -212,6 +213,7 @@ class OwnerApiService {
   }
 
   Future<dynamic> _get(String endpoint) async {
+    await AuthService().ensureActiveSession(endpoint);
     final uri = Uri.parse('${AppConstants.apiBaseUrl}$endpoint');
     final response = await _client
         .get(uri, headers: _headers)
@@ -220,6 +222,7 @@ class OwnerApiService {
   }
 
   Future<dynamic> _post(String endpoint, {Map<String, dynamic>? body}) async {
+    await AuthService().ensureActiveSession(endpoint);
     final uri = Uri.parse('${AppConstants.apiBaseUrl}$endpoint');
     final response = await _client
         .post(uri, headers: _headers, body: jsonEncode(body ?? const {}))

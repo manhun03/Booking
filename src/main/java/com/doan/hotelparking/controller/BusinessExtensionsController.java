@@ -1,18 +1,17 @@
 package com.doan.hotelparking.controller;
 
 import com.doan.hotelparking.common.ApiResponse;
-import com.doan.hotelparking.domain.entity.Booking;
-import com.doan.hotelparking.domain.entity.ChatMessage;
 import com.doan.hotelparking.domain.entity.Coupon;
-import com.doan.hotelparking.domain.entity.User;
+import com.doan.hotelparking.dto.chat.ChatMessageRequests.SendChatMessageRequest;
+import com.doan.hotelparking.dto.common.SimpleDtos.ChatConversationDto;
 import com.doan.hotelparking.dto.common.SimpleDtos.ChatMessageDto;
 import com.doan.hotelparking.repository.AuditLogRepository;
-import com.doan.hotelparking.repository.ChatMessageRepository;
 import com.doan.hotelparking.repository.CouponRepository;
 import com.doan.hotelparking.service.AuditService;
+import com.doan.hotelparking.service.ChatMessageService;
 import com.doan.hotelparking.service.CurrentUserService;
-import com.doan.hotelparking.service.DtoMapper;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -60,60 +59,58 @@ class CouponController extends CrudController<Coupon> {
 @RestController
 @RequestMapping("/api/messages")
 class ChatController {
-    private final ChatMessageRepository messages;
+    private final ChatMessageService chatMessages;
     private final CurrentUserService currentUser;
-    private final DtoMapper mapper;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    ChatController(ChatMessageRepository messages, CurrentUserService currentUser, DtoMapper mapper) {
-        this.messages = messages;
+    ChatController(ChatMessageService chatMessages, CurrentUserService currentUser, SimpMessagingTemplate messagingTemplate) {
+        this.chatMessages = chatMessages;
         this.currentUser = currentUser;
-        this.mapper = mapper;
+        this.messagingTemplate = messagingTemplate;
+    }
+
+    @GetMapping("/conversations")
+    ApiResponse<List<ChatConversationDto>> conversations() {
+        return ApiResponse.ok(chatMessages.conversations(currentUser.requireUserId()));
+    }
+
+    @GetMapping("/contacts")
+    ApiResponse<List<ChatConversationDto>> contacts() {
+        return ApiResponse.ok(chatMessages.contacts(currentUser.requireUserId()));
     }
 
     @GetMapping("/conversation/{otherUserId}")
     ApiResponse<List<ChatMessageDto>> conversation(@PathVariable Integer otherUserId) {
-        return ApiResponse.ok(messages.conversation(currentUser.requireUserId(), otherUserId).stream()
-                .map(mapper::toChatMessageDto)
-                .toList());
+        return ApiResponse.ok(chatMessages.conversation(currentUser.requireUserId(), otherUserId));
     }
 
     @GetMapping("/unread")
     ApiResponse<List<ChatMessageDto>> unread() {
-        return ApiResponse.ok(messages.findByReceiverIdAndReadFalseOrderByCreatedAtDesc(currentUser.requireUserId()).stream()
-                .map(mapper::toChatMessageDto)
-                .toList());
+        return ApiResponse.ok(chatMessages.unread(currentUser.requireUserId()));
     }
 
     @PostMapping
-    ApiResponse<ChatMessageDto> send(@RequestBody SendMessageRequest request) {
-        var sender = new User();
-        sender.setId(currentUser.requireUserId());
-        var receiver = new User();
-        receiver.setId(request.receiverId());
-        var message = new ChatMessage();
-        message.setSender(sender);
-        message.setReceiver(receiver);
-        if (request.bookingId() != null) {
-            var booking = new Booking();
-            booking.setId(request.bookingId());
-            message.setBooking(booking);
-        }
-        message.setContent(request.content());
-        return ApiResponse.ok("Message sent", mapper.toChatMessageDto(messages.save(message)));
+    ApiResponse<ChatMessageDto> send(@Valid @RequestBody SendChatMessageRequest request) {
+        var message = chatMessages.send(currentUser.requireUserId(), request);
+        publishMessage(message);
+        return ApiResponse.ok("Message sent", message);
     }
 
     @PostMapping("/{id}/read")
     ApiResponse<ChatMessageDto> markRead(@PathVariable Integer id) {
-        var message = messages.findById(id).orElseThrow(() -> new IllegalArgumentException("Message not found"));
-        if (!message.getReceiver().getId().equals(currentUser.requireUserId())) {
-            throw new IllegalArgumentException("Message not found");
-        }
-        message.setRead(true);
-        message.setReadAt(Instant.now());
-        return ApiResponse.ok("Message read", mapper.toChatMessageDto(messages.save(message)));
+        var message = chatMessages.markRead(currentUser.requireUserId(), id);
+        publishMessage(message);
+        return ApiResponse.ok("Message read", message);
     }
 
-    record SendMessageRequest(Integer receiverId, Integer bookingId, @NotBlank String content) {}
+    private void publishMessage(ChatMessageDto message) {
+        if (message.senderId() != null) {
+            messagingTemplate.convertAndSendToUser(message.senderId().toString(), "/queue/messages", message);
+        }
+        if (message.receiverId() != null) {
+            messagingTemplate.convertAndSendToUser(message.receiverId().toString(), "/queue/messages", message);
+        }
+    }
 }
 
 @RestController

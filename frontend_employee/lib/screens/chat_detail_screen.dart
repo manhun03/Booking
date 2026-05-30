@@ -131,21 +131,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Future<void> _send() async {
     final content = _message.text.trim();
     if (content.isEmpty || _otherUserId <= 0) return;
-    setState(() => _sending = true);
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
     _message.clear();
-
-    final socket = _socket;
-    if (socket != null) {
-      socket.sendMessage(receiverId: _otherUserId, content: content);
-      Future.delayed(const Duration(seconds: 5), () {
-        if (!mounted || !_sending) return;
-        setState(() {
-          _sending = false;
-          _error = 'Chua nhan duoc phan hoi realtime, hay thu lai.';
-        });
-      });
-      return;
-    }
 
     try {
       final sent = await _api.sendMessage(
@@ -156,6 +146,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       setState(() {
         _upsertMessage(sent);
         _sending = false;
+        _error = null;
       });
       _moveToEnd();
     } on ApiException catch (error) {
@@ -200,12 +191,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (id <= 0 || message['read'] == true) return;
     if (intValue(message['receiverId']) != _currentUserId) return;
 
-    final socket = _socket;
-    if (socket != null) {
-      socket.markRead(id);
-    } else {
-      unawaited(_api.markMessageRead(id));
-    }
+    unawaited(_api.markMessageRead(id));
   }
 
   void _moveToEnd() {

@@ -18,10 +18,10 @@ class AppConstants {
     }
 
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8085';
+      return 'http://10.0.2.2:8080';
     }
 
-    return 'http://localhost:8085';
+    return 'http://localhost:8080';
   }
 
   static String get apiBaseUrl {

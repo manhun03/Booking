@@ -5,9 +5,9 @@ spring:
   application:
     name: hotel-booking-api
   datasource:
-    url: jdbc:sqlserver://localhost:1433;databaseName=DoAnHotelParkingDb;encrypt=true;trustServerCertificate=true
+    url: jdbc:sqlserver://localhost;instanceName=SQLEXPRESS;databaseName=DoAnHotelParkingDb;encrypt=true;trustServerCertificate=true
     username: sa
-    password: 123456
+    password: 12345678
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
   jpa:
     hibernate:
@@ -76,3 +76,7 @@ management:
   health:
     mail:
       enabled: ${MAIL_HEALTH_ENABLED:false}
+    minio:
+      enabled: ${MINIO_HEALTH_ENABLED:false}
+    firebase:
+      enabled: ${FIREBASE_HEALTH_ENABLED:false}

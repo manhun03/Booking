@@ -174,21 +174,11 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     final receiverId = _otherUserId;
     if (content.isEmpty || receiverId == null || _sending) return;
 
-    setState(() => _sending = true);
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
     _composerController.clear();
-
-    final socket = _socket;
-    if (socket != null) {
-      socket.sendMessage(receiverId: receiverId, content: content);
-      Future.delayed(const Duration(seconds: 5), () {
-        if (!mounted || !_sending) return;
-        setState(() {
-          _sending = false;
-          _error = 'Chua nhan duoc phan hoi realtime, hay thu lai.';
-        });
-      });
-      return;
-    }
 
     try {
       final message = await _api.sendChatMessage(
@@ -199,6 +189,7 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       setState(() {
         _upsertMessage(message);
         _sending = false;
+        _error = null;
       });
       _scrollToBottom();
     } catch (error) {
@@ -238,12 +229,7 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     final id = _intValue(message['id']);
     if (id == null || id == 0 || message['read'] == true) return;
     if (_intValue(message['receiverId']) != _currentUserId) return;
-    final socket = _socket;
-    if (socket != null) {
-      socket.markRead(id);
-    } else {
-      _api.markChatMessageRead(id);
-    }
+    _api.markChatMessageRead(id);
   }
 
   void _scrollToBottom() {

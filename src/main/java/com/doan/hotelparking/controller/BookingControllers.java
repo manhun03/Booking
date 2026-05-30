@@ -453,6 +453,16 @@ class PaymentController {
         return ApiResponse.ok(payments.findAll().stream().map(mapper::toPaymentDto).toList());
     }
 
+    @GetMapping("/by-booking/{bookingId}")
+    @PreAuthorize("hasAnyRole('Customer','Owner','Admin')")
+    @Transactional(readOnly = true)
+    ApiResponse<List<PaymentDto>> byBooking(@PathVariable Integer bookingId) {
+        requireAccessibleBooking(bookingId);
+        return ApiResponse.ok(payments.findByBookingId(bookingId).stream()
+                .map(mapper::toPaymentDto)
+                .toList());
+    }
+
     @PostMapping("/initiate")
     @PreAuthorize("hasRole('Customer')")
     @Transactional
@@ -609,6 +619,21 @@ class PaymentController {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private Booking requireAccessibleBooking(Integer bookingId) {
+        var booking = bookings.findDetailedById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+        var userId = currentUser.requireUserId();
+        var isCustomer = booking.getCustomer() != null && booking.getCustomer().getId().equals(userId);
+        var isOwner = booking.getRoom() != null
+                && booking.getRoom().getHotel() != null
+                && booking.getRoom().getHotel().getOwner() != null
+                && booking.getRoom().getHotel().getOwner().getId().equals(userId);
+        if (!isCustomer && !isOwner && !isAdmin()) {
+            throw new IllegalArgumentException("Booking not found");
+        }
+        return booking;
     }
 
     @PostMapping("/{id}/refund")

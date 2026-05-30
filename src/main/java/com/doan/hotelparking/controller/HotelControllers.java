@@ -53,6 +53,15 @@ class HotelController {
                 pageIndex, pageSize, page.getTotalElements());
     }
 
+    @GetMapping("/owner")
+    @PreAuthorize("hasRole('Owner')")
+    @Transactional(readOnly = true)
+    ApiResponse<List<HotelDto>> ownerHotels() {
+        return ApiResponse.ok(hotels.findByOwnerId(currentUser.requireUserId()).stream()
+                .map(mapper::toHotelDto)
+                .toList());
+    }
+
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
     ApiResponse<HotelDto> getById(@PathVariable Integer id) {

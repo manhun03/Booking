@@ -207,6 +207,7 @@ class AdminApiService {
   Future<dynamic> _get(String endpoint) => _request('GET', endpoint);
 
   Future<Map<String, dynamic>> _requestRawMap(String url) async {
+    await AuthService().ensureActiveSession(url);
     final response = await _client
         .get(Uri.parse(url), headers: _headers)
         .timeout(AppConstants.apiTimeout);
@@ -227,6 +228,7 @@ class AdminApiService {
     String endpoint, {
     Map<String, dynamic>? body,
   }) async {
+    await AuthService().ensureActiveSession(endpoint);
     final uri = Uri.parse('${AppConstants.apiBaseUrl}$endpoint');
     final encodedBody = body == null ? null : jsonEncode(body);
     final response = switch (method) {
