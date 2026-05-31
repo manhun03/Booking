@@ -252,10 +252,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(_contactName),
-            const Text(
-              'Realtime chat',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
-            ),
           ],
         ),
         backgroundColor: AppColors.colorPrimary,

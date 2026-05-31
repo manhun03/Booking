@@ -8,7 +8,12 @@ import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
 
 class BookingScreen extends StatefulWidget {
-  const BookingScreen({super.key});
+  const BookingScreen({
+    super.key,
+    this.initialShowHistory = false,
+  });
+
+  final bool initialShowHistory;
 
   @override
   State<BookingScreen> createState() => _BookingScreenState();
@@ -27,6 +32,7 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   void initState() {
     super.initState();
+    _showHistory = widget.initialShowHistory;
     _currentBookings = [];
     _historyBookings = [];
     _loadBookings();
@@ -51,8 +57,10 @@ class _BookingScreenState extends State<BookingScreen> {
       setState(() {
         _currentBookings =
             bookings.where((booking) => booking['isHistory'] != true).toList();
-        _historyBookings =
-            bookings.where((booking) => booking['isHistory'] == true).toList();
+        _historyBookings = bookings
+            .where((booking) =>
+                booking['isHistory'] == true && booking['reviewed'] != true)
+            .toList();
         _isLoading = false;
       });
     } catch (error) {
@@ -408,7 +416,13 @@ class _BookingScreenState extends State<BookingScreen> {
                     ),
                   ],
                 ),
-                if (_canReviewBooking(booking)) ...[
+                if (_showHistory) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _buildHistoryActions(booking),
+                  ),
+                ] else if (_canReviewBooking(booking)) ...[
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerRight,
@@ -783,7 +797,13 @@ class _BookingScreenState extends State<BookingScreen> {
                   statusColor: statusColor,
                   alignEnd: statusAlignment == 'end',
                 ),
-                if (_canReviewBooking(booking)) ...[
+                if (_showHistory) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _buildHistoryActions(booking, compact: true),
+                  ),
+                ] else if (_canReviewBooking(booking)) ...[
                   const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.centerRight,
@@ -876,6 +896,54 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
+  Widget _buildHistoryActions(
+    Map<String, dynamic> booking, {
+    bool compact = false,
+  }) {
+    final actions = <Widget>[
+      _buildViewReviewsAction(booking, compact: compact),
+    ];
+    if (_canReviewBooking(booking)) {
+      actions.insert(0, _buildReviewAction(booking, compact: compact));
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: actions,
+    );
+  }
+
+  Widget _buildViewReviewsAction(
+    Map<String, dynamic> booking, {
+    bool compact = false,
+  }) {
+    return SizedBox(
+      height: compact ? 30 : 34,
+      child: OutlinedButton.icon(
+        onPressed: () => _openHotelReviews(booking),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.textPrimary,
+          side: const BorderSide(color: AppColors.divider),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6),
+          ),
+          padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 13),
+        ),
+        icon: Icon(Icons.reviews_outlined, size: compact ? 14 : 16),
+        label: Text(
+          compact ? 'Xem đánh giá' : 'Xem đánh giá trước đó',
+          style: TextStyle(
+            fontSize: compact ? 10 : 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildReviewAction(
     Map<String, dynamic> booking, {
     bool compact = false,
@@ -928,7 +996,8 @@ class _BookingScreenState extends State<BookingScreen> {
 
   bool _canReviewBooking(Map<String, dynamic> booking) {
     final status = booking['statusCode']?.toString().trim().toUpperCase();
-    return status == 'COMPLETED' || status == 'CHECKED_OUT';
+    return booking['reviewed'] != true &&
+        (status == 'COMPLETED' || status == 'CHECKED_OUT');
   }
 
   Future<void> _openReviewBooking(Map<String, dynamic> booking) async {
@@ -939,7 +1008,43 @@ class _BookingScreenState extends State<BookingScreen> {
     if (!mounted || result is! Map<String, dynamic>) return;
     setState(() {
       booking['reviewed'] = true;
+      _historyBookings.removeWhere((item) => item['id'] == booking['id']);
     });
+  }
+
+  Future<void> _openHotelReviews(Map<String, dynamic> booking) async {
+    final hotelId = _intValue(booking['hotelId']);
+    if (hotelId == null || hotelId <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Không tìm thấy khách sạn để xem đánh giá.')),
+      );
+      return;
+    }
+
+    Map<String, dynamic> hotel = {
+      'id': hotelId,
+      'name': booking['name'],
+      'initialTab': 'reviews',
+    };
+    try {
+      hotel = {
+        ...await ApiService().fetchHotel(hotelId),
+        'initialTab': 'reviews',
+      };
+    } on ApiException {
+      // Use the booking summary when hotel detail cannot be refreshed.
+    }
+
+    if (!mounted) return;
+    await Navigator.of(context).pushNamed('/hotel-detail', arguments: hotel);
+  }
+
+  int? _intValue(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
   }
 
   Widget _buildBottomNav() {

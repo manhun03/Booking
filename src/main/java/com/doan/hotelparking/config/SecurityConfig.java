@@ -35,6 +35,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/hotels/search", "/api/hotels/by-province", "/api/hotels/all-with-province", "/api/hotels/*/with-location").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/provinces/**", "/api/wards/**").permitAll()
                         .requestMatchers("/api/recommendations/similar/**", "/api/recommendations/new-user", "/api/recommendations/smart").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/coupons/active", "/api/coupons/validate").permitAll()
                         .requestMatchers("/api/rooms/by-hotel", "/api/rooms/by-room-type", "/api/room-types/by-hotel").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reviews/by-hotel/**", "/api/time-slots/room/**", "/api/time-slots/hotel/**").permitAll()
                         .anyRequest().authenticated())

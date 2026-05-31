@@ -42,9 +42,12 @@ import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -713,6 +716,9 @@ class ReviewController {
         if (reviews.existsByBookingIdAndCustomerId(booking.getId(), userId)) {
             throw new IllegalArgumentException("Booking has already been reviewed");
         }
+        if (reviews.existsByCustomerIdAndHotelId(userId, booking.getRoom().getHotel().getId())) {
+            throw new IllegalArgumentException("Hotel has already been reviewed by this customer");
+        }
         if (request.rating() < 1 || request.rating() > 5) {
             throw new IllegalArgumentException("Rating must be between 1 and 5");
         }
@@ -876,11 +882,15 @@ class RoomTypeController extends CrudController<RoomType> {
 @RequestMapping("/api/time-slots")
 class TimeSlotController extends CrudController<TimeSlot> {
     private final TimeSlotRepository timeSlots;
+    private final RoomRepository rooms;
+    private final BookingRepository bookings;
     private final DtoMapper mapper;
 
-    TimeSlotController(TimeSlotRepository repository, DtoMapper mapper) {
+    TimeSlotController(TimeSlotRepository repository, RoomRepository rooms, BookingRepository bookings, DtoMapper mapper) {
         super(repository);
         this.timeSlots = repository;
+        this.rooms = rooms;
+        this.bookings = bookings;
         this.mapper = mapper;
     }
 
@@ -894,5 +904,33 @@ class TimeSlotController extends CrudController<TimeSlot> {
     @Transactional(readOnly = true)
     ApiResponse<List<TimeSlotDto>> byRoom(@PathVariable Integer roomId) {
         return ApiResponse.ok(timeSlots.findByRoomId(roomId).stream().map(mapper::toTimeSlotDto).toList());
+    }
+
+    @GetMapping("/room/{roomId}/availability")
+    @Transactional(readOnly = true)
+    ApiResponse<List<RoomAvailabilityDto>> availability(@PathVariable Integer roomId,
+                                                        @RequestParam LocalDate from,
+                                                        @RequestParam LocalDate to,
+                                                        @RequestParam(required = false) Integer excludedBookingId) {
+        if (to.isBefore(from)) {
+            throw new IllegalArgumentException("End date must be after start date");
+        }
+        if (Duration.between(from.atStartOfDay(), to.plusDays(1).atStartOfDay()).toDays() > 370) {
+            throw new IllegalArgumentException("Availability range is too large");
+        }
+
+        var room = rooms.findById(roomId).orElseThrow(() -> new IllegalArgumentException("Room not found"));
+        var roomBookable = !room.isDeleted() && room.getStatus() == RoomStatus.AVAILABLE;
+        var items = new ArrayList<RoomAvailabilityDto>();
+        for (var day = from; !day.isAfter(to); day = day.plusDays(1)) {
+            var start = day.atStartOfDay(ZoneOffset.UTC).toInstant();
+            var end = day.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+            var available = roomBookable && !bookings.hasOverlappingBooking(roomId, start, end, excludedBookingId);
+            items.add(new RoomAvailabilityDto(day.toString(), available));
+        }
+        return ApiResponse.ok(items);
+    }
+
+    record RoomAvailabilityDto(String date, boolean available) {
     }
 }

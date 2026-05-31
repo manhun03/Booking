@@ -359,8 +359,13 @@ class ApiService {
   }
 
   Future<List<Map<String, dynamic>>> fetchCoupons() async {
-    final data = await _get('/coupons/active');
-    return _listFromData(data).map(_mapCoupon).toList();
+    try {
+      final data = await _get('/coupons/active');
+      return _activeCouponsFromData(data);
+    } on ApiException {
+      final data = await _get('/coupons');
+      return _activeCouponsFromData(data);
+    }
   }
 
   Future<Map<String, dynamic>> validateCoupon({
@@ -759,7 +764,8 @@ class ApiService {
         mapped.add({
           ...hotel,
           'favoriteId': favorite['id'],
-          'imageUrl': favorite['imageUrl'],
+          'favoriteCreatedAt': _dateTimeValue(favorite['createdAt']),
+          'imageUrl': favorite['imageUrl'] ?? hotel['imageUrl'],
         });
       } on ApiException {
         mapped.add(_mapFavoriteHotel(favorite));
@@ -771,6 +777,11 @@ class ApiService {
 
   Future<bool> toggleFavorite(int hotelId) async {
     final data = await _post('/favorites/$hotelId/toggle');
+    return data == true;
+  }
+
+  Future<bool> isFavoriteHotel(int hotelId) async {
+    final data = await _get('/favorites/$hotelId/is-favorite');
     return data == true;
   }
 
@@ -1100,6 +1111,7 @@ class ApiService {
     return {
       'id': id,
       'roomId': _intValue(raw['roomId']),
+      'hotelId': _intValue(raw['hotelId']),
       'ownerId': _intValue(raw['ownerId']),
       'customerId': _intValue(raw['customerId']),
       'customerAddress': _stringValue(raw['customerAddress']) ?? '',
@@ -1161,6 +1173,7 @@ class ApiService {
     return {
       'id': hotelId,
       'favoriteId': _intValue(raw['id']),
+      'hotelId': hotelId,
       'name': _stringValue(raw['hotelName']) ?? 'Hotel #$hotelId',
       'location': 'Dang cap nhat dia chi',
       'price': 'Xem gia phong',
@@ -1168,6 +1181,7 @@ class ApiService {
       'date': 'Ngay gan nhat',
       'guests': '2 nguoi lon (1 phong)',
       'imageUrl': _stringValue(raw['imageUrl']),
+      'favoriteCreatedAt': _dateTimeValue(raw['createdAt']),
       'colors': [palette.first, palette.last],
       'palette': palette,
       'backend': raw,
@@ -1228,6 +1242,29 @@ class ApiService {
       'icon': _couponIcon(id),
       'backend': raw,
     };
+  }
+
+  List<Map<String, dynamic>> _activeCouponsFromData(dynamic data) {
+    return _listFromData(data)
+        .map(_mapCoupon)
+        .where(_isCouponCurrentlyUsable)
+        .toList();
+  }
+
+  bool _isCouponCurrentlyUsable(Map<String, dynamic> coupon) {
+    if (coupon['active'] != true) return false;
+    final now = DateTime.now();
+    final startAt = coupon['startAt'];
+    if (startAt is DateTime && now.isBefore(startAt.toLocal())) {
+      return false;
+    }
+    final endAt = coupon['endAt'];
+    if (endAt is DateTime && now.isAfter(endAt.toLocal())) {
+      return false;
+    }
+    final maxUses = _intValue(coupon['maxUses']);
+    final usedCount = _intValue(coupon['usedCount']) ?? 0;
+    return maxUses == null || usedCount < maxUses;
   }
 
   Map<String, dynamic> _mapPaymentCard(Map<String, dynamic> raw) {
@@ -1441,6 +1478,7 @@ class ApiService {
         return const Color(0xFF22C55E);
       case 'CANCELLED':
       case 'REJECTED':
+      case 'NO_SHOW':
         return const Color(0xFFFF3B30);
       default:
         return const Color(0xFFD97706);
@@ -1463,6 +1501,8 @@ class ApiService {
         return 'Da huy';
       case 'REJECTED':
         return 'Da tu choi';
+      case 'NO_SHOW':
+        return 'Khong den';
       default:
         return 'Dang cho xac nhan';
     }
@@ -1492,7 +1532,8 @@ class ApiService {
     return status == 'COMPLETED' ||
         status == 'CHECKED_OUT' ||
         status == 'CANCELLED' ||
-        status == 'REJECTED';
+        status == 'REJECTED' ||
+        status == 'NO_SHOW';
   }
 
   String _dateRange(DateTime? checkIn, DateTime? checkOut) {

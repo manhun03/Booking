@@ -6,7 +6,9 @@ import java.time.Instant;
 public record BookingDto(
         Integer id,
         Integer roomId,
+        Integer hotelId,
         Integer customerId,
+        Integer ownerId,
         Instant checkInDate,
         Instant checkOutDate,
         int nightCount,
@@ -17,6 +19,7 @@ public record BookingDto(
         String note,
         String status,
         String roomNumber,
-        String hotelName
+        String hotelName,
+        boolean reviewed
 ) {
 }

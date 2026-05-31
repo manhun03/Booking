@@ -34,11 +34,25 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
   List<Map<String, dynamic>> _reviews = [];
   bool _loadingRelatedData = false;
   bool _reviewsLoaded = false;
+  bool _isFavorite = false;
+  bool _favoriteHovered = false;
+  bool _savingFavorite = false;
 
   @override
   void initState() {
     super.initState();
+    _selectedDetailTab = _initialDetailTab();
+    _isFavorite = widget.hotel?['favoriteId'] != null ||
+        widget.hotel?['favorite'] == true ||
+        widget.hotel?['isFavorite'] == true;
     _loadRelatedData();
+  }
+
+  int _initialDetailTab() {
+    final value = widget.hotel?['initialTab'];
+    if (value == 'reviews' || value == 1) return 1;
+    if (value == 'policy' || value == 2) return 2;
+    return 0;
   }
 
   Future<void> _loadRelatedData() async {
@@ -75,10 +89,26 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
       // Reviews are optional supporting content for the detail page.
     }
 
+    await _loadFavoriteState(hotelId);
+
     if (!mounted) return;
     setState(() {
       _loadingRelatedData = false;
     });
+  }
+
+  Future<void> _loadFavoriteState(int hotelId) async {
+    if (!ApiService().isAuthenticated) return;
+
+    try {
+      final isFavorite = await ApiService().isFavoriteHotel(hotelId);
+      if (!mounted) return;
+      setState(() {
+        _isFavorite = isFavorite;
+      });
+    } catch (_) {
+      // Favorite state is optional; the detail page can still render.
+    }
   }
 
   @override
@@ -226,14 +256,23 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
           _buildHotelMedia(),
           const SizedBox(height: 14),
         ],
-        Text(
-          hotelName,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            height: 1.05,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                hotelName,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  height: 1.05,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            _buildFavoriteButton(data),
+          ],
         ),
         const SizedBox(height: 8),
         _buildRatingRow(rating, reviews),
@@ -305,8 +344,117 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
             ),
           ),
         ),
+        const SizedBox(height: 16),
+        const Divider(height: 1, color: AppColors.divider),
+        const SizedBox(height: 16),
+        _buildContactSection(mergedHotel, hotelName),
       ],
     );
+  }
+
+  Widget _buildFavoriteButton(Map<String, dynamic> data) {
+    final activeColor = (_isFavorite || _favoriteHovered)
+        ? Colors.red
+        : AppColors.textSecondary;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) {
+        setState(() {
+          _favoriteHovered = true;
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          _favoriteHovered = false;
+        });
+      },
+      child: Tooltip(
+        message: _isFavorite ? 'Bỏ yêu thích' : 'Lưu vào yêu thích',
+        child: InkWell(
+          onTap: _savingFavorite ? null : () => _toggleFavorite(data),
+          borderRadius: BorderRadius.circular(999),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: (_isFavorite || _favoriteHovered)
+                  ? Colors.red.withValues(alpha: 0.08)
+                  : AppColors.colorBg,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: (_isFavorite || _favoriteHovered)
+                    ? Colors.red.withValues(alpha: 0.35)
+                    : AppColors.divider,
+              ),
+            ),
+            child: Center(
+              child: _savingFavorite
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: activeColor,
+                      ),
+                    )
+                  : Icon(
+                      _isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: activeColor,
+                      size: 20,
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleFavorite(Map<String, dynamic> data) async {
+    final hotelId = _hotelId(data);
+    if (hotelId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không tìm thấy khách sạn để lưu.')),
+      );
+      return;
+    }
+    if (!ApiService().isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để lưu yêu thích.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _savingFavorite = true;
+    });
+
+    try {
+      final isFavorite = await ApiService().toggleFavorite(hotelId);
+      if (!mounted) return;
+      setState(() {
+        _isFavorite = isFavorite;
+        _savingFavorite = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isFavorite
+                ? 'Đã lưu khách sạn vào mục yêu thích.'
+                : 'Đã bỏ khách sạn khỏi mục yêu thích.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _savingFavorite = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
   }
 
   Widget _buildBrandHeader(BuildContext context) {
@@ -770,6 +918,61 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
     );
   }
 
+  Widget _buildContactSection(
+    Map<String, dynamic> hotel,
+    String hotelName,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Liên hệ khách sạn',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          height: 32,
+          child: OutlinedButton(
+            onPressed: () => _openHotelOwnerChat(hotel, hotelName),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textPrimary,
+              side: const BorderSide(color: AppColors.colorPrimary),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+              padding: EdgeInsets.zero,
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Liên hệ',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                SizedBox(width: 4),
+                Icon(
+                  Icons.call_outlined,
+                  size: 13,
+                  color: AppColors.textPrimary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildHotelMedia() {
     final imageUrl = _primaryImageUrl;
     if (imageUrl != null) {
@@ -1063,6 +1266,28 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
       return int.tryParse(digits) ?? 0;
     }
     return _fallbackHotel['price'] as int;
+  }
+
+  void _openHotelOwnerChat(Map<String, dynamic> hotel, String hotelName) {
+    final backend = hotel['backend'];
+    final ownerId = _intValue(
+      hotel['ownerId'] ?? (backend is Map ? backend['ownerId'] : null),
+      0,
+    );
+    if (ownerId <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không tìm thấy chủ khách sạn.')),
+      );
+      return;
+    }
+
+    Navigator.of(context).pushNamed(
+      '/message-chat',
+      arguments: {
+        'userId': ownerId,
+        'name': hotelName,
+      },
+    );
   }
 
   String _formatPrice(int price) {

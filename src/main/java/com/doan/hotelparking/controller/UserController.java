@@ -64,6 +64,12 @@ public class UserController {
                 pageIndex, pageSize, page.getTotalElements());
     }
 
+    @GetMapping("/me")
+    public ApiResponse<UserDto> getCurrentUser() {
+        return ApiResponse.ok(users.findById(currentUser.requireUserId()).map(mapper::toUserDto)
+                .orElseThrow(() -> new IllegalArgumentException("User not found")));
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<UserDto> getById(@PathVariable Integer id) {
         requireSelfOrAdmin(id);

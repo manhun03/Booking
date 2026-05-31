@@ -90,7 +90,12 @@ class StaySmartApp extends StatelessWidget {
             '/home': (context) => const HomeScreen(),
             '/search': (context) => const SearchScreen(),
             '/message': (context) => const MessageScreen(),
-            '/booking': (context) => const BookingScreen(),
+            '/booking': (context) {
+              final args = ModalRoute.of(context)?.settings.arguments;
+              final showHistory = args is Map<String, dynamic> &&
+                  (args['showHistory'] == true || args['tab'] == 'history');
+              return BookingScreen(initialShowHistory: showHistory);
+            },
             '/booking-detail': (context) {
               final booking = ModalRoute.of(context)?.settings.arguments
                   as Map<String, dynamic>?;
@@ -120,6 +125,8 @@ class StaySmartApp extends StatelessWidget {
             '/user-profile': (context) => const UserProfileScreen(),
             '/edit-profile': (context) => const EditProfileScreen(),
             '/favorite': (context) => const FavoriteScreen(),
+            '/favorites': (context) => const FavoriteScreen(),
+            '/favourites': (context) => const FavoriteScreen(),
             '/notification': (context) => const NotificationScreen(),
             '/promotion': (context) => const PromotionScreen(),
             '/add-promotion': (context) => const AddPromotionScreen(),

@@ -27,11 +27,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           _language.t('profile.home'),
           route: '/home',
         ),
+        // _ProfileMenuItem(
+        //   Icons.account_balance_wallet_outlined,
+        //   _language.t('profile.bankAccount'),
+        // ),
         _ProfileMenuItem(
-          Icons.account_balance_wallet_outlined,
-          _language.t('profile.bankAccount'),
+          Icons.history,
+          _language.t('profile.history'),
+          route: '/booking',
+          arguments: const {'showHistory': true},
         ),
-        _ProfileMenuItem(Icons.history, _language.t('profile.history')),
         _ProfileMenuItem(
           Icons.favorite,
           _language.t('profile.favorites'),
@@ -194,15 +199,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     });
 
     try {
-      final response = await ApiService().sendEmailVerification(email: email);
+      await ApiService().sendEmailVerification(email: email);
       if (!mounted) return;
       setState(() {
         _isSendingEmailVerification = false;
       });
       _showSnack(_language.t('emailVerification.sendSuccess'));
-      await _showEmailVerificationDialog(
-        generatedToken: _textValue(response['token']),
-      );
+      await _showEmailVerificationDialog();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -212,8 +215,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
-  Future<void> _showEmailVerificationDialog({String? generatedToken}) async {
-    final tokenController = TextEditingController(text: generatedToken ?? '');
+  Future<void> _showEmailVerificationDialog() async {
+    final tokenController = TextEditingController();
     var isVerifying = false;
     String? errorMessage;
 
@@ -265,18 +268,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(_language.t('emailVerification.subtitle')),
-                    if (generatedToken != null &&
-                        generatedToken.trim().isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      SelectableText(
-                        '${_language.t('emailVerification.generatedToken')}: $generatedToken',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.colorPrimary,
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 16),
                     TextField(
                       controller: tokenController,
@@ -924,7 +915,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   void _openMenuItem(BuildContext context, _ProfileMenuItem item) {
     if (item.route == null) return;
-    Navigator.of(context).pushNamed(item.route!);
+    Navigator.of(context).pushNamed(item.route!, arguments: item.arguments);
   }
 
   Widget _buildLogoutButton() {
@@ -1054,11 +1045,13 @@ class _ProfileMenuItem {
     this.icon,
     this.label, {
     this.route,
+    this.arguments,
     this.color,
   });
 
   final IconData icon;
   final String label;
   final String? route;
+  final Object? arguments;
   final Color? color;
 }

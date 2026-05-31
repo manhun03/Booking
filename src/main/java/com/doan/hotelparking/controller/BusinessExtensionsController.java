@@ -33,15 +33,19 @@ class CouponController extends CrudController<Coupon> {
         this.coupons = repository;
     }
 
+    @GetMapping("/active")
+    ApiResponse<List<Coupon>> active() {
+        var now = Instant.now();
+        return ApiResponse.ok(coupons.findAll().stream()
+                .filter(coupon -> isUsable(coupon, now))
+                .toList());
+    }
+
     @GetMapping("/validate")
     ApiResponse<CouponValidationResponse> validate(@RequestParam String code, @RequestParam BigDecimal amount) {
         var coupon = coupons.findByCodeIgnoreCase(code).orElseThrow(() -> new IllegalArgumentException("Coupon not found"));
         var now = Instant.now();
-        if (!coupon.isActive()
-                || (coupon.getStartAt() != null && now.isBefore(coupon.getStartAt()))
-                || (coupon.getEndAt() != null && now.isAfter(coupon.getEndAt()))
-                || (coupon.getMaxUses() != null && coupon.getUsedCount() >= coupon.getMaxUses())
-                || amount.compareTo(coupon.getMinOrderAmount()) < 0) {
+        if (!isUsable(coupon, now) || amount.compareTo(coupon.getMinOrderAmount()) < 0) {
             throw new IllegalArgumentException("Coupon is not valid");
         }
         var discount = "PERCENT".equalsIgnoreCase(coupon.getDiscountType())
@@ -51,6 +55,13 @@ class CouponController extends CrudController<Coupon> {
             discount = coupon.getMaxDiscountAmount();
         }
         return ApiResponse.ok(new CouponValidationResponse(coupon.getCode(), discount, amount.subtract(discount).max(BigDecimal.ZERO)));
+    }
+
+    private boolean isUsable(Coupon coupon, Instant now) {
+        return coupon.isActive()
+                && (coupon.getStartAt() == null || !now.isBefore(coupon.getStartAt()))
+                && (coupon.getEndAt() == null || !now.isAfter(coupon.getEndAt()))
+                && (coupon.getMaxUses() == null || coupon.getUsedCount() < coupon.getMaxUses());
     }
 
     record CouponValidationResponse(String code, BigDecimal discountAmount, BigDecimal finalAmount) {}

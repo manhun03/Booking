@@ -9,19 +9,27 @@ import org.springframework.stereotype.Service;
 public class MailService {
     private final JavaMailSender mailSender;
     private final String mailHost;
+    private final String username;
+    private final String password;
     private final String from;
 
     public MailService(JavaMailSender mailSender,
                        @Value("${spring.mail.host:}") String mailHost,
-                       @Value("${spring.mail.username:no-reply@localhost}") String from) {
+                       @Value("${spring.mail.username:}") String username,
+                       @Value("${spring.mail.password:}") String password) {
         this.mailSender = mailSender;
         this.mailHost = mailHost;
-        this.from = from;
+        this.username = username;
+        this.password = password;
+        this.from = username == null || username.isBlank() ? "no-reply@localhost" : username;
     }
 
     public void send(String to, String subject, String body) {
-        if (mailHost == null || mailHost.isBlank()) {
-            return;
+        if (mailHost == null || mailHost.isBlank()
+                || username == null || username.isBlank()
+                || password == null || password.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Email service is not configured. Set MAIL_HOST, MAIL_USERNAME and MAIL_PASSWORD.");
         }
         var message = new SimpleMailMessage();
         message.setFrom(from);

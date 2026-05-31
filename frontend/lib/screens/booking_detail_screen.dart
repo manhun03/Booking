@@ -959,8 +959,13 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     });
   }
 
-  void _openHotelOwnerChat() {
-    final ownerId = _intValue(_booking?['ownerId'] ?? _backendField('ownerId'));
+  Future<void> _openHotelOwnerChat() async {
+    var ownerId = _bookingOwnerId;
+    if (ownerId == null || ownerId <= 0) {
+      await _refreshCurrentBooking();
+      if (!mounted) return;
+      ownerId = _bookingOwnerId;
+    }
     if (ownerId == null || ownerId <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Khong tim thay chu khach san.')),
@@ -968,13 +973,46 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       return;
     }
 
-    Navigator.of(context).pushNamed(
-      '/message-chat',
-      arguments: {
-        'userId': ownerId,
-        'name': _titleText,
-      },
+    unawaited(
+      Navigator.of(context).pushNamed(
+        '/message-chat',
+        arguments: {
+          'userId': ownerId,
+          'name': _titleText,
+        },
+      ),
     );
+  }
+
+  int? get _bookingOwnerId => _intValue(
+        _booking?['ownerId'] ??
+            _backendField('ownerId') ??
+            _booking?['hotelOwnerId'] ??
+            _backendField('hotelOwnerId'),
+      );
+
+  Future<void> _refreshCurrentBooking() async {
+    final bookingId = _bookingId;
+    if (bookingId == null) return;
+    try {
+      final bookings = await ApiService().fetchMyBookings(pageSize: 100);
+      Map<String, dynamic>? matched;
+      for (final item in bookings) {
+        if (_intValue(item['id']) == bookingId) {
+          matched = item;
+          break;
+        }
+      }
+      if (!mounted || matched == null) return;
+      setState(() {
+        _booking = {
+          ...?_booking,
+          ...matched!,
+        };
+      });
+    } catch (_) {
+      // Keep the current booking data and show the existing missing-owner message.
+    }
   }
 
   void _syncReturnedBooking(Object? result) {

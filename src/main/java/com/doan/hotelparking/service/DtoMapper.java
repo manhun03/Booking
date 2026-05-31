@@ -34,10 +34,17 @@ import com.doan.hotelparking.dto.location.ProvinceDto;
 import com.doan.hotelparking.dto.location.WardDto;
 import com.doan.hotelparking.dto.ownersetting.OwnerSettingDto;
 import com.doan.hotelparking.dto.user.UserDto;
+import com.doan.hotelparking.repository.ReviewRepository;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DtoMapper {
+    private final ReviewRepository reviews;
+
+    public DtoMapper(ReviewRepository reviews) {
+        this.reviews = reviews;
+    }
+
     public HotelDto toHotelDto(Hotel hotel) {
         var ward = hotel.getWard();
         var province = ward == null ? null : ward.getProvince();
@@ -80,10 +87,17 @@ public class DtoMapper {
     public BookingDto toBookingDto(Booking booking) {
         var room = booking.getRoom();
         var hotel = room == null ? null : room.getHotel();
+        var customerId = booking.getCustomer() == null ? null : booking.getCustomer().getId();
+        var hotelId = hotel == null ? null : hotel.getId();
+        var reviewed = customerId != null
+                && (reviews.existsByBookingIdAndCustomerId(booking.getId(), customerId)
+                || (hotelId != null && reviews.existsByCustomerIdAndHotelId(customerId, hotelId)));
         return new BookingDto(
                 booking.getId(),
                 room == null ? null : room.getId(),
-                booking.getCustomer() == null ? null : booking.getCustomer().getId(),
+                hotelId,
+                customerId,
+                hotel == null || hotel.getOwner() == null ? null : hotel.getOwner().getId(),
                 booking.getCheckInDate(),
                 booking.getCheckOutDate(),
                 booking.getNightCount(),
@@ -94,7 +108,8 @@ public class DtoMapper {
                 booking.getNote(),
                 booking.getStatus() == null ? null : booking.getStatus().name(),
                 room == null ? null : room.getRoomNumber(),
-                hotel == null ? null : hotel.getName());
+                hotel == null ? null : hotel.getName(),
+                reviewed);
     }
 
     public ProvinceDto toProvinceDto(Province province) {

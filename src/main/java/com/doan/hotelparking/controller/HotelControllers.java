@@ -263,6 +263,7 @@ class FavoriteHotelController {
     }
 
     @GetMapping
+    @Transactional(readOnly = true)
     ApiResponse<List<FavoriteHotelDto>> getAll() {
         return ApiResponse.ok(favorites.findAll().stream().map(mapper::toFavoriteHotelDto).toList());
     }
@@ -273,6 +274,7 @@ class FavoriteHotelController {
     }
 
     @GetMapping("/my-favorites")
+    @Transactional(readOnly = true)
     ApiResponse<List<FavoriteHotelDto>> myFavorites() {
         return ApiResponse.ok(favorites.findByUserId(currentUser.requireUserId()).stream()
                 .map(mapper::toFavoriteHotelDto)

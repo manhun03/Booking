@@ -72,7 +72,7 @@ Backend tu tao bucket neu chua co.
 
 ## Cau Hinh SMTP
 
-SMTP la tuy chon. Neu chua cau hinh, API forgot password/verify email van sinh token nhung khong gui email that.
+SMTP la tuy chon neu khong dung chuc nang email. Khi dung forgot password/verify email, backend can cau hinh SMTP de gui email that; neu thieu cau hinh, API se tra loi loi cau hinh email.
 
 Thiet lap bien moi truong khi can gui email that:
 

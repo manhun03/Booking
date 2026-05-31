@@ -14,77 +14,80 @@ class FavoriteScreen extends StatefulWidget {
 
 class _FavoriteScreenState extends State<FavoriteScreen> {
   int _selectedIndex = 4;
-  bool _showSaved = false;
+  bool _showSaved = true;
   bool _isLoading = false;
   String? _errorMessage;
+  String _searchText = '';
+  String? _selectedGroup;
   late List<Map<String, dynamic>> _savedHotels;
-
-  static const List<Map<String, dynamic>> _favoriteLists = [
-    {
-      'title': 'TP. Hồ Chí Minh',
-      'date': '27 - 30 tháng 9 2025',
-      'saved': '3 mục đã lưu',
-      'color': AppColors.colorPrimary,
-    },
-    {
-      'title': 'Hà Nội',
-      'date': '10 - 28 tháng 10 2025',
-      'saved': '1 mục đã lưu',
-      'color': Color(0xFF0891B2),
-    },
-    {
-      'title': 'Nhật Bản',
-      'date': '2 - 10 tháng 11 2025',
-      'saved': '5 mục đã lưu',
-      'color': Color(0xFFD97706),
-    },
-    {
-      'title': 'Mỹ',
-      'date': '23 - 25 tháng 12 2025',
-      'saved': '4 mục đã lưu',
-      'color': Color(0xFF7C3AED),
-    },
-  ];
-
-  static const List<Map<String, dynamic>> _fallbackSavedHotels = [
-    {
-      'name': 'Ocean Breeze Hotel',
-      'location': '36 Lý Thường Kiệt, Hoàn Kiếm',
-      'price': '2.400.000 VND / đêm',
-      'rating': '4.7',
-      'date': 'Ngày 12 - 14, Thg 11, 2024',
-      'guests': 'Khách 2 người lớn (1 phòng)',
-      'colors': [Color(0xFF7A9A74), Color(0xFFE4C7A1)],
-    },
-    {
-      'name': 'Horizon Sky Hotel',
-      'location': '45 Bà Triệu, Hoàn Kiếm, Hà Nội',
-      'price': '2.700.000 VND / đêm',
-      'rating': '4.7',
-      'date': 'Ngày 08 - 10, Thg 09, 2024',
-      'guests': 'Khách 2 người lớn (1 phòng)',
-      'colors': [Color(0xFFA65F45), Color(0xFFE0B79A)],
-    },
-    {
-      'name': 'Velora Boutique Hotel',
-      'location': '52 Kim Mã, Ba Đình, Hà Nội',
-      'price': '3.600.000 VND / đêm',
-      'rating': '4.8',
-      'date': 'Ngày 15 - 17, Thg 05, 2025',
-      'guests': 'Khách 3 người lớn (1 phòng)',
-      'colors': [Color(0xFF9B927C), Color(0xFFE4DED1)],
-    },
-  ];
 
   @override
   void initState() {
     super.initState();
-    _savedHotels = List<Map<String, dynamic>>.from(_fallbackSavedHotels);
+    _savedHotels = [];
     _loadFavoriteHotels();
   }
 
+  List<Map<String, dynamic>> get _visibleSavedHotels {
+    final query = _searchText.trim().toLowerCase();
+    return _savedHotels.where((hotel) {
+      final groupKey = _groupKeyForHotel(hotel);
+      if (_selectedGroup != null && groupKey != _selectedGroup) {
+        return false;
+      }
+      if (query.isEmpty) return true;
+      return _textValue(hotel, 'name').toLowerCase().contains(query) ||
+          _textValue(hotel, 'location').toLowerCase().contains(query);
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> get _favoriteGroups {
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final hotel in _savedHotels) {
+      final key = _groupKeyForHotel(hotel);
+      groups.putIfAbsent(key, () => []).add(hotel);
+    }
+
+    final colors = [
+      AppColors.colorPrimary,
+      const Color(0xFF0891B2),
+      const Color(0xFFD97706),
+      const Color(0xFF7C3AED),
+      const Color(0xFF16A34A),
+    ];
+
+    var index = 0;
+    return groups.entries.map((entry) {
+      final latest = entry.value
+          .map((hotel) => hotel['favoriteCreatedAt'])
+          .whereType<DateTime>()
+          .fold<DateTime?>(null, (current, value) {
+        if (current == null || value.isAfter(current)) return value;
+        return current;
+      });
+      final color = colors[index++ % colors.length];
+      return {
+        'title': entry.key,
+        'date': latest == null
+            ? 'Đã lưu trên StaySmart'
+            : 'Lưu gần nhất ${_formatDate(latest)}',
+        'saved': '${entry.value.length} khách sạn đã lưu',
+        'color': color,
+        'groupKey': entry.key,
+      };
+    }).toList()
+      ..sort((left, right) =>
+          _textValue(left, 'title').compareTo(_textValue(right, 'title')));
+  }
+
   Future<void> _loadFavoriteHotels() async {
-    if (!ApiService().isAuthenticated) return;
+    if (!ApiService().isAuthenticated) {
+      setState(() {
+        _savedHotels = [];
+        _errorMessage = 'Vui lòng đăng nhập để xem khách sạn yêu thích.';
+      });
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -96,6 +99,11 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
       if (!mounted) return;
       setState(() {
         _savedHotels = hotels;
+        if (_selectedGroup != null &&
+            !_savedHotels
+                .any((hotel) => _groupKeyForHotel(hotel) == _selectedGroup)) {
+          _selectedGroup = null;
+        }
         _isLoading = false;
       });
     } catch (error) {
@@ -196,10 +204,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
         const SizedBox(height: 16),
         const Divider(height: 1, color: AppColors.divider),
         const SizedBox(height: 4),
-        if (_showSaved)
-          _buildSavedHotels()
-        else
-          for (final item in _favoriteLists) _buildFavoriteListItem(item),
+        if (_showSaved) _buildSavedHotels() else _buildFavoriteGroups(),
       ],
     );
   }
@@ -232,8 +237,8 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
           const SizedBox(height: 22),
           _buildSummaryTile(
             Icons.folder_copy_outlined,
-            'Danh sách',
-            '${_favoriteLists.length}',
+            'Nhóm địa điểm',
+            '${_favoriteGroups.length}',
           ),
           const SizedBox(height: 10),
           _buildSummaryTile(
@@ -256,7 +261,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
             children: [
               Expanded(
                 child: Text(
-                  _showSaved ? 'Khách sạn đã lưu' : 'Danh sách yêu thích',
+                  _showSaved ? 'Khách sạn đã lưu' : 'Nhóm yêu thích',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -265,9 +270,9 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                 ),
               ),
               TextButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Tạo danh sách'),
+                onPressed: _loadFavoriteHotels,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Tải lại'),
               ),
             ],
           ),
@@ -275,26 +280,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
           if (_showSaved)
             _buildSavedHotels(wide: true)
           else
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final columns = constraints.maxWidth >= 700 ? 2 : 1;
-                final spacing = columns == 2 ? 14.0 : 0.0;
-                final itemWidth =
-                    (constraints.maxWidth - spacing) / columns.toDouble();
-
-                return Wrap(
-                  spacing: spacing,
-                  runSpacing: 14,
-                  children: [
-                    for (final item in _favoriteLists)
-                      SizedBox(
-                        width: itemWidth,
-                        child: _buildFavoriteListCard(item),
-                      ),
-                  ],
-                );
-              },
-            ),
+            _buildFavoriteGroups(wide: true),
         ],
       ),
     );
@@ -415,9 +401,14 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     return SizedBox(
       height: 42,
       child: TextField(
+        onChanged: (value) {
+          setState(() {
+            _searchText = value;
+          });
+        },
         decoration: InputDecoration(
           isDense: true,
-          hintText: 'Search...',
+          hintText: 'Tìm khách sạn hoặc địa điểm...',
           prefixIcon: const Icon(
             Icons.search,
             size: 18,
@@ -448,7 +439,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
       children: [
         Expanded(
           child: _buildSegmentButton(
-            label: 'Mục lưu',
+            label: 'Khách sạn',
             selected: _showSaved,
             onTap: () {
               setState(() {
@@ -460,7 +451,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: _buildSegmentButton(
-            label: 'Danh sách',
+            label: 'Nhóm địa điểm',
             selected: !_showSaved,
             onTap: () {
               setState(() {
@@ -505,6 +496,8 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
   }
 
   Widget _buildSavedHotels({bool wide = false}) {
+    final hotels = _visibleSavedHotels;
+
     if (_isLoading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
@@ -516,17 +509,90 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
       return _buildStateMessage(_errorMessage!);
     }
 
-    if (_savedHotels.isEmpty) {
-      return _buildStateMessage('Chua co khach san da luu');
+    if (hotels.isEmpty) {
+      if (_savedHotels.isEmpty) {
+        return _buildStateMessage('Bạn chưa lưu khách sạn nào.');
+      }
+      return _buildStateMessage('Không tìm thấy khách sạn phù hợp.');
     }
 
     return Column(
       children: [
-        for (var index = 0; index < _savedHotels.length; index++) ...[
+        if (_selectedGroup != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildActiveGroupChip(),
+          ),
+        for (var index = 0; index < hotels.length; index++) ...[
           if (!wide || index > 0) const SizedBox(height: 14),
-          _buildHotelCard(_savedHotels[index], wide: wide),
+          _buildHotelCard(hotels[index], wide: wide),
         ],
       ],
+    );
+  }
+
+  Widget _buildFavoriteGroups({bool wide = false}) {
+    final groups = _favoriteGroups;
+
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return _buildStateMessage(_errorMessage!);
+    }
+
+    if (groups.isEmpty) {
+      return _buildStateMessage(
+          'Chưa có nhóm yêu thích. Hãy lưu khách sạn trước.');
+    }
+
+    if (!wide) {
+      return Column(
+        children: [
+          for (final item in groups) _buildFavoriteListItem(item),
+        ],
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 700 ? 2 : 1;
+        final spacing = columns == 2 ? 14.0 : 0.0;
+        final itemWidth = (constraints.maxWidth - spacing) / columns.toDouble();
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: 14,
+          children: [
+            for (final item in groups)
+              SizedBox(
+                width: itemWidth,
+                child: _buildFavoriteListCard(item),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildActiveGroupChip() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: InputChip(
+        label: Text('Đang lọc: $_selectedGroup'),
+        onDeleted: () {
+          setState(() {
+            _selectedGroup = null;
+          });
+        },
+        deleteIcon: const Icon(Icons.close, size: 16),
+        backgroundColor: AppColors.colorPrimary.withValues(alpha: 0.08),
+        side: BorderSide(color: AppColors.colorPrimary.withValues(alpha: 0.18)),
+      ),
     );
   }
 
@@ -564,9 +630,10 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
         children: [
           Expanded(child: _buildFavoriteText(item)),
           IconButton(
-            onPressed: () {},
+            tooltip: 'Xem nhóm này',
+            onPressed: () => _selectFavoriteGroup(item),
             icon: const Icon(
-              Icons.more_vert,
+              Icons.chevron_right,
               size: 20,
               color: AppColors.textSecondary,
             ),
@@ -601,8 +668,9 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
           const SizedBox(width: 12),
           Expanded(child: _buildFavoriteText(item)),
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.more_vert, size: 20),
+            tooltip: 'Xem nhóm này',
+            onPressed: () => _selectFavoriteGroup(item),
+            icon: const Icon(Icons.chevron_right, size: 20),
           ),
         ],
       ),
@@ -647,110 +715,162 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
   }) {
     final colors = _colorsValue(hotel);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              width: wide ? 132 : 100,
-              height: wide ? 126 : 114,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: colors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: const Center(
-                child: Icon(
-                  Icons.hotel,
-                  size: 42,
-                  color: AppColors.white,
-                ),
-              ),
+    return InkWell(
+      onTap: () => _openHotelDetail(hotel),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.divider),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _textValue(hotel, 'name'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: wide ? 16 : 13,
+          ],
+        ),
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHotelThumbnail(hotel, colors, wide: wide),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _textValue(hotel, 'name'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: wide ? 16 : 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Bỏ yêu thích',
+                        onPressed: () => _removeFavorite(hotel),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 28,
+                          minHeight: 28,
+                        ),
+                        icon: const Icon(
+                          Icons.favorite,
+                          color: Colors.red,
+                          size: 17,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, size: 13, color: Colors.orange),
+                      const SizedBox(width: 3),
+                      Text(
+                        _textValue(hotel, 'rating'),
+                        style: const TextStyle(
+                          fontSize: 11,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary,
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  _buildHotelInfo(
+                    Icons.location_on_outlined,
+                    _textValue(hotel, 'location'),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _textValue(hotel, 'price'),
+                    style: TextStyle(
+                      fontSize: wide ? 13 : 11,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
                     ),
-                    const Icon(Icons.favorite, color: Colors.red, size: 16),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.star, size: 13, color: Colors.orange),
-                    const SizedBox(width: 3),
-                    Text(
-                      _textValue(hotel, 'rating'),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                _buildHotelInfo(
-                  Icons.location_on_outlined,
-                  _textValue(hotel, 'location'),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _textValue(hotel, 'price'),
-                  style: TextStyle(
-                    fontSize: wide ? 13 : 11,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+                  ),
+                  const SizedBox(height: 5),
+                  _buildHotelInfo(
+                    Icons.bookmark_added_outlined,
+                    _favoriteSavedText(hotel),
+                  ),
+                  const SizedBox(height: 5),
+                  _buildHotelInfo(
+                    Icons.info_outline,
+                    _hotelSubtitle(hotel),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHotelThumbnail(
+    Map<String, dynamic> hotel,
+    List<Color> colors, {
+    required bool wide,
+  }) {
+    final imageUrl = _textValue(hotel, 'imageUrl');
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: wide ? 132 : 100,
+        height: wide ? 126 : 114,
+        child: imageUrl.isEmpty
+            ? DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: colors,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                 ),
-                const SizedBox(height: 5),
-                _buildHotelInfo(
-                  Icons.calendar_today_outlined,
-                  _textValue(hotel, 'date'),
+                child: const Center(
+                  child: Icon(
+                    Icons.hotel,
+                    size: 42,
+                    color: AppColors.white,
+                  ),
                 ),
-                const SizedBox(height: 5),
-                _buildHotelInfo(
-                  Icons.person_outline,
-                  _textValue(hotel, 'guests'),
-                ),
-              ],
-            ),
-          ),
-        ],
+              )
+            : Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) {
+                  return DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: colors,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.hotel,
+                        size: 42,
+                        color: AppColors.white,
+                      ),
+                    ),
+                  );
+                },
+              ),
       ),
     );
   }
@@ -870,6 +990,104 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
 
   static Widget _buildAvatar({required double size}) {
     return CurrentUserAvatar(size: size);
+  }
+
+  void _selectFavoriteGroup(Map<String, dynamic> item) {
+    final groupKey = _textValue(item, 'groupKey');
+    if (groupKey.isEmpty) return;
+    setState(() {
+      _selectedGroup = groupKey;
+      _showSaved = true;
+    });
+  }
+
+  Future<void> _openHotelDetail(Map<String, dynamic> hotel) async {
+    final hotelId = _intValue(hotel['id'] ?? hotel['hotelId']);
+    if (hotelId == null || hotelId <= 0) return;
+
+    Map<String, dynamic> detail = hotel;
+    try {
+      detail = {
+        ...await ApiService().fetchHotel(hotelId),
+        'favoriteId': hotel['favoriteId'],
+        'favoriteCreatedAt': hotel['favoriteCreatedAt'],
+      };
+    } on ApiException {
+      // The favorite summary is enough to open the detail page shell.
+    }
+
+    if (!mounted) return;
+    await Navigator.of(context).pushNamed('/hotel-detail', arguments: detail);
+  }
+
+  Future<void> _removeFavorite(Map<String, dynamic> hotel) async {
+    final hotelId = _intValue(hotel['id'] ?? hotel['hotelId']);
+    if (hotelId == null || hotelId <= 0) return;
+
+    try {
+      final stillFavorite = await ApiService().toggleFavorite(hotelId);
+      if (!mounted) return;
+      if (!stillFavorite) {
+        setState(() {
+          _savedHotels.removeWhere(
+            (item) => _intValue(item['id'] ?? item['hotelId']) == hotelId,
+          );
+          if (_selectedGroup != null &&
+              !_savedHotels
+                  .any((item) => _groupKeyForHotel(item) == _selectedGroup)) {
+            _selectedGroup = null;
+          }
+        });
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
+  }
+
+  String _groupKeyForHotel(Map<String, dynamic> hotel) {
+    final location = _textValue(hotel, 'location').trim();
+    if (location.isEmpty || location == 'Dang cap nhat dia chi') {
+      return 'Đang cập nhật địa điểm';
+    }
+    final parts = location
+        .split(',')
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toList();
+    return parts.isEmpty ? location : parts.last;
+  }
+
+  String _favoriteSavedText(Map<String, dynamic> hotel) {
+    final createdAt = hotel['favoriteCreatedAt'];
+    if (createdAt is DateTime) {
+      return 'Đã lưu ${_formatDate(createdAt)}';
+    }
+    return 'Đã lưu trong danh sách yêu thích';
+  }
+
+  String _hotelSubtitle(Map<String, dynamic> hotel) {
+    final status = _textValue(hotel, 'status');
+    if (status.isNotEmpty) return 'Trạng thái: $status';
+    final description = _textValue(hotel, 'description');
+    if (description.isNotEmpty) return description;
+    return 'Mở chi tiết để xem phòng và tiện nghi';
+  }
+
+  String _formatDate(DateTime date) {
+    final local = date.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    return '$day/$month/${local.year}';
+  }
+
+  int? _intValue(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
   }
 
   String _textValue(Map<String, dynamic> data, String key) {
