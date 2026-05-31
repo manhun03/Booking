@@ -1,89 +1,213 @@
-# Chat Backend API
+# AIAgent Chat Backend API
 
-Backend duoc chia theo cac file:
+AIAgent la FastAPI service dung de chay AI chat cho he thong dat phong khach san.
+
+Flow hien tai:
+
+```text
+Flutter/Client
+  -> Java Backend: http://localhost:8080/api/ai-chat
+  -> AIAgent:      http://localhost:8000
+  -> Groq model
+```
+
+Frontend nen goi qua Java Backend `/api/ai-chat`. Khong nen goi truc tiep AIAgent tu FE, vi Java Backend da proxy Authorization header va gom tat ca API ve mot backend chinh.
+
+## File Chinh
 
 - `chat_backend.py`: khoi tao FastAPI app, CORS, startup DB, include router.
-- `chat_controller.py`: controller/router, dinh nghia endpoint va request/response DTO.
-- `chat_service.py`: nghiep vu chat, DB, forward Auth API ASP.NET, goi AI Agent.
+- `chat_controller.py`: khai bao endpoint FastAPI va DTO request/response.
+- `chat_service.py`: nghiep vu chat, SQLite memory, thread/message, goi AI Agent.
 - `auth_jwt.py`: doc JWT tu `Authorization: Bearer <accessToken>` va lay `user_id`.
+- `agent2.py`: cau hinh LangChain/Groq agent, tools, memory/checkpoint.
+- `call_api.py`: tool goi Java Backend de tim hotel/room.
+- `.env`: chua `GROQ_API_KEY` va URL backend. File nay da nam trong `.gitignore`.
 
-## Chay server
+## Cau Hinh
 
-```powershell
-pip install -e .
-uvicorn chat_backend:app --reload --host 0.0.0.0 --port 8000
+File `.env` trong thu muc `AIAgent`:
+
+```env
+GROQ_API_KEY=your-groq-api-key
+AUTH_API_BASE_URL=http://localhost:8080/api/auth
+TRAVEL_API_BASE_URL=http://localhost:8080/api
 ```
 
-Neu dang dung virtualenv cua project:
+Khong commit file `.env` len GitHub.
 
-```powershell
-.venv\Scripts\activate
-pip install -e .
-uvicorn chat_backend:app --reload --port 8000
-```
-
-Mac dinh backend chat se goi Auth API ASP.NET tai:
+Mac dinh trong code:
 
 ```text
-http://localhost:5146/api/auth
+AUTH_API_BASE_URL=http://localhost:8080/api/auth
+TRAVEL_API_BASE_URL=http://localhost:8080/api
 ```
 
-Neu URL khac, set bien moi truong:
+## Chay AIAgent
+
+Mo `cmd` hoac PowerShell:
 
 ```powershell
-$env:AUTH_API_BASE_URL="http://localhost:5146/api/auth"
+cd F:\Downloads\AI-integrated-hotel-booking-app-main\AI-integrated-hotel-booking-app-main\AIAgent
+.\.venv\Scripts\python.exe -m uvicorn chat_backend:app --host 0.0.0.0 --port 8000
 ```
 
-## Flow cho frontend
+Neu dung PowerShell va muon activate venv:
 
-1. Login/register bang ASP.NET Auth API hoac proxy cua chat backend.
-2. Luu `thread_id` tra ve o state frontend.
-3. Khi goi chat backend, gui header `Authorization: Bearer <accessToken>`.
-4. Tao hoi thoai moi bang `POST /threads`.
-5. Khi user gui tin nhan, goi `POST /threads/{thread_id}/messages`.
-6. Khi user bam xoa hoi thoai, goi `DELETE /threads/{thread_id}`.
-7. Neu can hien lai lich su, goi `GET /threads/{thread_id}/messages`.
-
-Backend chat se tu doc `user_id` tu JWT claim, frontend khong can truyen `user_id`.
-Swagger cua `chat_backend` tai `/docs` co nut `Authorize`; nhap token theo dang `Bearer <accessToken>`.
-
-## Endpoints
-
-### Auth proxy
-
-Neu frontend muon goi tat ca qua chat backend:
-
-```http
-POST /auth/register
-POST /auth/login
-POST /auth/refresh-token
+```powershell
+cd F:\Downloads\AI-integrated-hotel-booking-app-main\AI-integrated-hotel-booking-app-main\AIAgent
+.\.venv\Scripts\activate
+uvicorn chat_backend:app --host 0.0.0.0 --port 8000
 ```
 
-Ba endpoint nay forward request sang ASP.NET:
+Neu bao loi port 8000 dang duoc su dung:
 
-```text
-POST {AUTH_API_BASE_URL}/register
-POST {AUTH_API_BASE_URL}/login
-POST {AUTH_API_BASE_URL}/refresh-token
+```powershell
+$p = (Get-NetTCPConnection -LocalPort 8000 -State Listen).OwningProcess
+Stop-Process -Id $p -Force
 ```
 
-Response giu nguyen JSON tu ASP.NET, vi du:
+Sau do chay lai AIAgent.
+
+## Kiem Tra AIAgent
+
+Neu dang dung `cmd`:
+
+```cmd
+curl http://localhost:8000/health
+```
+
+Neu dang dung PowerShell:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/health
+```
+
+Ket qua dung:
 
 ```json
-{
-  "success": true,
-  "message": "Login successfully",
-  "data": {
-    "accessToken": "...",
-    "refreshToken": "..."
-  }
-}
+{"status":"ok"}
 ```
 
-### Tao thread
+Swagger cua AIAgent:
+
+```text
+http://localhost:8000/docs
+```
+
+ReDoc:
+
+```text
+http://localhost:8000/redoc
+```
+
+OpenAPI JSON:
+
+```text
+http://localhost:8000/openapi.json
+```
+
+## Java Backend Proxy
+
+Java Backend da noi voi AIAgent qua:
+
+```text
+http://localhost:8080/api/ai-chat
+```
+
+Cau hinh trong Java Backend:
+
+```yaml
+app:
+  ai-agent:
+    base-url: ${AI_AGENT_BASE_URL:http://localhost:8000}
+```
+
+Neu AIAgent chay o URL khac:
+
+```powershell
+$env:AI_AGENT_BASE_URL="http://localhost:8000"
+```
+
+Sau do restart Java Backend.
+
+## Kiem Tra Proxy Qua Java Backend
+
+Dung `cmd`:
+
+```cmd
+curl http://localhost:8080/api/ai-chat/health
+```
+
+Dung PowerShell:
+
+```powershell
+Invoke-RestMethod http://localhost:8080/api/ai-chat/health
+```
+
+Ket qua dung:
+
+```json
+{"status":"ok"}
+```
+
+Swagger cua Java Backend:
+
+```text
+http://localhost:8080/swagger-ui/index.html
+```
+
+Trong Swagger Java, tim controller:
+
+```text
+ai-chat-controller
+```
+
+## Endpoints AIAgent Goc
+
+Neu can test truc tiep AIAgent:
 
 ```http
-POST /threads
+GET    /health
+POST   /threads
+GET    /threads
+GET    /threads/{thread_id}
+DELETE /threads/{thread_id}
+GET    /threads/{thread_id}/messages
+POST   /threads/{thread_id}/messages
+POST   /chat
+```
+
+Tat ca endpoint thread/message can header:
+
+```http
+Authorization: Bearer <accessToken>
+```
+
+Token lay tu Java Backend:
+
+```http
+POST http://localhost:8080/api/auth/login
+```
+
+## Endpoints Nen Dung Qua Java Backend
+
+Frontend nen dung cac endpoint nay:
+
+```http
+GET    /api/ai-chat/health
+POST   /api/ai-chat/threads
+GET    /api/ai-chat/threads
+GET    /api/ai-chat/threads/{threadId}
+DELETE /api/ai-chat/threads/{threadId}
+GET    /api/ai-chat/threads/{threadId}/messages
+POST   /api/ai-chat/threads/{threadId}/messages
+POST   /api/ai-chat/chat
+```
+
+## Tao Thread
+
+```http
+POST http://localhost:8080/api/ai-chat/threads
 Authorization: Bearer <accessToken>
 Content-Type: application/json
 
@@ -98,25 +222,16 @@ Response:
 {
   "thread_id": "2d4b25f4-6f15-4f30-9877-7ef31b6e5949",
   "title": "Tim khach san Da Nang",
-  "user_id": "user-id-lay-tu-jwt",
-  "created_at": "2026-05-06T08:00:00+00:00",
-  "updated_at": "2026-05-06T08:00:00+00:00"
+  "user_id": "19",
+  "created_at": "2026-05-24T08:00:00+00:00",
+  "updated_at": "2026-05-24T08:00:00+00:00"
 }
 ```
 
-### Lay danh sach thread
+## Gui Message
 
 ```http
-GET /threads
-Authorization: Bearer <accessToken>
-```
-
-Chi tra ve thread cua user trong JWT.
-
-### Gui message vao AI Agent
-
-```http
-POST /threads/{thread_id}/messages
+POST http://localhost:8080/api/ai-chat/threads/{threadId}/messages
 Authorization: Bearer <accessToken>
 Content-Type: application/json
 
@@ -135,15 +250,15 @@ Response:
     "thread_id": "2d4b25f4-6f15-4f30-9877-7ef31b6e5949",
     "role": "assistant",
     "content": "Noi dung AI tra loi...",
-    "created_at": "2026-05-06T08:01:00+00:00"
+    "created_at": "2026-05-24T08:01:00+00:00"
   }
 }
 ```
 
-Endpoint thay the neu frontend muon gui truc tiep `thread_id` va `message` trong body:
+Endpoint thay the:
 
 ```http
-POST /chat
+POST http://localhost:8080/api/ai-chat/chat
 Authorization: Bearer <accessToken>
 Content-Type: application/json
 
@@ -153,30 +268,30 @@ Content-Type: application/json
 }
 ```
 
-### Lay lich su message
+## Lay Lich Su Message
 
 ```http
-GET /threads/{thread_id}/messages
+GET http://localhost:8080/api/ai-chat/threads/{threadId}/messages
 Authorization: Bearer <accessToken>
 ```
 
-### Xoa thread
+## Xoa Thread
 
 ```http
-DELETE /threads/{thread_id}
+DELETE http://localhost:8080/api/ai-chat/threads/{threadId}
 Authorization: Bearer <accessToken>
 ```
 
-Endpoint nay xoa:
+Xoa thread se xoa:
 
 - metadata trong `chat_threads`
 - message log trong `chat_messages`
 - checkpoint memory cua LangGraph theo `thread_id`
 
-## Vi du fetch frontend
+## Vi Du Frontend Fetch
 
 ```ts
-const apiBase = "http://localhost:8000";
+const apiBase = "http://localhost:8080/api/ai-chat";
 
 export async function createThread(accessToken: string, title?: string) {
   const res = await fetch(`${apiBase}/threads`, {
@@ -206,6 +321,15 @@ export async function sendMessage(
   return res.json();
 }
 
+export async function listMessages(accessToken: string, threadId: string) {
+  const res = await fetch(`${apiBase}/threads/${threadId}/messages`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  return res.json();
+}
+
 export async function deleteThread(accessToken: string, threadId: string) {
   await fetch(`${apiBase}/threads/${threadId}`, {
     method: "DELETE",
@@ -214,4 +338,65 @@ export async function deleteThread(accessToken: string, threadId: string) {
     },
   });
 }
+```
+
+## Loi Thuong Gap
+
+### Port 8000 bi trung
+
+Loi:
+
+```text
+ERROR: [Errno 10048] only one usage of each socket address is normally permitted
+```
+
+Xu ly:
+
+```powershell
+$p = (Get-NetTCPConnection -LocalPort 8000 -State Listen).OwningProcess
+Stop-Process -Id $p -Force
+```
+
+### `Invoke-RestMethod` khong nhan
+
+Ban dang dung `cmd`. Hay dung:
+
+```cmd
+curl http://localhost:8000/health
+```
+
+Hoac mo PowerShell de dung:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/health
+```
+
+### Thieu GROQ_API_KEY
+
+Loi:
+
+```text
+The api_key client option must be set
+```
+
+Them vao `AIAgent\.env`:
+
+```env
+GROQ_API_KEY=your-groq-api-key
+```
+
+Sau do restart AIAgent.
+
+### Java proxy khong goi duoc AIAgent
+
+Kiem tra AIAgent:
+
+```cmd
+curl http://localhost:8000/health
+```
+
+Kiem tra proxy Java:
+
+```cmd
+curl http://localhost:8080/api/ai-chat/health
 ```
