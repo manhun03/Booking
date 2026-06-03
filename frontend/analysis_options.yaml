@@ -1,0 +1,6 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # Keep the default Flutter lint set. Project-specific rules can be added
+    # here once they are supported by the pinned Dart SDK.

@@ -1,0 +1,42 @@
+# Secrets
+.env
+.env.*
+*.pem
+*.p12
+*.key
+firebase/*.json
+**/firebase/*.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+memory.db
+memory.db-shm
+memory.db-wal
+
+# Flutter
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Java/Maven
+target/
+*.class
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Runtime/uploads/exports
+uploads/
+exports/
+*.bak
+*.log

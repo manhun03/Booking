@@ -1,0 +1,57 @@
+# Maven build output
+target/
+*.class
+
+# Logs and runtime files
+logs/
+*.log
+*.pid
+*.tmp
+*.temp
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+application-local.properties
+application-local.yml
+application-local.yaml
+src/main/resources/application-local.properties
+src/main/resources/application-local.yml
+src/main/resources/application-local.yaml
+
+# Firebase service account and private keys
+firebase/
+*.json
+*.p12
+*.pem
+*.key
+
+# IDE files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test and coverage output
+coverage/
+*.exec
+jacoco.exec
+
+# Docker/local data
+minio-data/
+data/
+
+# Database exports/backups
+exports/*.bak
+exports/*.bacpac
+exports/*.sql
