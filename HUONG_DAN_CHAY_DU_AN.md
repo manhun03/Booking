@@ -1,7 +1,5 @@
 # HUONG DAN CAI DAT, DONG GOI VA CHAY DU AN STAYSMART
 
-Tai lieu nay dung cho du an sau khi da doi ten thu muc:
-
 ```text
 F:\Aptech\Project4\HotelBooking
 ```
@@ -523,141 +521,12 @@ Thu muc output:
 frontend_employee\build\web
 ```
 
-## 14. Test Chuc Nang Sau Deploy
-
-Nen test nhanh cac luong sau:
-
-```text
-1. Customer login/logout
-2. Customer xem Home/Search/Hotel Detail
-3. Customer dat phong va xem Booking cua toi
-4. Customer upload avatar va sua profile
-5. Customer chat voi Owner
-6. Customer chat AI
-7. Customer report review
-8. Owner quan ly hotel, anh hotel, room, room type/time slot
-9. Owner dashboard/revenue/top rooms/peak hours/upcoming/revenue summary
-10. Admin quan ly user, hotel, coupon, role, permission, province, ward, system config
-11. Admin/Owner xu ly review va booking
-12. Upload anh len MinIO hien dung URL public
-```
-
-## 15. Loi Thuong Gap
-
-### Docker daemon khong chay
-
-Loi thuong gap:
-
-```text
-failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine
-```
-
-Cach sua:
-
-```text
-Mo Docker Desktop
-Doi Docker Engine chay xong
-Chay lai docker compose ps
-```
-
-### Backend khong ket noi SQL Server
-
-Kiem tra:
-
-```text
-SQL Server dang Running
-TCP/IP enabled
-Port 1433 dang mo
-Database ten DoAnHotelParkingDb
-User sa dang enabled
-Password dung voi .env
-SPRING_DATASOURCE_URL dung host.docker.internal khi backend chay trong Docker
-```
-
-### SQL Server Docker khong khoi dong
-
-Neu dung profile `full-db`, password SA phai manh:
-
-```text
-It nhat 8 ky tu, co chu hoa, chu thuong, so va ky tu dac biet
-```
-
-Vi du:
-
-```env
-MSSQL_SA_PASSWORD=YourStrong!Passw0rd
-SPRING_DATASOURCE_PASSWORD=YourStrong!Passw0rd
-```
-
-### Frontend khong goi duoc API
-
-Kiem tra `PUBLIC_API_BASE_URL` trong `.env` truoc khi build:
-
-```env
-PUBLIC_API_BASE_URL=http://localhost:8080/api
-```
-
-Neu da build voi URL sai, can build lai:
-
-```powershell
-docker compose build customer-web admin-web
-docker compose up -d customer-web admin-web
-```
-
-### Anh upload khong hien
-
-Kiem tra MinIO public URL:
-
-```env
-APP_MINIO_PUBLIC_BASE_URL=http://localhost:9100
-```
-
-Kiem tra bucket va health:
-
-```powershell
-Invoke-WebRequest http://localhost:9100/minio/health/live -UseBasicParsing
-```
-
-### Chat AI loi timeout hoac khong tra loi
-
-Kiem tra:
-
-```text
-Container ai-agent dang Up
-GROQ_API_KEY da cau hinh
-Backend goi duoc http://ai-agent:8000 trong Docker
-/api/ai-chat/health tra ve OK
-```
-
-Lenh xem log:
-
-```powershell
-docker compose logs -f ai-agent
-docker compose logs -f backend
-```
-
-### Google login khong hoat dong
-
-Neu chay local:
-
-```text
-Authorized JavaScript origins can co http://localhost:8081
-```
-
 Neu deploy len domain:
 
 ```text
 Authorized JavaScript origins can co domain production
 PUBLIC_API_BASE_URL can la URL production
 GOOGLE_CLIENT_ID dung voi Google Cloud project
-```
-
-### VNPay return sai URL
-
-Kiem tra:
-
-```env
-VNPAY_RETURN_URL=http://localhost:8080/api/payments/vnpay-return
 ```
 
 Deploy production thi doi thanh domain that.
@@ -685,24 +554,4 @@ docker compose up -d customer-web
 docker compose down
 ```
 
-## 17. Ghi Chu Bao Mat
 
-Khong commit cac file secret len GitHub:
-
-```text
-.env
-AIAgent\.env
-Firebase service account JSON that
-```
-
-Khi deploy that, can doi cac gia tri:
-
-```text
-APP_JWT_SECRET_KEY
-GROQ_API_KEY
-VNPAY_TMN_CODE
-VNPAY_HASH_SECRET
-MAIL_USERNAME
-MAIL_PASSWORD
-GOOGLE_CLIENT_ID neu dung project rieng
-```
