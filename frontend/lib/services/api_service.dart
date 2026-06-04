@@ -227,6 +227,42 @@ class ApiService {
     return _setSession(data);
   }
 
+  Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    final data = await _post(
+      '/auth/forgot-password',
+      body: {'email': email.trim()},
+    );
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid forgot password response.');
+    }
+    return {
+      'message': _stringValue(data['message']) ?? '',
+      'token': _stringValue(data['token']),
+      'expiresAt': _dateTimeValue(data['expiresAt']),
+      'backend': data,
+    };
+  }
+
+  Future<Map<String, dynamic>> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    final data = await _post(
+      '/auth/reset-password',
+      body: {
+        'token': token.trim(),
+        'newPassword': newPassword,
+      },
+    );
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid reset password response.');
+    }
+    return {
+      'message': _stringValue(data['message']) ?? '',
+      'backend': data,
+    };
+  }
+
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -289,6 +325,15 @@ class ApiService {
     return _listFromData(data).map(_mapChatMessage).toList();
   }
 
+  Future<List<Map<String, dynamic>>> fetchUnreadChatMessages() async {
+    final data = await _get('/messages/unread');
+    return _listFromData(data).map(_mapChatMessage).toList();
+  }
+
+  Future<void> hideChatConversation(int otherUserId) async {
+    await _delete('/messages/conversation/$otherUserId');
+  }
+
   Future<Map<String, dynamic>> sendChatMessage({
     required int receiverId,
     required String content,
@@ -335,6 +380,56 @@ class ApiService {
       throw const ApiException('FCM token cannot be empty.');
     }
     await _post('/users/fcm-token', body: {'token': trimmed});
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAiChatThreads() async {
+    final data = await _get('/ai-chat/threads');
+    return _listFromData(data).map((thread) {
+      final threadId = _stringValue(thread['threadId']) ??
+          _stringValue(thread['thread_id']) ??
+          _stringValue(thread['id']) ??
+          '';
+      return {
+        ...thread,
+        'threadId': threadId,
+        'title': _stringValue(thread['title']) ?? 'AI thread',
+        'createdAt': thread['createdAt'] ?? thread['created_at'],
+      };
+    }).where((thread) =>
+        (thread['threadId']?.toString().trim().isNotEmpty ?? false)).toList();
+  }
+
+  Future<Map<String, dynamic>> fetchAiChatThread(String threadId) async {
+    final data = await _get('/ai-chat/threads/${Uri.encodeComponent(threadId)}');
+    if (data is Map<String, dynamic>) return data;
+    throw const ApiException('Invalid AI thread response.');
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAiChatThreadMessages(
+    String threadId,
+  ) async {
+    final data = await _get('/ai-chat/threads/${Uri.encodeComponent(threadId)}/messages');
+    return _listFromData(data).map((message) {
+      final role = (_stringValue(message['role']) ??
+              _stringValue(message['sender']) ??
+              _stringValue(message['type']) ??
+              '')
+          .toLowerCase();
+      final content = _stringValue(message['content']) ??
+          _stringValue(message['message']) ??
+          _stringValue(message['text']) ??
+          '';
+      return {
+        ...message,
+        'role': role,
+        'content': content,
+        'createdAt': message['createdAt'] ?? message['created_at'],
+      };
+    }).where((message) => (message['content']?.toString().trim().isNotEmpty ?? false)).toList();
+  }
+
+  Future<void> deleteAiChatThread(String threadId) async {
+    await _delete('/ai-chat/threads/${Uri.encodeComponent(threadId)}');
   }
 
   Future<Map<String, dynamic>> sendAiChatMessage({
@@ -416,6 +511,18 @@ class ApiService {
     };
   }
 
+  Future<List<Map<String, dynamic>>> fetchProvinces() async {
+    final data = await _get('/provinces');
+    return _listFromData(data);
+  }
+
+  Future<List<Map<String, dynamic>>> fetchWards({int? provinceId}) async {
+    final data = await _get('/wards', queryParameters: {
+      if (provinceId != null) 'provinceId': provinceId,
+    });
+    return _listFromData(data);
+  }
+
   Future<List<Map<String, dynamic>>> fetchHotels({
     String? keyword,
     int pageIndex = 1,
@@ -438,12 +545,51 @@ class ApiService {
     return _listFromData(data).map(_mapHotel).toList();
   }
 
+  Future<List<Map<String, dynamic>>> fetchHotelsByProvince(
+    int provinceId, {
+    int pageIndex = 1,
+    int pageSize = 100,
+  }) async {
+    final data = await _get('/hotels/by-province', queryParameters: {
+      'provinceId': provinceId,
+      'pageIndex': pageIndex,
+      'pageSize': pageSize,
+    });
+    return _listFromData(data).map(_mapHotel).toList();
+  }
+
   Future<Map<String, dynamic>> fetchHotel(int id) async {
     final data = await _get('/hotels/$id/with-location');
     if (data is! Map<String, dynamic>) {
       throw const ApiException('Invalid hotel response.');
     }
     return _mapHotel(data);
+  }
+
+  Future<List<Map<String, dynamic>>> fetchNewUserRecommendations({
+    int topK = 6,
+    String? province,
+    String? ward,
+  }) async {
+    final data = await _get('/recommendations/new-user', queryParameters: {
+      if (province != null && province.trim().isNotEmpty) 'province': province.trim(),
+      if (ward != null && ward.trim().isNotEmpty) 'ward': ward.trim(),
+      'topK': topK,
+    });
+    return _recommendationHotels(data);
+  }
+
+  Future<List<Map<String, dynamic>>> fetchPersonalizedRecommendations({
+    required int userId,
+    int topK = 6,
+    String? province,
+  }) async {
+    final data = await _get('/recommendations/personalized', queryParameters: {
+      'userId': userId,
+      if (province != null && province.trim().isNotEmpty) 'province': province.trim(),
+      'topK': topK,
+    });
+    return _recommendationHotels(data);
   }
 
   Future<List<Map<String, dynamic>>> fetchSmartRecommendations({
@@ -509,6 +655,24 @@ class ApiService {
     return data;
   }
 
+  Future<Map<String, dynamic>> reportReview({
+    required int reviewId,
+    required String reason,
+  }) async {
+    final trimmedReason = reason.trim();
+    if (trimmedReason.isEmpty) {
+      throw const ApiException('Reason cannot be empty.');
+    }
+    final data = await _post(
+      '/reviews/$reviewId/report',
+      body: {'reason': trimmedReason},
+    );
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Invalid review report response.');
+    }
+    return data;
+  }
+
   Future<Map<String, dynamic>> createHotel({
     required String name,
     required String street,
@@ -560,6 +724,22 @@ class ApiService {
 
   Future<void> deleteHotel(int id) async {
     await _delete('/hotels/$id');
+  }
+
+  Future<List<Map<String, dynamic>>> fetchRoomTypesByHotel(int hotelId) async {
+    final data = await _get('/room-types/by-hotel', queryParameters: {
+      'hotelId': hotelId,
+    });
+    return _listFromData(data);
+  }
+
+  Future<List<Map<String, dynamic>>> fetchRoomsByRoomType(
+    int roomTypeId,
+  ) async {
+    final data = await _get('/rooms/by-room-type', queryParameters: {
+      'roomTypeId': roomTypeId,
+    });
+    return _listFromData(data).map(_mapRoom).toList();
   }
 
   Future<List<Map<String, dynamic>>> fetchRoomsByHotel(int hotelId) async {

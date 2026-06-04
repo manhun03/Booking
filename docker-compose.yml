@@ -1,0 +1,122 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    image: staysmart/backend:latest
+    container_name: staysmart-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    environment:
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:sqlserver://host.docker.internal:1433;databaseName=DoAnHotelParkingDb;encrypt=true;trustServerCertificate=true}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-sa}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-123456}
+      AI_AGENT_BASE_URL: ${AI_AGENT_BASE_URL:-http://ai-agent:8000}
+      APP_MINIO_ENDPOINT: ${APP_MINIO_ENDPOINT:-http://minio:9000}
+      APP_MINIO_PUBLIC_BASE_URL: ${APP_MINIO_PUBLIC_BASE_URL:-http://localhost:9100}
+      APP_MINIO_ACCESS_KEY: ${APP_MINIO_ACCESS_KEY:-minioadmin}
+      APP_MINIO_SECRET_KEY: ${APP_MINIO_SECRET_KEY:-minioadmin}
+      APP_MINIO_BUCKET_NAME: ${APP_MINIO_BUCKET_NAME:-hotel-images}
+      APP_JWT_SECRET_KEY: ${APP_JWT_SECRET_KEY:-DoAn.HotelParking.Super.Secret.Key.2026}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-883824205385-182f65ondho5qnima9ladd5j7qk2b40h.apps.googleusercontent.com}
+      VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-http://localhost:8080/api/payments/vnpay-return}
+      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MINIO_HEALTH_ENABLED: ${MINIO_HEALTH_ENABLED:-false}
+      FIREBASE_HEALTH_ENABLED: ${FIREBASE_HEALTH_ENABLED:-false}
+      MAIL_HEALTH_ENABLED: ${MAIL_HEALTH_ENABLED:-false}
+    volumes:
+      - backend_uploads:/app/uploads
+      - ./backend/firebase:/app/firebase:ro
+    depends_on:
+      - ai-agent
+      - minio
+
+  ai-agent:
+    build:
+      context: ./AIAgent
+    image: staysmart/ai-agent:latest
+    container_name: staysmart-ai-agent
+    env_file:
+      - ./AIAgent/.env
+    restart: unless-stopped
+    ports:
+      - "${AI_AGENT_PORT:-8000}:8000"
+    environment:
+      AUTH_API_BASE_URL: ${AUTH_API_BASE_URL:-http://backend:8080/api/auth}
+      TRAVEL_API_BASE_URL: ${TRAVEL_API_BASE_URL:-http://backend:8080/api}
+      CHAT_DB_PATH: ${CHAT_DB_PATH:-/app/data/memory.db}
+    volumes:
+      - ai_memory:/app/data
+
+  customer-web:
+    build:
+      context: ./frontend
+      args:
+        API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8080/api}
+        GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-883824205385-182f65ondho5qnima9ladd5j7qk2b40h.apps.googleusercontent.com}
+    image: staysmart/customer-web:latest
+    container_name: staysmart-customer-web
+    restart: unless-stopped
+    ports:
+      - "${CUSTOMER_WEB_PORT:-8081}:80"
+    depends_on:
+      - backend
+
+  admin-web:
+    build:
+      context: ./frontend_employee
+      args:
+        API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8080/api}
+    image: staysmart/admin-web:latest
+    container_name: staysmart-admin-web
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_WEB_PORT:-8082}:80"
+    depends_on:
+      - backend
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: staysmart-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_API_PORT:-9100}:9000"
+      - "${MINIO_CONSOLE_PORT:-9101}:9001"
+    environment:
+      MINIO_ROOT_USER: ${APP_MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${APP_MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: staysmart-sqlserver
+    profiles:
+      - full-db
+    restart: unless-stopped
+    ports:
+      - "${SQLSERVER_PORT:-1433}:1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-YourStrong!Passw0rd}
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+
+volumes:
+  backend_uploads:
+  ai_memory:
+  minio_data:
+  sqlserver_data:
+
+
+
+
+
+

@@ -93,6 +93,25 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
     if (result == true) await _loadUsers();
   }
 
+  Future<void> _deleteUser(JsonMap user) async {
+    final id = intValue(user['id']);
+    if (id <= 0) return;
+    final confirmed = await _confirmAction(
+      context,
+      title: 'Xoa nguoi dung',
+      message: 'Xoa nguoi dung ${textValue(user['email'], user['id']?.toString() ?? '')}?',
+    );
+    if (confirmed != true) return;
+    try {
+      await _api.deleteUser(id);
+      if (!mounted) return;
+      _showSnack(context, 'Da xoa nguoi dung.');
+      await _loadUsers();
+    } on ApiException catch (error) {
+      if (mounted) _showSnack(context, error.message, isError: true);
+    }
+  }
+
   List<JsonMap> get _filteredUsers {
     final query = _query.trim().toLowerCase();
     if (query.isEmpty) return _users;
@@ -251,6 +270,14 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                   icon: Icon(inactive ? Icons.lock_open : Icons.lock_outline),
                   label: Text(inactive ? 'Mo khoa' : 'Khoa'),
                 ),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.redAccent,
+                  ),
+                  onPressed: () => _deleteUser(user),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Xoa'),
+                ),
               ],
             ),
           ],
@@ -274,6 +301,8 @@ class _AdminRolePermissionScreenState extends State<AdminRolePermissionScreen> {
 
   List<JsonMap> _roles = const [];
   List<JsonMap> _permissions = const [];
+  List<String> _modules = const [];
+  String? _selectedModule;
   bool _isLoading = true;
   String? _errorMessage;
   String _query = '';
@@ -297,14 +326,16 @@ class _AdminRolePermissionScreenState extends State<AdminRolePermissionScreen> {
     });
 
     try {
-      final results = await Future.wait([
-        _api.fetchRoles(),
-        _api.fetchPermissions(),
-      ]);
+      final roles = await _api.fetchRoles();
+      final modules = await _api.fetchPermissionModules();
+      final permissions = _selectedModule == null
+          ? await _api.fetchPermissions()
+          : await _api.fetchPermissionsByModule(_selectedModule!);
       if (!mounted) return;
       setState(() {
-        _roles = results[0];
-        _permissions = results[1];
+        _roles = roles;
+        _modules = modules;
+        _permissions = permissions;
         _isLoading = false;
       });
     } on ApiException catch (error) {
@@ -336,6 +367,31 @@ class _AdminRolePermissionScreenState extends State<AdminRolePermissionScreen> {
         .toList();
   }
 
+  Future<void> _selectModule(String? module) async {
+    setState(() {
+      _selectedModule = module;
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final permissions = module == null
+          ? await _api.fetchPermissions()
+          : await _api.fetchPermissionsByModule(module);
+      if (!mounted) return;
+      setState(() {
+        _permissions = permissions;
+        _isLoading = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.message;
+        _isLoading = false;
+      });
+    }
+  }
+
   Map<String, List<JsonMap>> get _permissionsByModule {
     final grouped = <String, List<JsonMap>>{};
     for (final permission in _filteredPermissions) {
@@ -345,11 +401,98 @@ class _AdminRolePermissionScreenState extends State<AdminRolePermissionScreen> {
     return grouped;
   }
 
+  Future<void> _editRole({JsonMap? role}) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => _RoleDialog(role: role),
+    );
+    if (result == true) await _loadData();
+  }
+
+  Future<void> _deleteRole(JsonMap role) async {
+    final id = intValue(role['id']);
+    if (id <= 0) return;
+    final confirmed = await _confirmDelete(
+      title: 'Xoa role',
+      message: 'Xoa role ${textValue(role['name'])}?',
+    );
+    if (confirmed != true) return;
+    try {
+      await _api.deleteRole(id);
+      if (!mounted) return;
+      _showSnack(context, 'Da xoa role.');
+      await _loadData();
+    } on ApiException catch (error) {
+      if (mounted) _showSnack(context, error.message, isError: true);
+    }
+  }
+
+  Future<void> _editPermission({JsonMap? permission}) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => _PermissionDialog(permission: permission),
+    );
+    if (result == true) await _loadData();
+  }
+
+  Future<void> _deletePermission(JsonMap permission) async {
+    final id = intValue(permission['id']);
+    if (id <= 0) return;
+    final confirmed = await _confirmDelete(
+      title: 'Xoa permission',
+      message: 'Xoa permission ${textValue(permission['permissionKey'])}?',
+    );
+    if (confirmed != true) return;
+    try {
+      await _api.deletePermission(id);
+      if (!mounted) return;
+      _showSnack(context, 'Da xoa permission.');
+      await _loadData();
+    } on ApiException catch (error) {
+      if (mounted) _showSnack(context, error.message, isError: true);
+    }
+  }
+
+  Future<bool?> _confirmDelete({
+    required String title,
+    required String message,
+  }) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Huy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Xoa'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return _AdminPageScaffold(
       title: 'Vai tro va phan quyen',
       onRefresh: _loadData,
+      actions: [
+        IconButton(
+          tooltip: 'Them role',
+          onPressed: () => _editRole(),
+          icon: const Icon(Icons.admin_panel_settings_outlined),
+        ),
+        IconButton(
+          tooltip: 'Them permission',
+          onPressed: () => _editPermission(),
+          icon: const Icon(Icons.key_outlined),
+        ),
+      ],
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
@@ -373,6 +516,8 @@ class _AdminRolePermissionScreenState extends State<AdminRolePermissionScreen> {
                     message:
                         'Frontend doc role/permission tu backend. API quan trong da duoc bao ve bang @PreAuthorize va permission key.',
                   ),
+                  const SizedBox(height: 16),
+                  _moduleFilter(),
                   const SizedBox(height: 16),
                   _SectionCard(
                     title: 'Danh sach vai tro',
@@ -414,6 +559,30 @@ class _AdminRolePermissionScreenState extends State<AdminRolePermissionScreen> {
     );
   }
 
+  Widget _moduleFilter() {
+    return _SectionCard(
+      title: 'Loc permission theo module',
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          ChoiceChip(
+            label: const Text('Tat ca'),
+            selected: _selectedModule == null,
+            onSelected: (_) => _selectModule(null),
+          ),
+          ..._modules.map(
+            (module) => ChoiceChip(
+              label: Text(module),
+              selected: _selectedModule == module,
+              onSelected: (_) => _selectModule(module),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _roleTile(JsonMap role) {
     final active = role['active'] == true;
     return ListTile(
@@ -427,9 +596,24 @@ class _AdminRolePermissionScreenState extends State<AdminRolePermissionScreen> {
         style: const TextStyle(fontWeight: FontWeight.w700),
       ),
       subtitle: Text(textValue(role['description'], 'Khong co mo ta')),
-      trailing: _StatusBadge(
-        label: active ? 'ACTIVE' : 'INACTIVE',
-        color: active ? Colors.green : Colors.grey,
+      trailing: Wrap(
+        spacing: 4,
+        children: [
+          _StatusBadge(
+            label: active ? 'ACTIVE' : 'INACTIVE',
+            color: active ? Colors.green : Colors.grey,
+          ),
+          IconButton(
+            tooltip: 'Sua',
+            onPressed: () => _editRole(role: role),
+            icon: const Icon(Icons.edit_outlined),
+          ),
+          IconButton(
+            tooltip: 'Xoa',
+            onPressed: () => _deleteRole(role),
+            icon: const Icon(Icons.delete_outline, color: Colors.red),
+          ),
+        ],
       ),
     );
   }
@@ -441,6 +625,251 @@ class _AdminRolePermissionScreenState extends State<AdminRolePermissionScreen> {
       leading: const Icon(Icons.key_outlined, size: 18),
       title: Text(textValue(permission['permissionKey'])),
       subtitle: Text(textValue(permission['description'], 'Khong co mo ta')),
+      trailing: Wrap(
+        spacing: 4,
+        children: [
+          IconButton(
+            tooltip: 'Sua',
+            onPressed: () => _editPermission(permission: permission),
+            icon: const Icon(Icons.edit_outlined),
+          ),
+          IconButton(
+            tooltip: 'Xoa',
+            onPressed: () => _deletePermission(permission),
+            icon: const Icon(Icons.delete_outline, color: Colors.red),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleDialog extends StatefulWidget {
+  const _RoleDialog({this.role});
+
+  final JsonMap? role;
+
+  @override
+  State<_RoleDialog> createState() => _RoleDialogState();
+}
+
+class _RoleDialogState extends State<_RoleDialog> {
+  final _api = AdminApiService();
+  late final TextEditingController _name;
+  late final TextEditingController _description;
+  bool _active = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: textValue(widget.role?['name']));
+    _description = TextEditingController(
+      text: textValue(widget.role?['description']),
+    );
+    _active = widget.role?['active'] != false;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_name.text.trim().isEmpty) {
+      setState(() => _error = 'Vui long nhap ten role.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final body = {
+      'name': _name.text.trim(),
+      'description': _description.text.trim(),
+      'active': _active,
+    };
+    try {
+      final id = intValue(widget.role?['id']);
+      if (id <= 0) {
+        await _api.createRole(body);
+      } else {
+        await _api.updateRole(id, body);
+      }
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.message;
+        _saving = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.role == null ? 'Them role' : 'Cap nhat role'),
+      content: SizedBox(
+        width: 460,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_error != null) ...[
+              Text(_error!, style: const TextStyle(color: Colors.red)),
+              const SizedBox(height: 10),
+            ],
+            TextField(
+              controller: _name,
+              decoration: const InputDecoration(labelText: 'Ten role'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _description,
+              decoration: const InputDecoration(labelText: 'Mo ta'),
+              maxLines: 3,
+            ),
+            SwitchListTile(
+              value: _active,
+              onChanged: (value) => setState(() => _active = value),
+              title: const Text('Dang kich hoat'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context, false),
+          child: const Text('Huy'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: const Text('Luu'),
+        ),
+      ],
+    );
+  }
+}
+
+class _PermissionDialog extends StatefulWidget {
+  const _PermissionDialog({this.permission});
+
+  final JsonMap? permission;
+
+  @override
+  State<_PermissionDialog> createState() => _PermissionDialogState();
+}
+
+class _PermissionDialogState extends State<_PermissionDialog> {
+  final _api = AdminApiService();
+  late final TextEditingController _permissionKey;
+  late final TextEditingController _description;
+  late final TextEditingController _module;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _permissionKey = TextEditingController(
+      text: textValue(widget.permission?['permissionKey']),
+    );
+    _description = TextEditingController(
+      text: textValue(widget.permission?['description']),
+    );
+    _module = TextEditingController(
+      text: textValue(widget.permission?['module']),
+    );
+  }
+
+  @override
+  void dispose() {
+    _permissionKey.dispose();
+    _description.dispose();
+    _module.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_permissionKey.text.trim().isEmpty || _module.text.trim().isEmpty) {
+      setState(() => _error = 'Vui long nhap permission key va module.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final body = {
+      'permissionKey': _permissionKey.text.trim(),
+      'description': _description.text.trim(),
+      'module': _module.text.trim(),
+    };
+    try {
+      final id = intValue(widget.permission?['id']);
+      if (id <= 0) {
+        await _api.createPermission(body);
+      } else {
+        await _api.updatePermission(id, body);
+      }
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.message;
+        _saving = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        widget.permission == null ? 'Them permission' : 'Cap nhat permission',
+      ),
+      content: SizedBox(
+        width: 500,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_error != null) ...[
+              Text(_error!, style: const TextStyle(color: Colors.red)),
+              const SizedBox(height: 10),
+            ],
+            TextField(
+              controller: _permissionKey,
+              decoration: const InputDecoration(labelText: 'Permission key'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _module,
+              decoration: const InputDecoration(labelText: 'Module'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _description,
+              decoration: const InputDecoration(labelText: 'Mo ta'),
+              maxLines: 3,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context, false),
+          child: const Text('Huy'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: const Text('Luu'),
+        ),
+      ],
     );
   }
 }
@@ -518,6 +947,25 @@ class _AdminHotelManagementScreenState
     } on ApiException catch (error) {
       if (!mounted) return;
       _showSnack(context, error.message, isError: true);
+    }
+  }
+
+  Future<void> _deleteHotel(JsonMap hotel) async {
+    final id = intValue(hotel['id']);
+    if (id <= 0) return;
+    final confirmed = await _confirmAction(
+      context,
+      title: 'Xoa khach san',
+      message: 'Xoa khach san ${textValue(hotel['name'], '#$id')}?',
+    );
+    if (confirmed != true) return;
+    try {
+      await _api.deleteHotel(id);
+      if (!mounted) return;
+      _showSnack(context, 'Da xoa khach san.');
+      await _loadHotels();
+    } on ApiException catch (error) {
+      if (mounted) _showSnack(context, error.message, isError: true);
     }
   }
 
@@ -671,6 +1119,14 @@ class _AdminHotelManagementScreenState
                   ),
                   icon: Icon(locked ? Icons.lock_open : Icons.lock_outline),
                   label: Text(locked ? 'Mo khoa' : 'Khoa'),
+                ),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.redAccent,
+                  ),
+                  onPressed: () => _deleteHotel(hotel),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Xoa'),
                 ),
               ],
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/language_service.dart';
 import '../utils/colors.dart';
 import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
@@ -13,6 +14,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final LanguageService _language = LanguageService();
   int _selectedIndex = 0;
 
   late List<Map<String, dynamic>> destinations;
@@ -103,8 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       desktopBody: WebAppShell(
         title: 'StaySmart',
-        subtitle:
-            'Tìm khách sạn phù hợp, theo dõi ưu đãi và mở nhanh các điểm đến đang được quan tâm.',
+        subtitle: _language.t('home.subtitle'),
         selectedIndex: 0,
         child: _buildDesktopContent(context),
       ),
@@ -237,9 +238,9 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Đặt phòng dễ dàng cho chuyến đi tiếp theo',
-                style: TextStyle(
+              Text(
+                _language.t('home.heroTitle'),
+                style: const TextStyle(
                   fontSize: 28,
                   height: 1.14,
                   fontWeight: FontWeight.w800,
@@ -247,9 +248,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'So sánh điểm đến, lưu ưu đãi và quản lý đặt phòng trong một giao diện thống nhất trên web và mobile.',
-                style: TextStyle(
+              Text(
+                _language.t('home.heroSubtitle'),
+                style: const TextStyle(
                   fontSize: 14,
                   height: 1.45,
                   color: AppColors.textSecondary,
@@ -268,9 +269,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                   ),
-                  child: const Text(
-                    'Tìm khách sạn',
-                    style: TextStyle(
+                  child: Text(
+                    _language.t('home.searchButton'),
+                    style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
                     ),
@@ -307,9 +308,9 @@ class _HomeScreenState extends State<HomeScreen> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Bạn muốn đi đâu?',
-                  style: TextStyle(
+                Text(
+                  _language.t('home.searchTitle'),
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
@@ -374,7 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: _buildStatCard(
             icon: Icons.hotel_outlined,
             value: '${destinations.length}',
-            label: 'điểm đến',
+            label: _language.t('home.destinationStat'),
           ),
         ),
         const SizedBox(width: 14),
@@ -382,7 +383,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: _buildStatCard(
             icon: Icons.local_offer_outlined,
             value: '${festivals.length}',
-            label: 'ưu đãi',
+            label: _language.t('home.offerStat'),
           ),
         ),
       ],
@@ -430,18 +431,18 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Column(
         children: [
-          const Text(
-            'Vòng quanh thế giới',
-            style: TextStyle(
+          Text(
+            _language.t('home.mobileRecommendationsTitle'),
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Các điểm đến du lịch hấp dẫn',
-            style: TextStyle(
+          Text(
+            _language.t('home.mobileDestinationsSubtitle'),
+            style: const TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,
             ),
@@ -476,19 +477,19 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       child: Column(
         children: [
-          const Text(
-            'Goi y cho ban',
-            style: TextStyle(
+          Text(
+            _language.t('home.mobileRecommendationsTitle'),
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Khach san duoc de xuat tu lich su va do pho bien',
+          Text(
+            _language.t('home.mobileRecommendationsSubtitle'),
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
           SingleChildScrollView(
@@ -521,9 +522,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Điểm đến nổi bật',
-          style: TextStyle(
+        Text(
+          _language.t('home.destinationsTitle'),
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
@@ -555,9 +556,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Goi y phu hop',
-          style: TextStyle(
+        Text(
+          _language.t('home.recommendationsTitle'),
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
@@ -688,9 +689,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Ưu đãi và sự kiện',
-          style: TextStyle(
+        Text(
+          _language.t('home.eventsTitle'),
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
@@ -814,31 +815,7 @@ class _HomeScreenState extends State<HomeScreen> {
           fontWeight: FontWeight.w600,
         ),
         unselectedLabelStyle: const TextStyle(fontSize: 10),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.group_outlined),
-            activeIcon: Icon(Icons.group),
-            label: 'Message',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_box_outlined),
-            activeIcon: Icon(Icons.add_box),
-            label: 'Booking',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu),
-            label: 'Menu',
-          ),
-        ],
+        items: customerBottomNavigationItems(),
       ),
     );
   }

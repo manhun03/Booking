@@ -71,9 +71,24 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
     try {
       final conversations = await _api.fetchConversations();
+      var unreadMessages = <Map<String, dynamic>>[];
+      try {
+        unreadMessages = await _api.fetchUnreadMessages();
+      } catch (_) {
+        unreadMessages = const [];
+      }
+      final unreadByUser = _unreadByOtherUser(unreadMessages);
+      final merged = conversations.map((conversation) {
+        final userId = intValue(conversation['userId'] ?? conversation['id']);
+        return {
+          ...conversation,
+          'unreadCount':
+              unreadByUser[userId] ?? intValue(conversation['unreadCount']),
+        };
+      }).toList();
       if (!mounted) return;
       setState(() {
-        _conversations = conversations;
+        _conversations = merged;
         _loading = false;
         _error = null;
       });
@@ -89,6 +104,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
   Future<void> _open(Map<String, dynamic> conversation) async {
     await Navigator.pushNamed(context, '/chat-detail', arguments: conversation);
     if (mounted) _load();
+  }
+
+  Map<int, int> _unreadByOtherUser(List<Map<String, dynamic>> messages) {
+    final currentUserId = AuthService().currentSession?.userId;
+    final counts = <int, int>{};
+    for (final message in messages) {
+      final senderId = intValue(message['senderId']);
+      final receiverId = intValue(message['receiverId']);
+      final otherUserId = senderId == currentUserId ? receiverId : senderId;
+      if (otherUserId <= 0) continue;
+      counts[otherUserId] = (counts[otherUserId] ?? 0) + 1;
+    }
+    return counts;
   }
 
   @override

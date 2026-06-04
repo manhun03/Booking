@@ -12,10 +12,22 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Intege
             join fetch m.sender
             join fetch m.receiver
             left join fetch m.booking
-            where m.sender.id = :userId or m.receiver.id = :userId
+            where (m.sender.id = :userId and m.senderHidden = false)
+               or (m.receiver.id = :userId and m.receiverHidden = false)
             order by m.createdAt desc
             """)
     List<ChatMessage> inboxMessages(Integer userId);
+
+    @Query("""
+            select m from ChatMessage m
+            join fetch m.sender
+            join fetch m.receiver
+            left join fetch m.booking
+            where (m.sender.id = :userId and m.receiver.id = :otherUserId and m.senderHidden = false)
+               or (m.sender.id = :otherUserId and m.receiver.id = :userId and m.receiverHidden = false)
+            order by m.createdAt asc
+            """)
+    List<ChatMessage> conversation(Integer userId, Integer otherUserId);
 
     @Query("""
             select m from ChatMessage m
@@ -26,6 +38,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Intege
                or (m.sender.id = :otherUserId and m.receiver.id = :userId)
             order by m.createdAt asc
             """)
-    List<ChatMessage> conversation(Integer userId, Integer otherUserId);
-    List<ChatMessage> findByReceiverIdAndReadFalseOrderByCreatedAtDesc(Integer receiverId);
+    List<ChatMessage> conversationIncludingHidden(Integer userId, Integer otherUserId);
+
+    List<ChatMessage> findByReceiverIdAndReadFalseAndReceiverHiddenFalseOrderByCreatedAtDesc(Integer receiverId);
 }

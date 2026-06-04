@@ -1,76 +1,103 @@
-# Huong Dan Chay Du An StaySmart
+# HUONG DAN CAI DAT, DONG GOI VA CHAY DU AN STAYSMART
 
-Tai lieu nay dung cho du an tai:
+Tai lieu nay dung cho du an sau khi da doi ten thu muc:
 
 ```text
 F:\Aptech\Project4\HotelBooking
 ```
 
-Du an gom 4 phan chinh:
+Cau truc chinh:
 
 ```text
-backend            Backend Spring Boot
-frontend            Ung dung khach hang Flutter
-frontend_employee   Ung dung nhan vien/admin Flutter
-AIAgent             Dich vu Chat AI FastAPI
+backend             Backend Spring Boot, chay local bang mvnd
+frontend            Web khach hang Flutter
+frontend_employee   Web Admin/Owner/Employee Flutter
+AIAgent             Chat AI FastAPI
+docker-compose.yml  Dong goi va chay toan bo he thong bang Docker
 ```
 
-Thu tu chay khuyen nghi:
+Cac URL mac dinh sau khi deploy Docker:
 
 ```text
-SQL Server -> MinIO -> Backend -> AIAgent -> Frontend
+Backend API:        http://localhost:8080/api
+Swagger Backend:    http://localhost:8080/swagger-ui/index.html
+Customer Web:       http://localhost:8081
+Admin/Owner Web:    http://localhost:8082
+AI Agent API:       http://localhost:8000
+AI Agent Swagger:   http://localhost:8000/docs
+MinIO API:          http://localhost:9100
+MinIO Console:      http://localhost:9101
 ```
 
 ## 1. Phan Mem Can Cai
 
-Can cai truoc cac phan mem sau:
+Can cai cac phan mem sau:
 
 ```text
+Docker Desktop
+Git
 Java 17
 Maven Daemon mvnd
 Flutter SDK
 Chrome
 SQL Server / SQL Server Express
 SQL Server Management Studio
-Docker Desktop
 Python 3.12
-Git
+```
+
+Neu chi chay ban da deploy bang Docker, bat buoc can:
+
+```text
+Docker Desktop
+SQL Server neu dung database tren may host
+Git neu clone source tu GitHub
 ```
 
 Kiem tra nhanh trong PowerShell:
 
 ```powershell
+docker --version
+docker compose version
+git --version
 java -version
 mvnd -v
 flutter --version
-docker --version
 python --version
-git --version
 ```
-
-Backend cua du an chay bang `mvnd`. Neu may chua co `mvnd`, can cai Maven Daemon truoc khi chay backend.
 
 ## 2. Mo Thu Muc Du An
 
-Tat ca lenh ben duoi bat dau tu thu muc goc:
+Tat ca lenh Docker chay tu thu muc goc:
 
 ```powershell
 cd "F:\Aptech\Project4\HotelBooking"
 ```
 
-## 3. Database SQL Server
+## 3. Cau Hinh Database SQL Server
 
-Backend dang dung database:
+Mac dinh backend trong Docker ket noi toi SQL Server dang chay tren may host Windows:
 
 ```text
+Server:   host.docker.internal
+Port:     1433
 Database: DoAnHotelParkingDb
-Server: localhost
-Port: 1433
 Username: sa
 Password: 123456
 ```
 
-Mo SSMS va tao database neu chua co:
+Chuoi ket noi dung trong Docker:
+
+```text
+jdbc:sqlserver://host.docker.internal:1433;databaseName=DoAnHotelParkingDb;encrypt=true;trustServerCertificate=true
+```
+
+Khi chay backend local bang mvnd, chuoi ket noi local la:
+
+```text
+jdbc:sqlserver://localhost:1433;databaseName=DoAnHotelParkingDb;encrypt=true;trustServerCertificate=true
+```
+
+Tao database neu chua co:
 
 ```sql
 IF DB_ID('DoAnHotelParkingDb') IS NULL
@@ -79,321 +106,256 @@ BEGIN
 END
 ```
 
-Cau hinh backend nam tai:
+Yeu cau SQL Server:
 
 ```text
-F:\Aptech\Project4\HotelBooking\backend\src\main\resources\application.yml
+TCP/IP enabled
+Port 1433 dang mo
+SQL Server Authentication enabled
+User sa dang bat
+Password sa la 123456 hoac sua lai trong .env
 ```
 
-Dong ket noi can tro vao database:
+## 4. Cau Hinh File .env Cho Docker
+
+Trong thu muc goc da co file mau:
 
 ```text
-jdbc:sqlserver://localhost:1433;databaseName=DoAnHotelParkingDb;encrypt=true;trustServerCertificate=true
+.env.docker.example
 ```
 
-Neu SQL Server cua may dung user/password khac, sua trong `application.yml`.
-
-## 4. Restore Database Mau
-
-Neu database trong may chua co du lieu mau, restore file backup:
-
-```text
-F:\Aptech\Project4\HotelBooking\DoAnHotelParkingDb.bak
-```
-
-Cach restore trong SSMS:
-
-```text
-1. Mo SSMS
-2. Click phai Databases
-3. Chon Restore Database
-4. Chon Device
-5. Chon file DoAnHotelParkingDb.bak
-6. Dat ten database la DoAnHotelParkingDb
-7. Bam OK
-```
-
-## 5. Chay MinIO Luu Anh
-
-Mo Docker Desktop truoc, doi Docker chay xong.
-
-Chay container MinIO neu da ton tai:
+Tao file `.env`:
 
 ```powershell
-docker start hotelparking-minio
+Copy-Item .env.docker.example .env
 ```
 
-Neu container chua ton tai, tao moi:
+Noi dung quan trong can kiem tra trong `.env`:
+
+```env
+PUBLIC_API_BASE_URL=http://localhost:8080/api
+GOOGLE_CLIENT_ID=883824205385-182f65ondho5qnima9ladd5j7qk2b40h.apps.googleusercontent.com
+
+BACKEND_PORT=8080
+CUSTOMER_WEB_PORT=8081
+ADMIN_WEB_PORT=8082
+AI_AGENT_PORT=8000
+MINIO_API_PORT=9100
+MINIO_CONSOLE_PORT=9101
+
+SPRING_DATASOURCE_URL=jdbc:sqlserver://host.docker.internal:1433;databaseName=DoAnHotelParkingDb;encrypt=true;trustServerCertificate=true
+SPRING_DATASOURCE_USERNAME=sa
+SPRING_DATASOURCE_PASSWORD=123456
+
+AI_AGENT_BASE_URL=http://ai-agent:8000
+AUTH_API_BASE_URL=http://backend:8080/api/auth
+TRAVEL_API_BASE_URL=http://backend:8080/api
+CHAT_DB_PATH=/app/data/memory.db
+
+APP_MINIO_ENDPOINT=http://minio:9000
+APP_MINIO_PUBLIC_BASE_URL=http://localhost:9100
+APP_MINIO_ACCESS_KEY=minioadmin
+APP_MINIO_SECRET_KEY=minioadmin
+APP_MINIO_BUCKET_NAME=hotel-images
+
+APP_JWT_SECRET_KEY=change-this-secret-before-production
+GROQ_API_KEY=your-groq-api-key
+VNPAY_TMN_CODE=
+VNPAY_HASH_SECRET=
+VNPAY_RETURN_URL=http://localhost:8080/api/payments/vnpay-return
+MAIL_HOST=
+MAIL_PORT=587
+MAIL_USERNAME=
+MAIL_PASSWORD=
+```
+
+Neu deploy len server that, sua cac URL public:
+
+```env
+PUBLIC_API_BASE_URL=https://your-domain.com/api
+APP_MINIO_PUBLIC_BASE_URL=https://your-domain.com/minio
+VNPAY_RETURN_URL=https://your-domain.com/api/payments/vnpay-return
+```
+
+Sau khi doi `PUBLIC_API_BASE_URL`, phai build lai image frontend vi URL nay duoc compile vao Flutter web.
+
+## 5. Cau Hinh AIAgent
+
+Docker Compose doc file:
+
+```text
+AIAgent\.env
+```
+
+Neu chua co, tao file:
 
 ```powershell
-docker run -d --name hotelparking-minio `
-  -p 9000:9000 -p 9001:9001 `
-  -e MINIO_ROOT_USER=minioadmin `
-  -e MINIO_ROOT_PASSWORD=minioadmin `
-  quay.io/minio/minio server /data --console-address ":9001"
+Copy-Item .env.docker.example AIAgent\.env
 ```
 
-Kiem tra MinIO:
+Toi thieu can co:
 
-```text
-Console: http://localhost:9001
-API:     http://localhost:9000
-User:    minioadmin
-Pass:    minioadmin
+```env
+GROQ_API_KEY=your-groq-api-key
+AUTH_API_BASE_URL=http://backend:8080/api/auth
+TRAVEL_API_BASE_URL=http://backend:8080/api
+CHAT_DB_PATH=/app/data/memory.db
 ```
 
-Lenh kiem tra health:
+Neu thieu `GROQ_API_KEY`, Chat AI co the loi hoac khong tra loi.
+
+## 6. Dong Goi Docker Images
+
+Mo Docker Desktop va doi Docker chay xong.
+
+Build toan bo image:
 
 ```powershell
-Invoke-RestMethod http://localhost:9000/minio/health/live
-Invoke-RestMethod http://localhost:9000/minio/health/ready
+docker compose build
 ```
 
-## 6. Firebase
-
-Firebase dang dung project:
-
-```text
-hotelparking-9c7ce
-```
-
-Kiem tra trong file:
-
-```text
-F:\Aptech\Project4\HotelBooking\backend\src\main\resources\application.yml
-```
-
-Gia tri can dung:
-
-```yaml
-app:
-  firebase:
-    project-id: hotelparking-9c7ce
-```
-
-Service account JSON can dung dung project `hotelparking-9c7ce`.
-
-Khong day service account JSON len GitHub neu repo public.
-
-## 7. Chay Backend
-
-Mo PowerShell moi:
+Build rieng tung phan khi chi sua mot service:
 
 ```powershell
-cd "F:\Aptech\Project4\HotelBooking\backend"
-mvnd spring-boot:run
+docker compose build backend
+docker compose build ai-agent
+docker compose build customer-web
+docker compose build admin-web
 ```
 
-
-
-Backend mac dinh chay:
+Cac image duoc tao:
 
 ```text
-http://localhost:8080
+staysmart/backend:latest
+staysmart/ai-agent:latest
+staysmart/customer-web:latest
+staysmart/admin-web:latest
 ```
+
+## 7. Chay Du An Bang Docker
+
+Chay toan bo he thong voi SQL Server tren may host:
+
+```powershell
+docker compose up -d
+```
+
+Cac service se chay:
+
+```text
+backend
+ai-agent
+customer-web
+admin-web
+minio
+```
+
+Kiem tra container:
+
+```powershell
+docker compose ps
+```
+
+Xem log:
+
+```powershell
+docker compose logs -f backend
+docker compose logs -f ai-agent
+docker compose logs -f customer-web
+docker compose logs -f admin-web
+docker compose logs -f minio
+```
+
+Restart mot service:
+
+```powershell
+docker compose restart backend
+docker compose restart customer-web
+```
+
+Dung toan bo:
+
+```powershell
+docker compose down
+```
+
+Dung va xoa volume du lieu Docker:
+
+```powershell
+docker compose down -v
+```
+
+Chi dung `down -v` khi muon xoa du lieu MinIO, AI memory hoac SQL Server Docker.
+
+## 8. Chay SQL Server Bang Docker Neu May Khong Co SQL Server
+
+Docker Compose co service `sqlserver` trong profile `full-db`.
+
+Chay kem SQL Server Docker:
+
+```powershell
+docker compose --profile full-db up -d
+```
+
+Khi dung SQL Server Docker, sua `.env`:
+
+```env
+SPRING_DATASOURCE_URL=jdbc:sqlserver://sqlserver:1433;databaseName=DoAnHotelParkingDb;encrypt=true;trustServerCertificate=true
+SPRING_DATASOURCE_USERNAME=sa
+SPRING_DATASOURCE_PASSWORD=YourStrong!Passw0rd
+MSSQL_SA_PASSWORD=YourStrong!Passw0rd
+```
+
+Luu y: SQL Server container can password manh. Khong dung `123456` cho SQL Server Docker vi image SQL Server se tu choi khoi dong.
+
+Sau khi SQL Server container len, tao database `DoAnHotelParkingDb` bang SSMS hoac sqlcmd.
+
+## 9. Kiem Tra Sau Khi Deploy
 
 Kiem tra backend:
 
 ```powershell
-Invoke-RestMethod http://localhost:8080/actuator/health
+Invoke-WebRequest http://localhost:8080/api/hotels -UseBasicParsing
 ```
 
-Swagger:
-
-```text
-http://localhost:8080/swagger-ui/index.html
-```
-
-Build/test backend:
+Kiem tra AI agent:
 
 ```powershell
-cd "F:\Aptech\Project4\HotelBooking\backend"
-mvnd test
-mvnd package -DskipTests
+Invoke-WebRequest http://localhost:8000/health -UseBasicParsing
 ```
 
-## 8. Chay AIAgent
-
-AIAgent can file `.env` trong:
-
-```text
-F:\Aptech\Project4\HotelBooking\AIAgent\.env
-```
-
-Noi dung can co:
-
-```env
-GROQ_API_KEY=your-groq-api-key
-AUTH_API_BASE_URL=http://localhost:8080/api/auth
-TRAVEL_API_BASE_URL=http://localhost:8080/api
-```
-
-Chay AIAgent:
+Kiem tra backend proxy toi AI:
 
 ```powershell
-cd "F:\Aptech\Project4\HotelBooking\AIAgent"
-.\.venv\Scripts\python.exe -m uvicorn chat_backend:app --host 0.0.0.0 --port 8000
+Invoke-WebRequest http://localhost:8080/api/ai-chat/health -UseBasicParsing
 ```
 
-Neu muon activate venv truoc:
+Kiem tra web:
 
 ```powershell
-cd "F:\Aptech\Project4\HotelBooking\AIAgent"
-.\.venv\Scripts\activate
-uvicorn chat_backend:app --host 0.0.0.0 --port 8000
+Invoke-WebRequest http://localhost:8081 -UseBasicParsing
+Invoke-WebRequest http://localhost:8082 -UseBasicParsing
 ```
 
-Kiem tra AIAgent:
+Kiem tra MinIO:
 
 ```powershell
-Invoke-RestMethod http://localhost:8000/health
+Invoke-WebRequest http://localhost:9100/minio/health/live -UseBasicParsing
+Invoke-WebRequest http://localhost:9100/minio/health/ready -UseBasicParsing
 ```
 
-Swagger AIAgent:
+Mo trinh duyet:
 
 ```text
-http://localhost:8000/docs
+Customer Web:    http://localhost:8081
+Admin/Owner Web: http://localhost:8082
+MinIO Console:   http://localhost:9101
+Swagger:         http://localhost:8080/swagger-ui/index.html
 ```
 
-## 9. Kiem Tra Backend Noi Voi AIAgent
+## 10. Tai Khoan Test
 
-Khi backend va AIAgent deu dang chay, kiem tra proxy AI:
-
-```powershell
-Invoke-RestMethod http://localhost:8080/api/ai-chat/health
-```
-
-Neu tra ve:
-
-```json
-{"status":"ok"}
-```
-
-la backend da noi duoc voi AIAgent.
-
-Neu loi, kiem tra:
-
-```text
-Backend dang chay port 8080
-AIAgent dang chay port 8000
-AI_AGENT_BASE_URL trong backend neu co custom
-GROQ_API_KEY trong AIAgent\.env
-```
-
-## 10. Chay Frontend Khach Hang
-
-Mo PowerShell moi:
-
-```powershell
-cd "F:\Aptech\Project4\HotelBooking\frontend"
-flutter pub get
-flutter run -d chrome --web-port 8081
-```
-
-Frontend khach hang:
-
-```text
-http://localhost:8081
-```
-
-Neu man hinh trang sau khi F5, chay lai:
-
-```powershell
-flutter clean
-flutter pub get
-flutter run -d chrome --web-port 8081
-```
-
-## 11. Chay Frontend Nhan Vien/Admin
-
-Mo PowerShell moi:
-
-```powershell
-cd "F:\Aptech\Project4\HotelBooking\frontend_employee"
-flutter pub get
-flutter run -d chrome --web-port 8082
-```
-
-Frontend nhan vien/admin:
-
-```text
-http://localhost:8082
-```
-
-## 12. Test Chat AI
-
-Can chay du cac phan:
-
-```text
-SQL Server
-MinIO
-Backend port 8080
-AIAgent port 8000
-Frontend port 8081
-```
-
-Dang nhap customer:
-
-```text
-Email:    customer.demo@hotel.local
-Password: Password@123
-```
-
-Mo frontend:
-
-```text
-http://localhost:8081
-```
-
-Mo box Chat AI va nhap:
-
-```text
-Toi muon dat phong khach san
-```
-
-Neu chat thanh cong, AI se hoi them thong tin nhu dia diem, ngay o, so khach, ngan sach.
-
-Neu gap loi `422 UNPROCESSABLE_ENTITY` voi `thread_id required`, nghia la frontend dang gui sai body. API dung la:
-
-```json
-{
-  "thread_id": "id-thread",
-  "message": "Noi dung cau hoi"
-}
-```
-
-Khong dung:
-
-```json
-{
-  "threadId": "id-thread",
-  "message": "Noi dung cau hoi"
-}
-```
-
-## 13. Test Dang Nhap Google
-
-Backend Google login dung endpoint:
-
-```text
-POST http://localhost:8080/api/auth/google
-```
-
-Khi chay Flutter web voi port co dinh:
-
-```text
-http://localhost:8081
-```
-
-Trong Google Cloud Console can them Authorized JavaScript origins:
-
-```text
-http://localhost:8081
-```
-
-Neu doi port frontend, phai them port moi vao Google Cloud Console.
-
-## 14. Tai Khoan Test
+Neu database da co du lieu mau:
 
 ```text
 Admin:
@@ -409,232 +371,338 @@ customer.demo@hotel.local
 Password@123
 ```
 
-Neu dang nhap that bai, kiem tra database da restore du lieu mau chua.
+Neu dang nhap that bai, kiem tra database da co du lieu mau chua va backend log co loi migration/connection khong.
 
-## 15. Lenh Chay Tung Phan
+## 11. Cap Nhat Code Sau Khi Da Deploy Docker
 
-SQL Server:
-
-```text
-Mo SQL Server Services va dam bao SQL Server dang Running
-```
-
-MinIO:
+Sau khi sua code backend/frontend/admin/AI, chay lai:
 
 ```powershell
-docker start hotelparking-minio
+docker compose build
+docker compose up -d
 ```
 
-Backend:
+Neu chi sua Customer FE:
+
+```powershell
+docker compose build customer-web
+docker compose up -d customer-web
+```
+
+Neu chi sua Admin/Owner FE:
+
+```powershell
+docker compose build admin-web
+docker compose up -d admin-web
+```
+
+Neu chi sua Backend:
+
+```powershell
+docker compose build backend
+docker compose up -d backend
+```
+
+Neu trinh duyet van hien giao dien cu, bam:
+
+```text
+Ctrl + F5
+```
+
+hoac xoa cache site tren Chrome DevTools.
+
+## 12. Chay Local Cho Dev Khong Dung Docker
+
+Thu tu chay local:
+
+```text
+SQL Server -> MinIO -> Backend -> AIAgent -> Frontend Customer -> Frontend Admin
+```
+
+### 12.1 Backend local bang mvnd
+
+Cau hinh trong:
+
+```text
+backend\src\main\resources\application.yml
+```
+
+Dung URL local:
+
+```text
+jdbc:sqlserver://localhost:1433;databaseName=DoAnHotelParkingDb;encrypt=true;trustServerCertificate=true
+```
+
+Chay backend:
 
 ```powershell
 cd "F:\Aptech\Project4\HotelBooking\backend"
 mvnd spring-boot:run
 ```
 
-AIAgent:
+Build/test backend:
+
+```powershell
+mvnd test
+mvnd package -DskipTests
+```
+
+### 12.2 MinIO local bang Docker
+
+Neu chay local tung phan va khong dung compose:
+
+```powershell
+docker run -d --name staysmart-minio-local `
+  -p 9100:9000 -p 9101:9001 `
+  -e MINIO_ROOT_USER=minioadmin `
+  -e MINIO_ROOT_PASSWORD=minioadmin `
+  minio/minio:RELEASE.2025-04-22T22-12-26Z server /data --console-address ":9001"
+```
+
+### 12.3 AIAgent local
 
 ```powershell
 cd "F:\Aptech\Project4\HotelBooking\AIAgent"
 .\.venv\Scripts\python.exe -m uvicorn chat_backend:app --host 0.0.0.0 --port 8000
 ```
 
-Frontend khach hang:
+File `AIAgent\.env` khi chay local:
+
+```env
+GROQ_API_KEY=your-groq-api-key
+AUTH_API_BASE_URL=http://localhost:8080/api/auth
+TRAVEL_API_BASE_URL=http://localhost:8080/api
+CHAT_DB_PATH=memory.db
+```
+
+### 12.4 Customer Web local
 
 ```powershell
 cd "F:\Aptech\Project4\HotelBooking\frontend"
+flutter pub get
 flutter run -d chrome --web-port 8081
 ```
 
-Frontend nhan vien/admin:
+### 12.5 Admin/Owner Web local
 
 ```powershell
 cd "F:\Aptech\Project4\HotelBooking\frontend_employee"
+flutter pub get
 flutter run -d chrome --web-port 8082
 ```
 
-## 16. Build Va Deploy Frontend
+## 13. Build Thu Cong Frontend Neu Khong Dung Docker
 
-Khi sua code Flutter va du an da deploy, can build lai web bundle roi dua thu muc build len hosting/server.
-
-Build frontend khach hang:
+Customer FE:
 
 ```powershell
 cd "F:\Aptech\Project4\HotelBooking\frontend"
 flutter clean
 flutter pub get
-flutter build web
+flutter build web --release
 ```
 
-Thu muc can deploy:
+Thu muc output:
 
 ```text
-F:\Aptech\Project4\HotelBooking\frontend\build\web
+frontend\build\web
 ```
 
-Build frontend nhan vien/admin/owner:
+Admin/Owner FE:
 
 ```powershell
 cd "F:\Aptech\Project4\HotelBooking\frontend_employee"
 flutter clean
 flutter pub get
-flutter build web
+flutter build web --release
 ```
 
-Thu muc can deploy:
+Thu muc output:
 
 ```text
-F:\Aptech\Project4\HotelBooking\frontend_employee\build\web
+frontend_employee\build\web
 ```
 
-Sau khi deploy, neu trinh duyet van hien giao dien cu, hard refresh bang `Ctrl + Shift + R` hoac xoa cache cua site.
+## 14. Test Chuc Nang Sau Deploy
 
-## 17. Tat Du An
-
-Tat Flutter:
+Nen test nhanh cac luong sau:
 
 ```text
-Bam q trong cua so PowerShell dang chay Flutter
+1. Customer login/logout
+2. Customer xem Home/Search/Hotel Detail
+3. Customer dat phong va xem Booking cua toi
+4. Customer upload avatar va sua profile
+5. Customer chat voi Owner
+6. Customer chat AI
+7. Customer report review
+8. Owner quan ly hotel, anh hotel, room, room type/time slot
+9. Owner dashboard/revenue/top rooms/peak hours/upcoming/revenue summary
+10. Admin quan ly user, hotel, coupon, role, permission, province, ward, system config
+11. Admin/Owner xu ly review va booking
+12. Upload anh len MinIO hien dung URL public
 ```
 
-Tat backend/AIAgent:
+## 15. Loi Thuong Gap
+
+### Docker daemon khong chay
+
+Loi thuong gap:
 
 ```text
-Bam Ctrl + C trong cua so PowerShell dang chay service
+failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine
 ```
 
-Tat MinIO:
+Cach sua:
 
-```powershell
-docker stop hotelparking-minio
+```text
+Mo Docker Desktop
+Doi Docker Engine chay xong
+Chay lai docker compose ps
 ```
 
-## 18. Loi Thuong Gap
-
-### Backend khong ket noi duoc SQL Server
+### Backend khong ket noi SQL Server
 
 Kiem tra:
 
 ```text
 SQL Server dang Running
-Database ten dung la DoAnHotelParkingDb
-Port SQL Server la 1433
-User/password dung voi application.yml
+TCP/IP enabled
+Port 1433 dang mo
+Database ten DoAnHotelParkingDb
+User sa dang enabled
+Password dung voi .env
+SPRING_DATASOURCE_URL dung host.docker.internal khi backend chay trong Docker
 ```
 
-### Port 8080, 8000, 8081 hoac 8082 bi trung
+### SQL Server Docker khong khoi dong
 
-Kiem tra process dang dung port:
-
-```powershell
-Get-NetTCPConnection -LocalPort 8080 -State Listen
-Get-NetTCPConnection -LocalPort 8000 -State Listen
-Get-NetTCPConnection -LocalPort 8081 -State Listen
-Get-NetTCPConnection -LocalPort 8082 -State Listen
-```
-
-Dung process:
-
-```powershell
-$p = (Get-NetTCPConnection -LocalPort 8000 -State Listen).OwningProcess
-Stop-Process -Id $p -Force
-```
-
-Doi `8000` thanh port can tat.
-
-### AIAgent thieu GROQ_API_KEY
-
-Them vao:
+Neu dung profile `full-db`, password SA phai manh:
 
 ```text
-F:\Aptech\Project4\HotelBooking\AIAgent\.env
+It nhat 8 ky tu, co chu hoa, chu thuong, so va ky tu dac biet
 ```
 
-Gia tri:
+Vi du:
 
 ```env
-GROQ_API_KEY=your-groq-api-key
+MSSQL_SA_PASSWORD=YourStrong!Passw0rd
+SPRING_DATASOURCE_PASSWORD=YourStrong!Passw0rd
 ```
 
-Sau do restart AIAgent.
+### Frontend khong goi duoc API
 
-### Chat AI bao 422 thread_id required
+Kiem tra `PUBLIC_API_BASE_URL` trong `.env` truoc khi build:
 
-Can dam bao frontend tao thread truoc, sau do gui message voi field:
-
-```text
-thread_id
+```env
+PUBLIC_API_BASE_URL=http://localhost:8080/api
 ```
 
-Khong gui field:
-
-```text
-threadId
-```
-
-### F5 frontend bi trang trang
-
-Thu chay lai frontend:
+Neu da build voi URL sai, can build lai:
 
 ```powershell
-cd "F:\Aptech\Project4\HotelBooking\frontend"
-flutter clean
-flutter pub get
-flutter run -d chrome --web-port 8081
+docker compose build customer-web admin-web
+docker compose up -d customer-web admin-web
 ```
 
-Neu van bi trang, mo DevTools cua Chrome va xem loi Console.
+### Anh upload khong hien
 
-### MinIO khong upload duoc anh
+Kiem tra MinIO public URL:
 
-Kiem tra Docker va MinIO:
+```env
+APP_MINIO_PUBLIC_BASE_URL=http://localhost:9100
+```
+
+Kiem tra bucket va health:
 
 ```powershell
-docker ps
-Invoke-RestMethod http://localhost:9000/minio/health/live
+Invoke-WebRequest http://localhost:9100/minio/health/live -UseBasicParsing
 ```
 
-### Google login khong hoat dong
+### Chat AI loi timeout hoac khong tra loi
 
 Kiem tra:
 
 ```text
-Frontend dang chay dung port da khai bao trong Google Cloud
-Client ID frontend/backend giong nhau
-Authorized JavaScript origins co http://localhost:8081
+Container ai-agent dang Up
+GROQ_API_KEY da cau hinh
+Backend goi duoc http://ai-agent:8000 trong Docker
+/api/ai-chat/health tra ve OK
 ```
 
-## 19. Day Code Len GitHub
-
-Repo remote:
-
-```text
-https://github.com/manhun03/Booking.git
-```
-
-Kiem tra branch hien tai:
+Lenh xem log:
 
 ```powershell
-git status -sb
-git branch --show-current
+docker compose logs -f ai-agent
+docker compose logs -f backend
 ```
 
-Neu push bi loi:
+### Google login khong hoat dong
+
+Neu chay local:
 
 ```text
-rejected: fetch first
+Authorized JavaScript origins can co http://localhost:8081
 ```
 
-Thi remote dang co commit moi hon local. Xu ly an toan:
+Neu deploy len domain:
+
+```text
+Authorized JavaScript origins can co domain production
+PUBLIC_API_BASE_URL can la URL production
+GOOGLE_CLIENT_ID dung voi Google Cloud project
+```
+
+### VNPay return sai URL
+
+Kiem tra:
+
+```env
+VNPAY_RETURN_URL=http://localhost:8080/api/payments/vnpay-return
+```
+
+Deploy production thi doi thanh domain that.
+
+## 16. Lenh Nhanh Hay Dung
 
 ```powershell
-git fetch origin
-git status -sb
-git pull --rebase origin main
-git push -u origin main
+cd "F:\Aptech\Project4\HotelBooking"
+
+# build va chay toan bo
+docker compose build
+docker compose up -d
+
+# xem trang thai
+docker compose ps
+
+# xem log backend
+docker compose logs -f backend
+
+# rebuild customer web
+docker compose build customer-web
+docker compose up -d customer-web
+
+# tat toan bo
+docker compose down
 ```
 
-Neu dang lam tren branch khac, thay `main` bang ten branch hien tai.
+## 17. Ghi Chu Bao Mat
 
-Khong dung `git push --force` neu chua chac chan, vi co the ghi de code tren GitHub.
+Khong commit cac file secret len GitHub:
 
+```text
+.env
+AIAgent\.env
+Firebase service account JSON that
+```
+
+Khi deploy that, can doi cac gia tri:
+
+```text
+APP_JWT_SECRET_KEY
+GROQ_API_KEY
+VNPAY_TMN_CODE
+VNPAY_HASH_SECRET
+MAIL_USERNAME
+MAIL_PASSWORD
+GOOGLE_CLIENT_ID neu dung project rieng
+```

@@ -15,7 +15,7 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("select b from Booking b")
     List<Booking> findAllDetailed();
 
-    @EntityGraph(attributePaths = {"room", "room.hotel", "room.hotel.owner", "room.hotel.ward", "room.hotel.ward.province"})
+    @EntityGraph(attributePaths = {"room", "room.hotel", "room.hotel.owner", "room.hotel.ward", "room.hotel.ward.province", "customer"})
     @Query("select b from Booking b where b.customer.id = :customerId")
     List<Booking> findDetailedByCustomerId(Integer customerId);
 

@@ -81,11 +81,30 @@ public class ChatMessageService {
 
     @Transactional(readOnly = true)
     public List<ChatMessageDto> unread(Integer receiverId) {
-        return messages.findByReceiverIdAndReadFalseOrderByCreatedAtDesc(receiverId).stream()
+        return messages.findByReceiverIdAndReadFalseAndReceiverHiddenFalseOrderByCreatedAtDesc(receiverId).stream()
                 .map(mapper::toChatMessageDto)
                 .toList();
     }
 
+    @Transactional
+    public void hideConversation(Integer userId, Integer otherUserId) {
+        if (!canChat(userId, otherUserId)) {
+            throw new IllegalArgumentException("Customers can only chat with hotel owners");
+        }
+        var conversation = messages.conversationIncludingHidden(userId, otherUserId);
+        if (conversation.isEmpty()) {
+            return;
+        }
+        for (var message : conversation) {
+            if (message.getSender().getId().equals(userId)) {
+                message.setSenderHidden(true);
+            }
+            if (message.getReceiver().getId().equals(userId)) {
+                message.setReceiverHidden(true);
+            }
+        }
+        messages.saveAll(conversation);
+    }
     @Transactional
     public ChatMessageDto send(Integer senderId, SendChatMessageRequest request) {
         var content = request.content() == null ? "" : request.content().trim();

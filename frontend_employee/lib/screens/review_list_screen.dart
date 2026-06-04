@@ -109,6 +109,68 @@ class _ReviewListScreenState extends State<ReviewListScreen> {
     }
   }
 
+  Future<void> _report(Map<String, dynamic> review) async {
+    final controller = TextEditingController();
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Bao cao danh gia',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: 'Nhap ly do bao cao...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  final value = controller.text.trim();
+                  if (value.isNotEmpty) Navigator.pop(context, value);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Bao cao danh gia'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    if (reason == null) return;
+
+    try {
+      await _api.reportReview(intValue(review['id']), reason);
+      if (!mounted) return;
+      _message('Da bao cao danh gia.');
+      await _load();
+    } on ApiException catch (error) {
+      if (mounted) _message(error.message);
+    }
+  }
+
   void _message(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
@@ -215,16 +277,30 @@ class _ReviewListScreenState extends State<ReviewListScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text('Phan hoi: $answer'),
-              )
-            else
-              Align(
-                alignment: Alignment.centerRight,
-                child: OutlinedButton.icon(
-                  onPressed: () => _reply(review),
-                  icon: const Icon(Icons.reply, size: 18),
-                  label: const Text('Phan hoi'),
-                ),
               ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _report(review),
+                    icon: const Icon(Icons.flag_outlined, size: 18),
+                    label: const Text('Bao cao'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                    ),
+                  ),
+                  if (answer.isEmpty)
+                    OutlinedButton.icon(
+                      onPressed: () => _reply(review),
+                      icon: const Icon(Icons.reply, size: 18),
+                      label: const Text('Phan hoi'),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

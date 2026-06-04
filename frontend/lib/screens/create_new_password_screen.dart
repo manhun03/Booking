@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import '../utils/colors.dart';
 import '../utils/strings.dart';
 import 'widgets/custom_text_field.dart';
@@ -12,31 +13,48 @@ class CreateNewPasswordScreen extends StatefulWidget {
 }
 
 class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
+  late TextEditingController _tokenController;
   late TextEditingController _newPasswordController;
   late TextEditingController _confirmPasswordController;
 
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
+  bool _loading = false;
 
   @override
   void initState() {
     super.initState();
+    _tokenController = TextEditingController();
     _newPasswordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map<String, dynamic>) {
+      final token = args['token']?.toString().trim();
+      if (token != null && token.isNotEmpty && _tokenController.text.isEmpty) {
+        _tokenController.text = token;
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    _tokenController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  void _handleAccept() {
+  Future<void> _handleAccept() async {
+    final token = _tokenController.text.trim();
     final newPassword = _newPasswordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
-    if (newPassword.isEmpty || confirmPassword.isEmpty) {
+    if (token.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
       );
@@ -50,9 +68,31 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Password updated successfully!')),
-    );
+    setState(() => _loading = true);
+    try {
+      final result = await ApiService().resetPassword(
+        token: token,
+        newPassword: newPassword,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result['message']?.toString().isNotEmpty == true
+                ? result['message'].toString()
+                : 'Password updated successfully!',
+          ),
+        ),
+      );
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -123,6 +163,14 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                       alignment: Alignment.centerLeft,
                       child: Column(
                         children: [
+                          CustomTextField(
+                            label: 'Reset token',
+                            hint: 'Enter token from email',
+                            icon: Icons.key_outlined,
+                            controller: _tokenController,
+                          ),
+                          const SizedBox(height: 20),
+
                           // New Password Field
                           CustomTextField(
                             label: AppStrings.newPasswordLabel,
@@ -164,7 +212,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _handleAccept,
+                        onPressed: _loading ? null : _handleAccept,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.colorPrimary,
                           foregroundColor: Colors.white,
@@ -173,13 +221,22 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                           ),
                           elevation: 1,
                         ),
-                        child: const Text(
-                          'Accept',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        child: _loading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Accept',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                   ],

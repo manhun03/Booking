@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/language_service.dart';
 import '../utils/colors.dart';
 import 'widgets/current_user_avatar.dart';
 import 'widgets/responsive_page.dart';
@@ -20,6 +21,7 @@ class BookingScreen extends StatefulWidget {
 }
 
 class _BookingScreenState extends State<BookingScreen> {
+  final LanguageService _language = LanguageService();
   int _selectedIndex = 2;
   bool _showHistory = false;
   bool _isLoading = false;
@@ -41,7 +43,7 @@ class _BookingScreenState extends State<BookingScreen> {
   Future<void> _loadBookings() async {
     if (!ApiService().isAuthenticated) {
       setState(() {
-        _errorMessage = 'Vui long dang nhap de xem booking cua ban.';
+        _errorMessage = _language.t('booking.loginRequired');
       });
       return;
     }
@@ -57,10 +59,8 @@ class _BookingScreenState extends State<BookingScreen> {
       setState(() {
         _currentBookings =
             bookings.where((booking) => booking['isHistory'] != true).toList();
-        _historyBookings = bookings
-            .where((booking) =>
-                booking['isHistory'] == true && booking['reviewed'] != true)
-            .toList();
+        _historyBookings =
+            bookings.where((booking) => booking['isHistory'] == true).toList();
         _isLoading = false;
       });
     } catch (error) {
@@ -133,9 +133,8 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Widget _buildDesktopPage(BuildContext context) {
     return WebAppShell(
-      title: 'My Booking',
-      subtitle:
-          'Theo dõi các phòng đang đặt, kiểm tra lịch sử lưu trú và mở chi tiết đặt phòng nhanh hơn trên màn hình lớn.',
+      title: _language.t('booking.title'),
+      subtitle: _language.t('booking.subtitle'),
       selectedIndex: 2,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,11 +482,11 @@ class _BookingScreenState extends State<BookingScreen> {
                 ),
               ),
               const SizedBox(width: 40),
-              const Expanded(
+              Expanded(
                 child: Center(
                   child: Text(
-                    'My Booking',
-                    style: TextStyle(
+                    _language.t('booking.title'),
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
@@ -534,7 +533,7 @@ class _BookingScreenState extends State<BookingScreen> {
         ),
         decoration: InputDecoration(
           isDense: true,
-          hintText: 'Search...',
+          hintText: _language.t('booking.searchHint'),
           hintStyle: const TextStyle(
             fontSize: 11,
             color: AppColors.textPrimary,
@@ -582,7 +581,7 @@ class _BookingScreenState extends State<BookingScreen> {
         children: [
           Expanded(
             child: _buildSegmentButton(
-              label: 'Booking',
+              label: _language.t('booking.current'),
               selected: !_showHistory,
               onTap: () {
                 setState(() {
@@ -593,7 +592,7 @@ class _BookingScreenState extends State<BookingScreen> {
           ),
           Expanded(
             child: _buildSegmentButton(
-              label: 'History',
+              label: _language.t('booking.history'),
               selected: _showHistory,
               onTap: () {
                 setState(() {
@@ -1008,7 +1007,6 @@ class _BookingScreenState extends State<BookingScreen> {
     if (!mounted || result is! Map<String, dynamic>) return;
     setState(() {
       booking['reviewed'] = true;
-      _historyBookings.removeWhere((item) => item['id'] == booking['id']);
     });
   }
 
@@ -1075,31 +1073,7 @@ class _BookingScreenState extends State<BookingScreen> {
           fontSize: 10,
           fontWeight: FontWeight.w500,
         ),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.group_outlined),
-            activeIcon: Icon(Icons.group),
-            label: 'Message',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_box_outlined),
-            activeIcon: Icon(Icons.add_box),
-            label: 'Booking',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu),
-            label: 'Menu',
-          ),
-        ],
+        items: customerBottomNavigationItems(),
       ),
     );
   }
@@ -1399,3 +1373,4 @@ class _HotelThumbnailPainter extends CustomPainter {
     return oldDelegate.palette != palette || oldDelegate.variant != variant;
   }
 }
+

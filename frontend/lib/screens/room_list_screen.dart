@@ -15,6 +15,9 @@ class RoomListScreen extends StatefulWidget {
 
 class _RoomListScreenState extends State<RoomListScreen> {
   late List<Map<String, dynamic>> rooms;
+  late List<Map<String, dynamic>> _allRooms;
+  late List<Map<String, dynamic>> _roomTypes;
+  int? _selectedRoomTypeId;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -40,10 +43,17 @@ class _RoomListScreenState extends State<RoomListScreen> {
     });
 
     try {
-      final loadedRooms = await ApiService().fetchRoomsByHotel(hotelId);
+      final values = await Future.wait([
+        ApiService().fetchRoomsByHotel(hotelId),
+        ApiService().fetchRoomTypesByHotel(hotelId),
+      ]);
+      final loadedRooms = values[0];
+      final roomTypes = values[1];
       if (!mounted) return;
       setState(() {
-        rooms = loadedRooms;
+        _allRooms = loadedRooms;
+        _roomTypes = roomTypes;
+        rooms = _filterRoomsBySelectedType(loadedRooms);
         _isLoading = false;
       });
     } catch (error) {
@@ -69,6 +79,8 @@ class _RoomListScreenState extends State<RoomListScreen> {
 
   void _initializeRooms() {
     rooms = [];
+    _allRooms = [];
+    _roomTypes = const [];
   }
 
   @override
@@ -231,9 +243,78 @@ class _RoomListScreenState extends State<RoomListScreen> {
               color: AppColors.textMuted,
             ),
           ),
+          if (_roomTypes.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _buildRoomTypeFilter(),
+          ],
         ],
       ),
     );
+  }
+
+  Widget _buildRoomTypeFilter() {
+    return DropdownButtonFormField<int?>(
+      initialValue: _selectedRoomTypeId,
+      decoration: const InputDecoration(
+        labelText: 'Loai phong',
+        isDense: true,
+        border: OutlineInputBorder(),
+      ),
+      items: [
+        const DropdownMenuItem<int?>(value: null, child: Text('Tat ca loai phong')),
+        ..._roomTypes.map((type) {
+          final id = _intValue(type['id']);
+          return DropdownMenuItem<int?>(
+            value: id,
+            child: Text(type['name']?.toString() ?? 'Room type #$id'),
+          );
+        }),
+      ],
+      onChanged: (value) => _loadRoomsForType(value),
+    );
+  }
+
+  Future<void> _loadRoomsForType(int? roomTypeId) async {
+    final hotelId = _hotelId;
+    if (hotelId == null) return;
+    setState(() {
+      _selectedRoomTypeId = roomTypeId;
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final loadedRooms = roomTypeId == null
+          ? _allRooms
+          : (await ApiService().fetchRoomsByRoomType(roomTypeId))
+              .where((room) => _intValue(room['hotelId']) == hotelId)
+              .toList();
+      if (!mounted) return;
+      setState(() {
+        rooms = loadedRooms;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<Map<String, dynamic>> _filterRoomsBySelectedType(
+    List<Map<String, dynamic>> source,
+  ) {
+    final selected = _selectedRoomTypeId;
+    if (selected == null) return source;
+    return source.where((room) => _intValue(room['roomTypeId']) == selected).toList();
+  }
+
+  int? _intValue(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
   }
 
   Widget _buildSidebar(String icon, String label) {

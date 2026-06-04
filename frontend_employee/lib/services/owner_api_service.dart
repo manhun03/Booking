@@ -24,6 +24,9 @@ class OwnerApiService {
   Future<List<Map<String, dynamic>>> fetchRoomTypes() =>
       _getList('/room-types');
 
+  Future<List<Map<String, dynamic>>> fetchRoomTypesByHotel(int hotelId) =>
+      _getList('/room-types/by-hotel?hotelId=$hotelId');
+
   Future<Map<String, dynamic>> createRoomType(Map<String, dynamic> roomType) =>
       _postMap('/room-types', body: roomType);
 
@@ -141,6 +144,23 @@ class OwnerApiService {
   Future<List<Map<String, dynamic>>> fetchTopRooms({int limit = 5}) =>
       _getList('/statistics/owner/top-rooms?limit=$limit');
 
+  Future<List<Map<String, dynamic>>> fetchPeakHours() =>
+      _getList('/statistics/owner/peak-hours');
+
+  Future<List<Map<String, dynamic>>> fetchUpcomingBookings({
+    int hoursAhead = 3,
+  }) => _getList('/statistics/owner/upcoming?hoursAhead=$hoursAhead');
+
+  Future<List<Map<String, dynamic>>> fetchRevenueSummary({
+    String periodType = 'DAILY',
+    required DateTime startDate,
+    required DateTime endDate,
+  }) {
+    return _getList(
+      '/statistics/owner/revenue-summary?periodType=$periodType&startDate=${_date(startDate)}&endDate=${_date(endDate)}',
+    );
+  }
+
   Future<List<Map<String, dynamic>>> fetchNotifications() =>
       _getList('/notifications/my');
 
@@ -211,11 +231,17 @@ class OwnerApiService {
   Future<Map<String, dynamic>> replyReview(int id, String reply) =>
       _postMap('/reviews/$id/reply', body: {'reply': reply.trim()});
 
+  Future<Map<String, dynamic>> reportReview(int id, String reason) =>
+      _postMap('/reviews/$id/report', body: {'reason': reason.trim()});
+
   Future<List<Map<String, dynamic>>> fetchConversations() =>
       _getList('/messages/conversations');
 
   Future<List<Map<String, dynamic>>> fetchMessages(int userId) =>
       _getList('/messages/conversation/$userId');
+
+  Future<List<Map<String, dynamic>>> fetchUnreadMessages() =>
+      _getList('/messages/unread');
 
   Future<Map<String, dynamic>> markMessageRead(int id) =>
       _postMap('/messages/$id/read');

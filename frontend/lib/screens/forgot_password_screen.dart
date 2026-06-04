@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/colors.dart';
+import '../services/api_service.dart';
 import '../utils/strings.dart';
 import 'widgets/custom_text_field.dart';
 
@@ -12,6 +13,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   late TextEditingController _emailController;
+  bool _loading = false;
 
   @override
   void initState() {
@@ -25,7 +27,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  void _handleConfirm() {
+  Future<void> _handleConfirm() async {
     final email = _emailController.text.trim();
 
     if (email.isEmpty) {
@@ -35,9 +37,32 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Reset password link sent to $email')),
-    );
+    setState(() => _loading = true);
+    try {
+      final result = await ApiService().forgotPassword(email: email);
+      if (!mounted) return;
+      final token = result['token']?.toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result['message']?.toString().isNotEmpty == true
+                ? result['message'].toString()
+                : 'Reset password token sent to $email',
+          ),
+        ),
+      );
+      Navigator.of(context).pushNamed(
+        '/create-new-password',
+        arguments: {'email': email, 'token': token},
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -121,7 +146,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _handleConfirm,
+                        onPressed: _loading ? null : _handleConfirm,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.colorPrimary,
                           foregroundColor: Colors.white,
@@ -130,13 +155,22 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           ),
                           elevation: 1,
                         ),
-                        child: const Text(
-                          'Confirm',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        child: _loading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Confirm',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                   ],

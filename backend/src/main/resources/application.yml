@@ -1,4 +1,4 @@
-server:
+﻿server:
   port: 8080
 
 spring:
@@ -9,9 +9,9 @@ spring:
       max-file-size: 25MB
       max-request-size: 30MB
   datasource:
-    url: jdbc:sqlserver://localhost:1433;databaseName=DoAnHotelParkingDb;encrypt=true;trustServerCertificate=true
-    username: sa
-    password: 123456
+    url: ${SPRING_DATASOURCE_URL:jdbc:sqlserver://localhost:1433;databaseName=DoAnHotelParkingDb;encrypt=true;trustServerCertificate=true}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:123456}
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
   jpa:
     hibernate:
@@ -42,18 +42,18 @@ app:
   jwt:
     issuer: DoAn.HotelParking
     audience: DoAn.HotelParking.Client
-    secret-key: DoAn.HotelParking.Super.Secret.Key.2026
-    access-token-expiration-minutes: 60
+    secret-key: ${APP_JWT_SECRET_KEY:DoAn.HotelParking.Super.Secret.Key.2026}
+    access-token-expiration-minutes: ${APP_JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:60}
   minio:
-    endpoint: http://localhost:9000
-    access-key: minioadmin
-    secret-key: minioadmin
-    bucket-name: hotel-images
-    public-base-url: http://localhost:9000
-    auto-create-bucket: true
+    endpoint: ${APP_MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${APP_MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${APP_MINIO_SECRET_KEY:minioadmin}
+    bucket-name: ${APP_MINIO_BUCKET_NAME:hotel-images}
+    public-base-url: ${APP_MINIO_PUBLIC_BASE_URL:http://localhost:9000}
+    auto-create-bucket: ${APP_MINIO_AUTO_CREATE_BUCKET:true}
   firebase:
-    credentials-path: firebase/hotelapp-63196-firebase-adminsdk-fbsvc-a126f141e7.json
-    project-id: hotelparking-9c7ce
+    credentials-path: ${APP_FIREBASE_CREDENTIALS_PATH:firebase/hotelapp-63196-firebase-adminsdk-fbsvc-a126f141e7.json}
+    project-id: ${APP_FIREBASE_PROJECT_ID:hotelparking-9c7ce}
   google:
     client-id: ${GOOGLE_CLIENT_ID:883824205385-182f65ondho5qnima9ladd5j7qk2b40h.apps.googleusercontent.com}
   ai-agent:
@@ -84,3 +84,4 @@ management:
       enabled: ${MINIO_HEALTH_ENABLED:false}
     firebase:
       enabled: ${FIREBASE_HEALTH_ENABLED:false}
+

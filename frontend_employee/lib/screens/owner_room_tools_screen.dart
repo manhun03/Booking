@@ -14,8 +14,10 @@ class OwnerRoomToolsScreen extends StatefulWidget {
 class _OwnerRoomToolsScreenState extends State<OwnerRoomToolsScreen> {
   final _api = OwnerApiService();
   List<Map<String, dynamic>> _roomTypes = const [];
+  List<Map<String, dynamic>> _hotels = const [];
   List<Map<String, dynamic>> _rooms = const [];
   List<Map<String, dynamic>> _timeSlots = const [];
+  int? _selectedHotelId;
   int? _selectedRoomId;
   bool _loading = true;
   String? _error;
@@ -33,20 +35,32 @@ class _OwnerRoomToolsScreenState extends State<OwnerRoomToolsScreen> {
     });
     try {
       final values = await Future.wait([
-        _api.fetchRoomTypes(),
+        _api.fetchHotels(),
         _api.fetchRooms(),
       ]);
+      final hotels = values[0];
       final rooms = values[1];
+      final selectedHotelId =
+          _selectedHotelId ??
+          (hotels.isEmpty ? null : intValue(hotels.first['id']));
+      final hotelRooms = _roomsForHotel(rooms, selectedHotelId);
       final selectedRoomId =
-          _selectedRoomId ??
-          (rooms.isEmpty ? null : intValue(rooms.first['id']));
-      final slots = selectedRoomId == null
+          _selectedRoomId != null &&
+              hotelRooms.any((room) => intValue(room['id']) == _selectedRoomId)
+          ? _selectedRoomId
+          : (hotelRooms.isEmpty ? null : intValue(hotelRooms.first['id']));
+      final slots = selectedHotelId == null
           ? <Map<String, dynamic>>[]
-          : await _api.fetchTimeSlotsByRoom(selectedRoomId);
+          : await _api.fetchTimeSlotsByHotel(selectedHotelId);
+      final roomTypes = selectedHotelId == null
+          ? await _api.fetchRoomTypes()
+          : await _api.fetchRoomTypesByHotel(selectedHotelId);
       if (!mounted) return;
       setState(() {
-        _roomTypes = values[0];
+        _roomTypes = roomTypes;
+        _hotels = hotels;
         _rooms = rooms;
+        _selectedHotelId = selectedHotelId;
         _selectedRoomId = selectedRoomId;
         _timeSlots = slots;
         _loading = false;
@@ -60,19 +74,51 @@ class _OwnerRoomToolsScreenState extends State<OwnerRoomToolsScreen> {
     }
   }
 
-  Future<void> _loadSlotsForRoom(int? roomId) async {
+  Future<void> _loadSlotsForHotel(int? hotelId) async {
+    final hotelRooms = _roomsForHotel(_rooms, hotelId);
+    final selectedRoomId = hotelRooms.isEmpty
+        ? null
+        : intValue(hotelRooms.first['id']);
     setState(() {
-      _selectedRoomId = roomId;
+      _selectedHotelId = hotelId;
+      _selectedRoomId = selectedRoomId;
       _timeSlots = const [];
     });
-    if (roomId == null) return;
+    if (hotelId == null) return;
     try {
-      final slots = await _api.fetchTimeSlotsByRoom(roomId);
+      final values = await Future.wait([
+        _api.fetchTimeSlotsByHotel(hotelId),
+        _api.fetchRoomTypesByHotel(hotelId),
+      ]);
+      final slots = values[0];
+      final roomTypes = values[1];
       if (!mounted) return;
-      setState(() => _timeSlots = slots);
+      setState(() {
+        _timeSlots = slots;
+        _roomTypes = roomTypes;
+      });
     } on ApiException catch (error) {
       if (mounted) _snack(error.message, isError: true);
     }
+  }
+
+  Future<void> _selectRoom(int? roomId) async {
+    setState(() => _selectedRoomId = roomId);
+  }
+
+  List<Map<String, dynamic>> _roomsForHotel(
+    List<Map<String, dynamic>> rooms,
+    int? hotelId,
+  ) {
+    if (hotelId == null) return rooms;
+    return rooms.where((room) => intValue(room['hotelId']) == hotelId).toList();
+  }
+
+  Map<String, dynamic>? _roomById(int roomId) {
+    for (final room in _rooms) {
+      if (intValue(room['id']) == roomId) return room;
+    }
+    return null;
   }
 
   Future<void> _editRoomType({Map<String, dynamic>? roomType}) async {
@@ -97,19 +143,23 @@ class _OwnerRoomToolsScreenState extends State<OwnerRoomToolsScreen> {
   }
 
   Future<void> _editTimeSlot({Map<String, dynamic>? slot}) async {
-    if (_rooms.isEmpty) {
-      _snack('Can tao phong truoc khi them lich gia.', isError: true);
+    final hotelRooms = _roomsForHotel(_rooms, _selectedHotelId);
+    if (hotelRooms.isEmpty) {
+      _snack(
+        'Can tao phong trong khach san nay truoc khi them lich gia.',
+        isError: true,
+      );
       return;
     }
     final result = await showDialog<bool>(
       context: context,
       builder: (_) => _TimeSlotDialog(
-        rooms: _rooms,
+        rooms: hotelRooms,
         slot: slot,
         initialRoomId: _selectedRoomId,
       ),
     );
-    if (result == true) await _loadSlotsForRoom(_selectedRoomId);
+    if (result == true) await _loadSlotsForHotel(_selectedHotelId);
   }
 
   Future<void> _deleteTimeSlot(Map<String, dynamic> slot) async {
@@ -119,7 +169,7 @@ class _OwnerRoomToolsScreenState extends State<OwnerRoomToolsScreen> {
       await _api.deleteTimeSlot(id);
       if (!mounted) return;
       _snack('Da xoa lich gia.');
-      await _loadSlotsForRoom(_selectedRoomId);
+      await _loadSlotsForHotel(_selectedHotelId);
     } on ApiException catch (error) {
       if (mounted) _snack(error.message, isError: true);
     }
@@ -220,6 +270,7 @@ class _OwnerRoomToolsScreenState extends State<OwnerRoomToolsScreen> {
   }
 
   Widget _timeSlotTab() {
+    final hotelRooms = _roomsForHotel(_rooms, _selectedHotelId);
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -233,21 +284,37 @@ class _OwnerRoomToolsScreenState extends State<OwnerRoomToolsScreen> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 SizedBox(
-                  width: 360,
+                  width: 320,
                   child: DropdownButtonFormField<int>(
-                    initialValue: _selectedRoomId,
-                    decoration: const InputDecoration(labelText: 'Phong'),
-                    items: _rooms
+                    initialValue: _selectedHotelId,
+                    decoration: const InputDecoration(labelText: 'Khach san'),
+                    items: _hotels
                         .map(
-                          (room) => DropdownMenuItem(
-                            value: intValue(room['id']),
-                            child: Text(
-                              'Phong ${textValue(room['roomNumber'])} - ${textValue(room['hotelName'])}',
-                            ),
+                          (hotel) => DropdownMenuItem(
+                            value: intValue(hotel['id']),
+                            child: Text(textValue(hotel['name'])),
                           ),
                         )
                         .toList(),
-                    onChanged: _loadSlotsForRoom,
+                    onChanged: _loadSlotsForHotel,
+                  ),
+                ),
+                SizedBox(
+                  width: 360,
+                  child: DropdownButtonFormField<int>(
+                    initialValue: _selectedRoomId,
+                    decoration: const InputDecoration(
+                      labelText: 'Phong mac dinh khi them lich',
+                    ),
+                    items: hotelRooms
+                        .map(
+                          (room) => DropdownMenuItem(
+                            value: intValue(room['id']),
+                            child: Text(_roomLabel(room)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _selectRoom,
                   ),
                 ),
                 FilledButton.icon(
@@ -261,10 +328,11 @@ class _OwnerRoomToolsScreenState extends State<OwnerRoomToolsScreen> {
         ),
         const SizedBox(height: 12),
         if (_timeSlots.isEmpty)
-          const _Empty(message: 'Phong nay chua co lich gia.')
+          const _Empty(message: 'Khach san nay chua co lich gia.')
         else
-          ..._timeSlots.map(
-            (slot) => Card(
+          ..._timeSlots.map((slot) {
+            final room = _roomById(intValue(slot['roomId']));
+            return Card(
               elevation: 0,
               margin: const EdgeInsets.only(bottom: 10),
               child: ListTile(
@@ -273,7 +341,9 @@ class _OwnerRoomToolsScreenState extends State<OwnerRoomToolsScreen> {
                   '${formatDate(slot['startDate'])} - ${formatDate(slot['endDate'])}',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                subtitle: Text(formatMoney(slot['price'])),
+                subtitle: Text(
+                  '${room == null ? 'Phong #${slot['roomId']}' : _roomLabel(room)}\n${formatMoney(slot['price'])}',
+                ),
                 trailing: Wrap(
                   spacing: 4,
                   children: [
@@ -293,10 +363,20 @@ class _OwnerRoomToolsScreenState extends State<OwnerRoomToolsScreen> {
                   ],
                 ),
               ),
-            ),
-          ),
+            );
+          }),
       ],
     );
+  }
+
+  String _roomLabel(Map<String, dynamic> room) {
+    final roomNumber = textValue(room['roomNumber'], '#${room['id']}');
+    final hotelName = textValue(room['hotelName']);
+    final seasonalPrice = doubleValue(room['seasonalPrice']);
+    final seasonal = seasonalPrice > 0
+        ? ' - Gia mua: ${formatMoney(seasonalPrice)}'
+        : '';
+    return 'Phong $roomNumber${hotelName.isEmpty ? '' : ' - $hotelName'}$seasonal';
   }
 }
 

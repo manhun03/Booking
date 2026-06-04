@@ -209,6 +209,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             route: '/admin-notifications',
                           ),
                           _actionTile(
+                            icon: Icons.local_offer_outlined,
+                            title: 'Quan ly coupon',
+                            subtitle:
+                                'Tao, cap nhat, kich hoat va xoa ma uu dai trong he thong.',
+                            route: '/admin-coupons',
+                          ),
+                          _actionTile(
                             icon: Icons.tune_outlined,
                             title: 'Cau hinh he thong',
                             subtitle: 'Xem va cap nhat system config theo key.',

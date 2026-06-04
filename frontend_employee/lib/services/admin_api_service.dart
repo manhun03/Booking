@@ -35,10 +35,36 @@ class AdminApiService {
   Future<Map<String, dynamic>> unlockUser(int id) =>
       _patchMap('/admin/users/$id/unlock');
 
+  Future<void> deleteUser(int id) => _delete('/users/$id');
+
   Future<List<Map<String, dynamic>>> fetchRoles() => _getList('/roles');
+
+  Future<Map<String, dynamic>> createRole(Map<String, dynamic> role) =>
+      _postMap('/roles', body: role);
+
+  Future<Map<String, dynamic>> updateRole(int id, Map<String, dynamic> role) =>
+      _putMap('/roles/$id', body: {'id': id, ...role});
+
+  Future<void> deleteRole(int id) => _delete('/roles/$id');
 
   Future<List<Map<String, dynamic>>> fetchPermissions() =>
       _getList('/permissions');
+
+  Future<Map<String, dynamic>> createPermission(
+    Map<String, dynamic> permission,
+  ) => _postMap('/permissions', body: permission);
+
+  Future<Map<String, dynamic>> updatePermission(
+    int id,
+    Map<String, dynamic> permission,
+  ) => _putMap('/permissions/$id', body: {'id': id, ...permission});
+
+  Future<void> deletePermission(int id) => _delete('/permissions/$id');
+
+  Future<List<Map<String, dynamic>>> fetchPermissionsByModule(String module) {
+    final encodedModule = Uri.encodeComponent(module.trim());
+    return _getList('/permissions/modules/$encodedModule');
+  }
 
   Future<List<Map<String, dynamic>>> fetchProvinces() => _getList('/provinces');
 
@@ -88,6 +114,8 @@ class AdminApiService {
   Future<Map<String, dynamic>> unlockHotel(int id) =>
       _patchMap('/admin/hotels/$id/unlock');
 
+  Future<void> deleteHotel(int id) => _delete('/hotels/$id');
+
   Future<List<Map<String, dynamic>>> fetchBookings({
     int pageIndex = 1,
     int pageSize = 100,
@@ -99,6 +127,18 @@ class AdminApiService {
       _patchMap('/bookings/$id/force-complete');
 
   Future<List<Map<String, dynamic>>> fetchPayments() => _getList('/payments');
+
+  Future<List<Map<String, dynamic>>> fetchCoupons() => _getList('/coupons');
+
+  Future<Map<String, dynamic>> createCoupon(Map<String, dynamic> coupon) =>
+      _postMap('/coupons', body: coupon);
+
+  Future<Map<String, dynamic>> updateCoupon(
+    int id,
+    Map<String, dynamic> coupon,
+  ) => _putMap('/coupons/$id', body: {'id': id, ...coupon});
+
+  Future<void> deleteCoupon(int id) => _delete('/coupons/$id');
 
   Future<Map<String, dynamic>> refundPayment(
     int id, {
@@ -149,6 +189,20 @@ class AdminApiService {
   Future<List<Map<String, dynamic>>> fetchNotifications() =>
       _getList('/notifications');
 
+  Future<Map<String, dynamic>> fetchNotification(int id) =>
+      _getMap('/notifications/$id');
+
+  Future<Map<String, dynamic>> createNotification(
+    Map<String, dynamic> notification,
+  ) => _postMap('/notifications', body: notification);
+
+  Future<Map<String, dynamic>> updateNotification(
+    int id,
+    Map<String, dynamic> notification,
+  ) => _putMap('/notifications/$id', body: {'id': id, ...notification});
+
+  Future<void> deleteNotification(int id) => _delete('/notifications/$id');
+
   Future<Map<String, dynamic>> markNotificationRead(int id) =>
       _postMap('/notifications/$id/read');
 
@@ -161,6 +215,11 @@ class AdminApiService {
 
   Future<List<Map<String, dynamic>>> fetchSystemConfigs() =>
       _getList('/admin/system-configs');
+
+  Future<Map<String, dynamic>> fetchSystemConfigByKey(String key) {
+    final encodedKey = Uri.encodeComponent(key.trim());
+    return _getMap('/admin/system-configs/$encodedKey');
+  }
 
   Future<Map<String, dynamic>> updateSystemConfig({
     required String key,

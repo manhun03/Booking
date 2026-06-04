@@ -18,6 +18,9 @@ class _RevenueDetailScreenState extends State<RevenueDetailScreen> {
   Map<String, dynamic> _comparison = const {};
   List<Map<String, dynamic>> _chart = const [];
   List<Map<String, dynamic>> _topRooms = const [];
+  List<Map<String, dynamic>> _peakHours = const [];
+  List<Map<String, dynamic>> _upcomingBookings = const [];
+  List<Map<String, dynamic>> _revenueSummary = const [];
   bool _loading = true;
   String? _error;
 
@@ -39,12 +42,18 @@ class _RevenueDetailScreenState extends State<RevenueDetailScreen> {
         _api.fetchRevenueComparison(startDate: start, endDate: end),
         _api.fetchRevenueChart(startDate: start, endDate: end),
         _api.fetchTopRooms(),
+        _api.fetchPeakHours(),
+        _api.fetchUpcomingBookings(hoursAhead: 24),
+        _api.fetchRevenueSummary(startDate: start, endDate: end),
       ]);
       if (!mounted) return;
       setState(() {
         _comparison = data[0] as Map<String, dynamic>;
         _chart = data[1] as List<Map<String, dynamic>>;
         _topRooms = data[2] as List<Map<String, dynamic>>;
+        _peakHours = data[3] as List<Map<String, dynamic>>;
+        _upcomingBookings = data[4] as List<Map<String, dynamic>>;
+        _revenueSummary = data[5] as List<Map<String, dynamic>>;
         _loading = false;
       });
     } on ApiException catch (error) {
@@ -91,6 +100,39 @@ class _RevenueDetailScreenState extends State<RevenueDetailScreen> {
                   ),
                   const SizedBox(height: 10),
                   _chartCard(),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'TOM TAT DOANH THU',
+                    style: TextStyle(
+                      color: Colors.black54,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _summaryCard(),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'GIO DAT PHONG CAO DIEM',
+                    style: TextStyle(
+                      color: Colors.black54,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _peakHoursCard(),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'BOOKING SAP TOI TRONG 24 GIO',
+                    style: TextStyle(
+                      color: Colors.black54,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _upcomingCard(),
                   const SizedBox(height: 24),
                   const Text(
                     'TOP PHONG THEO DOANH THU',
@@ -207,6 +249,128 @@ class _RevenueDetailScreenState extends State<RevenueDetailScreen> {
                   }).toList(),
                 ),
         ),
+      ),
+    );
+  }
+
+  Widget _summaryCard() {
+    if (_revenueSummary.isEmpty) {
+      return const Card(
+        elevation: 0,
+        child: Padding(
+          padding: EdgeInsets.all(18),
+          child: Text('Chua co du lieu tong hop doanh thu.'),
+        ),
+      );
+    }
+
+    return Card(
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          children: _revenueSummary.take(5).map((item) {
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                textValue(item['period'], 'Khoang thoi gian'),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                '${formatDate(item['startDate'])} - ${formatDate(item['endDate'])}'
+                ' | ${intValue(item['totalBookings'])} booking',
+              ),
+              trailing: Text(
+                formatMoney(item['totalRevenue']),
+                style: const TextStyle(
+                  color: _primaryBlue,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _peakHoursCard() {
+    final highest = _peakHours.fold<int>(
+      0,
+      (max, item) => intValue(item['bookingCount']) > max
+          ? intValue(item['bookingCount'])
+          : max,
+    );
+    return Card(
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: _peakHours.isEmpty
+            ? const Text('Chua co du lieu gio cao diem.')
+            : Column(
+                children: _peakHours.take(8).map((item) {
+                  final count = intValue(item['bookingCount']);
+                  final ratio = highest == 0 ? 0.02 : count / highest;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 54,
+                          child: Text(textValue(item['hour'], '--:--')),
+                        ),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: LinearProgressIndicator(
+                              minHeight: 9,
+                              value: ratio.clamp(0.02, 1.0),
+                              backgroundColor: const Color(0xFFE7ECF5),
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                _primaryBlue,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text('$count booking'),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+      ),
+    );
+  }
+
+  Widget _upcomingCard() {
+    if (_upcomingBookings.isEmpty) {
+      return const Card(
+        elevation: 0,
+        child: Padding(
+          padding: EdgeInsets.all(18),
+          child: Text('Khong co booking sap toi trong 24 gio.'),
+        ),
+      );
+    }
+
+    return Card(
+      elevation: 0,
+      child: Column(
+        children: _upcomingBookings.map((booking) {
+          return ListTile(
+            leading: const CircleAvatar(child: Icon(Icons.event_available)),
+            title: Text(
+              textValue(booking['customerName'], 'Khach hang'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              '${textValue(booking['hotelName'])} - ${textValue(booking['roomName'])}'
+              '\nNhan phong: ${formatDate(booking['checkInDate'], withTime: true)}',
+            ),
+            trailing: Text(formatMoney(booking['totalAmount'])),
+          );
+        }).toList(),
       ),
     );
   }

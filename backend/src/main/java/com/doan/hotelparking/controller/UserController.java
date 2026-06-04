@@ -94,6 +94,17 @@ public class UserController {
         return ApiResponse.ok("Created", mapper.toUserDto(users.save(user)));
     }
 
+    @PutMapping("/me")
+    public ApiResponse<UserDto> updateCurrentUser(@RequestBody User request) {
+        var user = users.findById(currentUser.requireUserId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+        user.setPhone(request.getPhone());
+        user.setAvatarUrl(request.getAvatarUrl());
+        user.setUpdatedAt(Instant.now());
+        return ApiResponse.ok("Updated", mapper.toUserDto(users.save(user)));
+    }
     @PutMapping("/{id}")
     public ApiResponse<UserDto> update(@PathVariable Integer id, @RequestBody User request) {
         var admin = isAdmin();

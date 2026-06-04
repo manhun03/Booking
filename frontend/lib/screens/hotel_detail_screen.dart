@@ -922,9 +922,79 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => _reportReview(review),
+              icon: const Icon(Icons.flag_outlined, size: 15),
+              label: const Text('Bao cao'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.redAccent,
+                visualDensity: VisualDensity.compact,
+                textStyle: const TextStyle(fontSize: 11),
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _reportReview(Map<String, dynamic> review) async {
+    final reviewId = _intValue(review['id'], 0);
+    if (reviewId <= 0) return;
+    final reason = await _showReportReviewDialog();
+    if (reason == null || reason.trim().isEmpty) return;
+    try {
+      await ApiService().reportReview(reviewId: reviewId, reason: reason);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Da bao cao danh gia.')),
+      );
+      final hotelId = _hotelId(widget.hotel ?? const <String, dynamic>{});
+      if (hotelId != null) {
+        final reviews = await ApiService().fetchReviewsByHotel(hotelId);
+        if (mounted) setState(() => _reviews = reviews);
+      }
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
+  }
+
+  Future<String?> _showReportReviewDialog() async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Bao cao danh gia'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Ly do bao cao',
+            hintText: 'Vi du: noi dung khong phu hop, spam...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Huy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Bao cao'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return reason;
   }
 
   Widget _buildRefundPolicyContent() {

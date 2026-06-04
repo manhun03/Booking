@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/language_service.dart';
 import '../services/chat_socket.dart';
 import '../utils/colors.dart';
 import '../utils/constants.dart';
@@ -17,6 +18,7 @@ class MessageScreen extends StatefulWidget {
 }
 
 class _MessageScreenState extends State<MessageScreen> {
+  final LanguageService _language = LanguageService();
   final ApiService _api = ApiService();
   final TextEditingController _searchController = TextEditingController();
 
@@ -26,6 +28,7 @@ class _MessageScreenState extends State<MessageScreen> {
   String? _error;
   ChatSocketConnection? _socket;
   StreamSubscription<Map<String, dynamic>>? _socketSubscription;
+  final Set<int> _hidingConversationIds = <int>{};
 
   @override
   void initState() {
@@ -83,9 +86,23 @@ class _MessageScreenState extends State<MessageScreen> {
 
     try {
       final conversations = await _api.fetchChatConversations();
+      var unreadMessages = <Map<String, dynamic>>[];
+      try {
+        unreadMessages = await _api.fetchUnreadChatMessages();
+      } catch (_) {
+        unreadMessages = const [];
+      }
+      final unreadByUser = _unreadByOtherUser(unreadMessages);
+      final merged = conversations.map((conversation) {
+        final userId = _intValue(conversation['userId'] ?? conversation['id']);
+        return {
+          ...conversation,
+          'unread': unreadByUser[userId] ?? _intValue(conversation['unread']),
+        };
+      }).toList();
       if (!mounted) return;
       setState(() {
-        _conversations = conversations.where(_hasConversationMessages).toList();
+        _conversations = merged.where(_hasConversationMessages).toList();
         _loading = false;
         _error = null;
       });
@@ -121,6 +138,61 @@ class _MessageScreenState extends State<MessageScreen> {
       arguments: conversation,
     );
     await _loadConversations(silent: true);
+  }
+  Future<void> _hideConversation(Map<String, dynamic> conversation) async {
+    final otherUserId = _intValue(conversation['userId'] ?? conversation['id']);
+    if (otherUserId <= 0 || _hidingConversationIds.contains(otherUserId)) {
+      return;
+    }
+
+    final name = conversation['name']?.toString().trim();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ẩn hội thoại?'),
+        content: Text(
+          'Hội thoại này chỉ bị ẩn khỏi tài khoản của bạn. ${name == null || name.isEmpty ? 'Người còn lại' : name} vẫn xem được tin nhắn.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Ẩn'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _hidingConversationIds.add(otherUserId);
+    });
+
+    try {
+      await _api.hideChatConversation(otherUserId);
+      if (!mounted) return;
+      setState(() {
+        _conversations.removeWhere((item) =>
+            _intValue(item['userId'] ?? item['id']) == otherUserId);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã ẩn hội thoại.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không ẩn được hội thoại: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _hidingConversationIds.remove(otherUserId);
+        });
+      }
+    }
   }
 
   void _onBottomNavTapped(int index) {
@@ -166,9 +238,8 @@ class _MessageScreenState extends State<MessageScreen> {
         ],
       ),
       desktopBody: WebAppShell(
-        title: 'Tin nhắn',
-        subtitle:
-            'Trao đổi với khách sạn và bộ phận hỗ trợ, theo dõi tin nhắn chưa đọc và mở nhanh từng cuộc trò chuyện.',
+        title: _language.t('message.title'),
+        subtitle: _language.t('message.subtitle'),
         selectedIndex: 1,
         child: _buildDesktopContent(),
       ),
@@ -617,6 +688,8 @@ class _MessageScreenState extends State<MessageScreen> {
     final name = conversation['name']?.toString() ?? 'Liên hệ';
     final email = conversation['email']?.toString() ?? '';
     final time = conversation['time']?.toString() ?? '';
+    final otherUserId = _intValue(conversation['userId'] ?? conversation['id']);
+    final isHiding = _hidingConversationIds.contains(otherUserId);
 
     return InkWell(
       onTap: () => _openConversation(conversation),
@@ -672,6 +745,28 @@ class _MessageScreenState extends State<MessageScreen> {
                           ),
                         ),
                       ],
+                      const SizedBox(width: 4),
+                      SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: IconButton(
+                          tooltip: 'Ẩn hội thoại',
+                          onPressed: isHiding
+                              ? null
+                              : () => unawaited(_hideConversation(conversation)),
+                          icon: isHiding
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.delete_outline, size: 18),
+                          color: const Color(0xFFDC2626),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
                     ],
                   ),
                   if (email.isNotEmpty) ...[
@@ -793,31 +888,7 @@ class _MessageScreenState extends State<MessageScreen> {
           fontSize: 10,
           fontWeight: FontWeight.w500,
         ),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.group_outlined),
-            activeIcon: Icon(Icons.group),
-            label: 'Message',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_box_outlined),
-            activeIcon: Icon(Icons.add_box),
-            label: 'Booking',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu),
-            label: 'Menu',
-          ),
-        ],
+        items: customerBottomNavigationItems(),
       ),
     );
   }
@@ -838,6 +909,19 @@ class _MessageScreenState extends State<MessageScreen> {
     if (conversation['lastMessageAt'] is DateTime) return true;
     final message = conversation['message']?.toString().trim() ?? '';
     return message.isNotEmpty && message != 'Bat dau tro chuyen';
+  }
+
+  Map<int, int> _unreadByOtherUser(List<Map<String, dynamic>> messages) {
+    final currentUserId = _api.currentSession?.userId;
+    final counts = <int, int>{};
+    for (final message in messages) {
+      final senderId = _intValue(message['senderId']);
+      final receiverId = _intValue(message['receiverId']);
+      final otherUserId = senderId == currentUserId ? receiverId : senderId;
+      if (otherUserId <= 0) continue;
+      counts[otherUserId] = (counts[otherUserId] ?? 0) + 1;
+    }
+    return counts;
   }
 
   int _intValue(dynamic value) {

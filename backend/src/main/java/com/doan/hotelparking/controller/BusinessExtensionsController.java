@@ -107,6 +107,11 @@ class ChatController {
         return ApiResponse.ok("Message sent", message);
     }
 
+    @DeleteMapping("/conversation/{otherUserId}")
+    ApiResponse<Void> hideConversation(@PathVariable Integer otherUserId) {
+        chatMessages.hideConversation(currentUser.requireUserId(), otherUserId);
+        return ApiResponse.ok("Conversation hidden", null);
+    }
     @PostMapping("/{id}/read")
     ApiResponse<ChatMessageDto> markRead(@PathVariable Integer id) {
         var message = chatMessages.markRead(currentUser.requireUserId(), id);

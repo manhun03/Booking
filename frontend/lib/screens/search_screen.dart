@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/language_service.dart';
 import '../utils/colors.dart';
 import 'widgets/responsive_page.dart';
 
@@ -12,6 +13,7 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
+  final LanguageService _language = LanguageService();
   late TextEditingController _searchController;
   late TextEditingController _locationController;
   late TextEditingController _minBudgetController;
@@ -22,9 +24,11 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   int _selectedIndex = 3;
+  int? _selectedProvinceId;
 
   late List<Map<String, dynamic>> _suggestedHotels;
   late List<Map<String, dynamic>> _searchResults;
+  late List<Map<String, dynamic>> _provinces;
 
   @override
   void initState() {
@@ -35,6 +39,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _maxBudgetController = TextEditingController();
     _suggestedHotels = [];
     _searchResults = const [];
+    _provinces = const [];
     _loadSuggestedHotels();
   }
 
@@ -54,10 +59,16 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     try {
-      final hotels = await ApiService().fetchHotels(pageSize: 10);
+      final values = await Future.wait([
+        ApiService().fetchHotels(pageSize: 10),
+        ApiService().fetchProvinces(),
+      ]);
+      final hotels = values[0];
+      final provinces = values[1];
       if (!mounted) return;
       setState(() {
         _suggestedHotels = hotels;
+        _provinces = provinces;
         _isLoading = false;
       });
     } catch (error) {
@@ -84,11 +95,23 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     try {
-      final hotels = await ApiService().fetchHotels(
-        keyword: keyword.isEmpty ? null : keyword,
-        pageSize: 100,
-      );
-      final filteredHotels = await _applyFilters(hotels);
+      final hotels = _selectedProvinceId == null
+          ? await ApiService().fetchHotels(
+              keyword: keyword.isEmpty ? null : keyword,
+              pageSize: 100,
+            )
+          : await ApiService().fetchHotelsByProvince(_selectedProvinceId!);
+      final keywordFiltered = keyword.isEmpty
+          ? hotels
+          : hotels.where((hotel) {
+              final haystack = [
+                hotel['name'],
+                hotel['location'],
+                hotel['street'],
+              ].whereType<Object>().join(' ').toLowerCase();
+              return haystack.contains(keyword.toLowerCase());
+            }).toList();
+      final filteredHotels = await _applyFilters(keywordFiltered);
       if (!mounted) return;
       setState(() {
         _searchResults = _sortHotels(filteredHotels);
@@ -112,6 +135,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _locationController.clear();
       _minBudgetController.clear();
       _maxBudgetController.clear();
+      _selectedProvinceId = null;
       _guestCount = 1;
       _sortBy = 'Default';
       _searchResults = const [];
@@ -120,7 +144,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _removeTag(String tag) {
     setState(() {
-      if (tag.startsWith('Dia diem:')) {
+      if (tag.startsWith('Tinh/TP:')) {
+        _selectedProvinceId = null;
+      } else if (tag.startsWith('Dia diem:')) {
         _locationController.clear();
       } else if (tag.startsWith('Khach:')) {
         _guestCount = 1;
@@ -275,10 +301,10 @@ class _SearchScreenState extends State<SearchScreen> {
                   children: [
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'Bo loc tim kiem',
-                            style: TextStyle(
+                            _language.t('search.filterTitle'),
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
                               color: AppColors.textPrimary,
@@ -292,11 +318,18 @@ class _SearchScreenState extends State<SearchScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
+                    _buildProvinceDropdown(
+                      onChanged: (value) {
+                        setState(() => _selectedProvinceId = value);
+                        setSheetState(() {});
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     _buildFilterTextField(
                       controller: _locationController,
                       icon: Icons.location_on_outlined,
-                      label: 'Dia diem',
-                      hint: 'Thanh pho, quan hoac dia chi',
+                      label: _language.t('search.location'),
+                      hint: _language.t('search.locationHint'),
                     ),
                     const SizedBox(height: 12),
                     _buildGuestStepperForSheet(updateGuests),
@@ -307,7 +340,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           child: _buildFilterTextField(
                             controller: _minBudgetController,
                             icon: Icons.payments_outlined,
-                            label: 'Gia tu',
+                            label: _language.t('search.minPrice'),
                             hint: '500000',
                             keyboardType: TextInputType.number,
                           ),
@@ -317,7 +350,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           child: _buildFilterTextField(
                             controller: _maxBudgetController,
                             icon: Icons.payments_outlined,
-                            label: 'Den',
+                            label: _language.t('search.maxPrice'),
                             hint: '2000000',
                             keyboardType: TextInputType.number,
                           ),
@@ -334,7 +367,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               Navigator.of(context).pop();
                               _loadSuggestedHotels();
                             },
-                            child: const Text('Xoa loc'),
+                            child: Text(_language.t('search.clearFilters')),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -348,7 +381,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               backgroundColor: AppColors.colorPrimary,
                               foregroundColor: AppColors.white,
                             ),
-                            child: const Text('Ap dung'),
+                            child: Text(_language.t('search.apply')),
                           ),
                         ),
                       ],
@@ -384,9 +417,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildDesktopPage(BuildContext context) {
     return WebAppShell(
-      title: 'Search',
-      subtitle:
-          'Tìm khách sạn theo điểm đến, lọc nhanh theo nhu cầu và xem kết quả phù hợp trên màn hình rộng.',
+      title: _language.t('search.title'),
+      subtitle: _language.t('search.subtitle'),
       selectedIndex: 3,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -522,7 +554,7 @@ class _SearchScreenState extends State<SearchScreen> {
           else if (_errorMessage != null)
             _buildStateMessage(_errorMessage!)
           else if (_hasSearched && _searchResults.isEmpty)
-            _buildStateMessage('Khong tim thay khach san phu hop')
+            _buildStateMessage(_language.t('search.noResults'))
           else if (_hasSearched)
             Column(
               children: [
@@ -583,7 +615,7 @@ class _SearchScreenState extends State<SearchScreen> {
         ] else if (_searchResults.isEmpty) ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _buildStateMessage('Khong tim thay khach san phu hop'),
+            child: _buildStateMessage(_language.t('search.noResults')),
           ),
         ] else ...[
           Padding(
@@ -1114,11 +1146,13 @@ class _SearchScreenState extends State<SearchScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildProvinceDropdown(),
+        const SizedBox(height: 12),
         _buildFilterTextField(
           controller: _locationController,
           icon: Icons.location_on_outlined,
-          label: 'Dia diem',
-          hint: 'Thanh pho, quan hoac dia chi',
+          label: _language.t('search.location'),
+          hint: _language.t('search.locationHint'),
         ),
         const SizedBox(height: 12),
         _buildGuestStepper(),
@@ -1129,7 +1163,7 @@ class _SearchScreenState extends State<SearchScreen> {
               child: _buildFilterTextField(
                 controller: _minBudgetController,
                 icon: Icons.payments_outlined,
-                label: 'Gia tu',
+                label: _language.t('search.minPrice'),
                 hint: 'VD: 500000',
                 keyboardType: TextInputType.number,
               ),
@@ -1139,7 +1173,7 @@ class _SearchScreenState extends State<SearchScreen> {
               child: _buildFilterTextField(
                 controller: _maxBudgetController,
                 icon: Icons.payments_outlined,
-                label: 'Den',
+                label: _language.t('search.maxPrice'),
                 hint: 'VD: 2000000',
                 keyboardType: TextInputType.number,
               ),
@@ -1184,6 +1218,37 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  Widget _buildProvinceDropdown({ValueChanged<int?>? onChanged}) {
+    return DropdownButtonFormField<int?>(
+      initialValue: _selectedProvinceId,
+      decoration: const InputDecoration(
+        labelText: 'Tinh/TP',
+        prefixIcon: Icon(Icons.map_outlined, size: 18),
+        filled: true,
+        fillColor: AppColors.white,
+        border: OutlineInputBorder(),
+      ),
+      items: [
+        const DropdownMenuItem<int?>(value: null, child: Text('Tat ca tinh/TP')),
+        ..._provinces.map((province) {
+          final id = _intValue(province['id']);
+          return DropdownMenuItem<int?>(
+            value: id,
+            child: Text(province['name']?.toString() ?? 'Province #$id'),
+          );
+        }),
+      ],
+      onChanged: (value) {
+        if (onChanged != null) {
+          onChanged(value);
+          return;
+        }
+        setState(() => _selectedProvinceId = value);
+        if (_hasSearched) _performSearch(_searchController.text);
+      },
+    );
+  }
+
   Widget _buildGuestStepper() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1200,10 +1265,10 @@ class _SearchScreenState extends State<SearchScreen> {
             color: AppColors.textSecondary,
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
-              'So khach',
-              style: TextStyle(
+              _language.t('search.guests'),
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
@@ -1250,10 +1315,10 @@ class _SearchScreenState extends State<SearchScreen> {
             color: AppColors.textSecondary,
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
-              'So khach',
-              style: TextStyle(
+              _language.t('search.guests'),
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
@@ -1317,37 +1382,15 @@ class _SearchScreenState extends State<SearchScreen> {
           fontWeight: FontWeight.w600,
         ),
         unselectedLabelStyle: const TextStyle(fontSize: 10),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.mail_outline),
-            activeIcon: Icon(Icons.mail),
-            label: 'Message',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.book_outlined),
-            activeIcon: Icon(Icons.book),
-            label: 'Booking',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.more_horiz),
-            label: 'Menu',
-          ),
-        ],
+        items: customerBottomNavigationItems(),
+
       ),
     );
   }
 
   bool get _hasActiveFilters {
-    return _locationController.text.trim().isNotEmpty ||
+    return _selectedProvinceId != null ||
+        _locationController.text.trim().isNotEmpty ||
         _guestCount > 1 ||
         _budgetValue(_minBudgetController.text) != null ||
         _budgetValue(_maxBudgetController.text) != null;
@@ -1358,6 +1401,8 @@ class _SearchScreenState extends State<SearchScreen> {
     final location = _locationController.text.trim();
     final minBudget = _budgetValue(_minBudgetController.text);
     final maxBudget = _budgetValue(_maxBudgetController.text);
+    final provinceName = _provinceName(_selectedProvinceId);
+    if (provinceName != null) tags.add('Tinh/TP: $provinceName');
     if (location.isNotEmpty) tags.add('Dia diem: $location');
     if (_guestCount > 1) tags.add('Khach: $_guestCount nguoi');
     if (minBudget != null || maxBudget != null) {
@@ -1367,6 +1412,17 @@ class _SearchScreenState extends State<SearchScreen> {
       tags.add('Ngan sach: $minText - $maxText');
     }
     return tags;
+  }
+
+  String? _provinceName(int? id) {
+    if (id == null) return null;
+    for (final province in _provinces) {
+      if (_intValue(province['id']) == id) {
+        final name = province['name']?.toString().trim();
+        return name == null || name.isEmpty ? 'Province #$id' : name;
+      }
+    }
+    return 'Province #$id';
   }
 
   int? _budgetValue(String value) {

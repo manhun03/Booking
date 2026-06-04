@@ -380,3 +380,32 @@ class _WebNavItem {
   final IconData icon;
   final String route;
 }
+
+List<BottomNavigationBarItem> customerBottomNavigationItems() {
+  final language = LanguageService();
+  return [
+    BottomNavigationBarItem(
+      icon: const Icon(Icons.home_outlined),
+      activeIcon: const Icon(Icons.home),
+      label: language.t('nav.home'),
+    ),
+    BottomNavigationBarItem(
+      icon: const Icon(Icons.group_outlined),
+      activeIcon: const Icon(Icons.group),
+      label: language.t('nav.message'),
+    ),
+    BottomNavigationBarItem(
+      icon: const Icon(Icons.add_box_outlined),
+      activeIcon: const Icon(Icons.add_box),
+      label: language.t('nav.booking'),
+    ),
+    BottomNavigationBarItem(
+      icon: const Icon(Icons.search),
+      label: language.t('nav.search'),
+    ),
+    BottomNavigationBarItem(
+      icon: const Icon(Icons.menu),
+      label: language.t('nav.menu'),
+    ),
+  ];
+}

@@ -136,7 +136,8 @@ class _RoomListScreenState extends State<RoomListScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          'Suc chua: ${intValue(room['capacity'])} khach | ${formatMoney(room['price'])}',
+          'Suc chua: ${intValue(room['capacity'])} khach | ${formatMoney(room['price'])}'
+          '${doubleValue(room['seasonalPrice']) > 0 ? ' | Gia mua vu: ${formatMoney(room['seasonalPrice'])}' : ''}',
         ),
         trailing: Text(
           status,

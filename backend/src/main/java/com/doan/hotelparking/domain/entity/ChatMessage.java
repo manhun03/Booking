@@ -36,6 +36,10 @@ public class ChatMessage {
     private Instant createdAt;
     @Column(name = "ReadAt")
     private Instant readAt;
+    @Column(name = "SenderHidden")
+    private boolean senderHidden;
+    @Column(name = "ReceiverHidden")
+    private boolean receiverHidden;
 
     @PrePersist
     void prePersist() {

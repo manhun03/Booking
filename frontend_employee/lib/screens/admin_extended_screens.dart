@@ -6,6 +6,483 @@ import '../utils/display_format.dart';
 
 typedef JsonMap = Map<String, dynamic>;
 
+class AdminCouponManagementScreen extends StatefulWidget {
+  const AdminCouponManagementScreen({super.key});
+
+  @override
+  State<AdminCouponManagementScreen> createState() =>
+      _AdminCouponManagementScreenState();
+}
+
+class _AdminCouponManagementScreenState
+    extends State<AdminCouponManagementScreen> {
+  final _api = AdminApiService();
+  final _searchController = TextEditingController();
+
+  List<JsonMap> _coupons = const [];
+  bool _isLoading = true;
+  String _query = '';
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCoupons();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadCoupons() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final coupons = await _api.fetchCoupons();
+      if (!mounted) return;
+      setState(() {
+        _coupons = coupons;
+        _isLoading = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.message;
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<JsonMap> get _filteredCoupons {
+    final query = _query.trim().toLowerCase();
+    if (query.isEmpty) return _coupons;
+    return _coupons.where((coupon) {
+      return textValue(coupon['code']).toLowerCase().contains(query) ||
+          textValue(coupon['description']).toLowerCase().contains(query) ||
+          textValue(coupon['discountType']).toLowerCase().contains(query);
+    }).toList();
+  }
+
+  Future<void> _editCoupon({JsonMap? coupon}) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => _CouponDialog(coupon: coupon),
+    );
+    if (result == true) await _loadCoupons();
+  }
+
+  Future<void> _deleteCoupon(JsonMap coupon) async {
+    final id = intValue(coupon['id']);
+    if (id <= 0) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xoa coupon'),
+        content: Text('Xoa ma ${textValue(coupon['code'])}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Huy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Xoa'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await _api.deleteCoupon(id);
+      if (!mounted) return;
+      _showSnack(context, 'Da xoa coupon.');
+      await _loadCoupons();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      _showSnack(context, error.message, isError: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _AdminScaffold(
+      title: 'Quan ly coupon',
+      onRefresh: _loadCoupons,
+      actions: [
+        IconButton(
+          tooltip: 'Them coupon',
+          onPressed: () => _editCoupon(),
+          icon: const Icon(Icons.add),
+        ),
+      ],
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+          ? _ErrorState(message: _errorMessage!, onRetry: _loadCoupons)
+          : RefreshIndicator(
+              onRefresh: _loadCoupons,
+              child: ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  _SearchCard(
+                    controller: _searchController,
+                    hintText: 'Tim code, mo ta, loai giam...',
+                    resultText: '${_filteredCoupons.length} coupon',
+                    onChanged: (value) => setState(() => _query = value),
+                    trailing: FilledButton.icon(
+                      onPressed: () => _editCoupon(),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Them coupon'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (_filteredCoupons.isEmpty)
+                    const _EmptyState(message: 'Khong co coupon phu hop.')
+                  else
+                    ..._filteredCoupons.map(_couponCard),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _couponCard(JsonMap coupon) {
+    final active = coupon['active'] == true;
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: CircleAvatar(
+          backgroundColor: Colors.orange.withValues(alpha: 0.12),
+          child: const Icon(Icons.local_offer_outlined, color: Colors.orange),
+        ),
+        title: Text(
+          textValue(coupon['code'], 'Coupon #${coupon['id']}'),
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        subtitle: Text(
+          '${textValue(coupon['discountType'], 'AMOUNT')} - ${formatMoney(coupon['discountValue'])}'
+          '\nMin: ${formatMoney(coupon['minOrderAmount'])} | Max uses: ${textValue(coupon['maxUses'], 'Khong gioi han')}'
+          '\n${textValue(coupon['description'], 'Khong co mo ta')}',
+        ),
+        isThreeLine: true,
+        trailing: Wrap(
+          spacing: 6,
+          children: [
+            _Badge(
+              label: active ? 'ACTIVE' : 'OFF',
+              color: active ? Colors.green : Colors.grey,
+            ),
+            IconButton(
+              tooltip: 'Sua',
+              onPressed: () => _editCoupon(coupon: coupon),
+              icon: const Icon(Icons.edit_outlined),
+            ),
+            IconButton(
+              tooltip: 'Xoa',
+              onPressed: () => _deleteCoupon(coupon),
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CouponDialog extends StatefulWidget {
+  const _CouponDialog({this.coupon});
+
+  final JsonMap? coupon;
+
+  @override
+  State<_CouponDialog> createState() => _CouponDialogState();
+}
+
+class _CouponDialogState extends State<_CouponDialog> {
+  final _api = AdminApiService();
+  late final TextEditingController _code;
+  late final TextEditingController _description;
+  late final TextEditingController _discountValue;
+  late final TextEditingController _maxDiscountAmount;
+  late final TextEditingController _minOrderAmount;
+  late final TextEditingController _startAt;
+  late final TextEditingController _endAt;
+  late final TextEditingController _maxUses;
+  late final TextEditingController _usedCount;
+  String _discountType = 'AMOUNT';
+  bool _active = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final coupon = widget.coupon;
+    _code = TextEditingController(text: textValue(coupon?['code']));
+    _description = TextEditingController(
+      text: textValue(coupon?['description']),
+    );
+    _discountType = textValue(coupon?['discountType'], 'AMOUNT').toUpperCase();
+    if (_discountType != 'PERCENT') _discountType = 'AMOUNT';
+    _discountValue = TextEditingController(
+      text: _numberText(coupon?['discountValue']),
+    );
+    _maxDiscountAmount = TextEditingController(
+      text: _numberText(coupon?['maxDiscountAmount']),
+    );
+    _minOrderAmount = TextEditingController(
+      text: _numberText(coupon?['minOrderAmount']),
+    );
+    _startAt = TextEditingController(text: _dateText(coupon?['startAt']));
+    _endAt = TextEditingController(text: _dateText(coupon?['endAt']));
+    _maxUses = TextEditingController(text: textValue(coupon?['maxUses']));
+    _usedCount = TextEditingController(
+      text: textValue(coupon?['usedCount'], '0'),
+    );
+    _active = coupon?['active'] != false;
+  }
+
+  @override
+  void dispose() {
+    _code.dispose();
+    _description.dispose();
+    _discountValue.dispose();
+    _maxDiscountAmount.dispose();
+    _minOrderAmount.dispose();
+    _startAt.dispose();
+    _endAt.dispose();
+    _maxUses.dispose();
+    _usedCount.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final code = _code.text.trim().toUpperCase();
+    final discountValue = double.tryParse(_discountValue.text.trim());
+    final minOrder =
+        double.tryParse(
+          _minOrderAmount.text.trim().isEmpty
+              ? '0'
+              : _minOrderAmount.text.trim(),
+        ) ??
+        0;
+    if (code.isEmpty || discountValue == null || discountValue <= 0) {
+      setState(() => _error = 'Vui long nhap code va gia tri giam hop le.');
+      return;
+    }
+    final body = {
+      'code': code,
+      'description': _description.text.trim(),
+      'discountType': _discountType,
+      'discountValue': discountValue,
+      'maxDiscountAmount': _optionalDouble(_maxDiscountAmount.text),
+      'minOrderAmount': minOrder,
+      'startAt': _instantOrNull(_startAt.text),
+      'endAt': _instantOrNull(_endAt.text),
+      'maxUses': _optionalInt(_maxUses.text),
+      'usedCount': int.tryParse(_usedCount.text.trim()) ?? 0,
+      'active': _active,
+    };
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final id = intValue(widget.coupon?['id']);
+      if (id <= 0) {
+        await _api.createCoupon(body);
+      } else {
+        await _api.updateCoupon(id, body);
+      }
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.message;
+        _saving = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.coupon == null ? 'Them coupon' : 'Cap nhat coupon'),
+      content: SizedBox(
+        width: 560,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_error != null) ...[
+                Text(_error!, style: const TextStyle(color: Colors.red)),
+                const SizedBox(height: 10),
+              ],
+              TextField(
+                controller: _code,
+                decoration: const InputDecoration(labelText: 'Code'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _description,
+                decoration: const InputDecoration(labelText: 'Mo ta'),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: _discountType,
+                decoration: const InputDecoration(labelText: 'Loai giam'),
+                items: const [
+                  DropdownMenuItem(value: 'AMOUNT', child: Text('AMOUNT')),
+                  DropdownMenuItem(value: 'PERCENT', child: Text('PERCENT')),
+                ],
+                onChanged: (value) =>
+                    setState(() => _discountType = value ?? 'AMOUNT'),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _discountValue,
+                      decoration: const InputDecoration(labelText: 'Gia tri'),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _maxDiscountAmount,
+                      decoration: const InputDecoration(
+                        labelText: 'Giam toi da',
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _minOrderAmount,
+                      decoration: const InputDecoration(
+                        labelText: 'Don toi thieu',
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _maxUses,
+                      decoration: const InputDecoration(
+                        labelText: 'So lan dung toi da',
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _startAt,
+                      decoration: const InputDecoration(
+                        labelText: 'StartAt yyyy-MM-dd',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _endAt,
+                      decoration: const InputDecoration(
+                        labelText: 'EndAt yyyy-MM-dd',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _usedCount,
+                decoration: const InputDecoration(labelText: 'Da su dung'),
+                keyboardType: TextInputType.number,
+              ),
+              SwitchListTile(
+                value: _active,
+                onChanged: (value) => setState(() => _active = value),
+                title: const Text('Dang kich hoat'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context, false),
+          child: const Text('Huy'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: const Text('Luu'),
+        ),
+      ],
+    );
+  }
+
+  String _numberText(dynamic value) {
+    if (value == null) return '';
+    final number = doubleValue(value);
+    if (number == 0) return '';
+    return number == number.roundToDouble()
+        ? number.round().toString()
+        : number.toString();
+  }
+
+  String _dateText(dynamic value) {
+    final date = DateTime.tryParse(value?.toString() ?? '');
+    if (date == null) return '';
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  double? _optionalDouble(String value) {
+    final text = value.trim();
+    if (text.isEmpty) return null;
+    return double.tryParse(text);
+  }
+
+  int? _optionalInt(String value) {
+    final text = value.trim();
+    if (text.isEmpty) return null;
+    return int.tryParse(text);
+  }
+
+  String? _instantOrNull(String value) {
+    final text = value.trim();
+    if (text.isEmpty) return null;
+    final date = DateTime.tryParse(text);
+    if (date == null) return text;
+    return DateTime.utc(date.year, date.month, date.day).toIso8601String();
+  }
+}
+
 class AdminReviewModerationScreen extends StatefulWidget {
   const AdminReviewModerationScreen({super.key});
 
@@ -332,6 +809,34 @@ class _AdminNotificationManagementScreenState
     }
   }
 
+  Future<void> _showNotificationDialog({JsonMap? notification}) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => _NotificationFormDialog(notification: notification),
+    );
+    if (result == true) await _loadNotifications();
+  }
+
+  Future<void> _deleteNotification(JsonMap notification) async {
+    final id = intValue(notification['id']);
+    if (id <= 0) return;
+    final confirmed = await _confirmAction(
+      context,
+      title: 'Xoa thong bao',
+      message: 'Ban co chac muon xoa thong bao #$id?',
+    );
+    if (confirmed != true) return;
+    try {
+      await _api.deleteNotification(id);
+      if (!mounted) return;
+      _showSnack(context, 'Da xoa thong bao.');
+      await _loadNotifications();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      _showSnack(context, error.message, isError: true);
+    }
+  }
+
   List<JsonMap> get _filteredNotifications {
     final query = _query.trim().toLowerCase();
     return _notifications.where((notification) {
@@ -347,6 +852,11 @@ class _AdminNotificationManagementScreenState
       title: 'Quan ly thong bao',
       onRefresh: _loadNotifications,
       actions: [
+        IconButton(
+          tooltip: 'Tao thong bao',
+          onPressed: () => _showNotificationDialog(),
+          icon: const Icon(Icons.add_alert_outlined),
+        ),
         IconButton(
           tooltip: 'Doc tat ca thong bao cua admin',
           onPressed: _markMineReadAll,
@@ -367,11 +877,23 @@ class _AdminNotificationManagementScreenState
                     hintText: 'Tim title, message, type, user...',
                     resultText: '${_filteredNotifications.length} thong bao',
                     onChanged: (value) => setState(() => _query = value),
-                    trailing: FilterChip(
-                      label: const Text('Chua doc'),
-                      selected: _unreadOnly,
-                      onSelected: (value) =>
-                          setState(() => _unreadOnly = value),
+                    trailing: Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        FilterChip(
+                          label: const Text('Chua doc'),
+                          selected: _unreadOnly,
+                          onSelected: (value) =>
+                              setState(() => _unreadOnly = value),
+                        ),
+                        FilledButton.icon(
+                          onPressed: () => _showNotificationDialog(),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Tao thong bao'),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -445,14 +967,286 @@ class _AdminNotificationManagementScreenState
               icon: const Icon(Icons.visibility_outlined),
             ),
             IconButton(
+              tooltip: 'Cap nhat',
+              onPressed: () =>
+                  _showNotificationDialog(notification: notification),
+              icon: const Icon(Icons.edit_outlined),
+            ),
+            IconButton(
               tooltip: 'Danh dau da doc',
               onPressed: read ? null : () => _markRead(notification),
               icon: const Icon(Icons.done_all_outlined),
+            ),
+            IconButton(
+              tooltip: 'Xoa',
+              onPressed: () => _deleteNotification(notification),
+              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
             ),
           ],
         ),
       ),
     );
+  }
+}
+
+class _NotificationFormDialog extends StatefulWidget {
+  const _NotificationFormDialog({this.notification});
+
+  final JsonMap? notification;
+
+  @override
+  State<_NotificationFormDialog> createState() =>
+      _NotificationFormDialogState();
+}
+
+class _NotificationFormDialogState extends State<_NotificationFormDialog> {
+  static const _types = [
+    'GENERAL',
+    'BOOKING',
+    'PAYMENT',
+    'PARKING',
+    'SYSTEM',
+    'REVIEW',
+  ];
+
+  final _api = AdminApiService();
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _userIdController;
+  late final TextEditingController _senderIdController;
+  late final TextEditingController _titleController;
+  late final TextEditingController _messageController;
+  late final TextEditingController _relatedTableController;
+  late final TextEditingController _relatedIdController;
+  late String _type;
+  late bool _read;
+  bool _isSaving = false;
+  String? _errorMessage;
+
+  bool get _isEdit => widget.notification != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final notification = widget.notification;
+    _userIdController = TextEditingController(
+      text: textValue(notification?['userId'], ''),
+    );
+    _senderIdController = TextEditingController(
+      text: textValue(notification?['senderId'], ''),
+    );
+    _titleController = TextEditingController(
+      text: textValue(notification?['title'], ''),
+    );
+    _messageController = TextEditingController(
+      text: textValue(notification?['message'], ''),
+    );
+    _relatedTableController = TextEditingController(
+      text: textValue(notification?['relatedTable'], ''),
+    );
+    _relatedIdController = TextEditingController(
+      text: textValue(notification?['relatedId'], ''),
+    );
+    final type = textValue(notification?['type'], 'GENERAL').toUpperCase();
+    _type = _types.contains(type) ? type : 'GENERAL';
+    _read = notification?['read'] == true;
+  }
+
+  @override
+  void dispose() {
+    _userIdController.dispose();
+    _senderIdController.dispose();
+    _titleController.dispose();
+    _messageController.dispose();
+    _relatedTableController.dispose();
+    _relatedIdController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_formKey.currentState?.validate() != true) return;
+    final userId = int.tryParse(_userIdController.text.trim());
+    if (userId == null || userId <= 0) {
+      setState(() => _errorMessage = 'UserId khong hop le.');
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      _errorMessage = null;
+    });
+
+    final senderId = _optionalInt(_senderIdController.text);
+    final relatedId = _optionalInt(_relatedIdController.text);
+    final createdAt = textValue(widget.notification?['createdAt'], '');
+    final readAt = textValue(widget.notification?['readAt'], '');
+    final body = {
+      'user': {'id': userId},
+      if (senderId != null) 'sender': {'id': senderId},
+      'title': _titleController.text.trim(),
+      'message': _messageController.text.trim(),
+      'type': _type,
+      'relatedTable': _blankToNull(_relatedTableController.text),
+      'relatedId': relatedId,
+      'read': _read,
+      'createdAt': createdAt.isEmpty
+          ? DateTime.now().toUtc().toIso8601String()
+          : createdAt,
+      'readAt': _read
+          ? (readAt.isEmpty ? DateTime.now().toUtc().toIso8601String() : readAt)
+          : null,
+    };
+
+    try {
+      if (_isEdit) {
+        await _api.updateNotification(
+          intValue(widget.notification!['id']),
+          body,
+        );
+      } else {
+        await _api.createNotification(body);
+      }
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.message;
+        _isSaving = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(_isEdit ? 'Cap nhat thong bao' : 'Tao thong bao'),
+      content: SizedBox(
+        width: 560,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_errorMessage != null) ...[
+                  _InlineError(message: _errorMessage!),
+                  const SizedBox(height: 12),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _userIdController,
+                        decoration: const InputDecoration(
+                          labelText: 'UserId nhan *',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: _requiredText,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _senderIdController,
+                        decoration: const InputDecoration(
+                          labelText: 'SenderId',
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(labelText: 'Title *'),
+                  validator: _requiredText,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _messageController,
+                  decoration: const InputDecoration(labelText: 'Message *'),
+                  minLines: 2,
+                  maxLines: 4,
+                  validator: _requiredText,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _type,
+                  decoration: const InputDecoration(labelText: 'Type'),
+                  items: _types
+                      .map(
+                        (type) =>
+                            DropdownMenuItem(value: type, child: Text(type)),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) setState(() => _type = value);
+                  },
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _relatedTableController,
+                        decoration: const InputDecoration(
+                          labelText: 'Related table',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _relatedIdController,
+                        decoration: const InputDecoration(
+                          labelText: 'Related id',
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  value: _read,
+                  onChanged: (value) => setState(() => _read = value),
+                  title: const Text('Da doc'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Huy'),
+        ),
+        FilledButton(
+          onPressed: _isSaving ? null : _save,
+          child: _isSaving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Luu'),
+        ),
+      ],
+    );
+  }
+
+  int? _optionalInt(String value) {
+    final text = value.trim();
+    if (text.isEmpty || text == '-') return null;
+    return int.tryParse(text);
+  }
+
+  String? _blankToNull(String value) {
+    final text = value.trim();
+    return text.isEmpty || text == '-' ? null : text;
   }
 }
 
@@ -519,6 +1313,36 @@ class _AdminSystemConfigScreenState extends State<AdminSystemConfigScreen> {
       builder: (_) => _SystemConfigDialog(config: config),
     );
     if (result == true) await _loadConfigs();
+  }
+
+  Future<JsonMap> _fetchFreshConfig(JsonMap config) async {
+    final key = textValue(config['configKey']).trim();
+    if (key.isEmpty) return config;
+    return _api.fetchSystemConfigByKey(key);
+  }
+
+  Future<void> _showConfigDetail(JsonMap config) async {
+    try {
+      final freshConfig = await _fetchFreshConfig(config);
+      if (!mounted) return;
+      _showJsonDetail(context, title: 'Chi tiet cau hinh', data: freshConfig);
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
+  Future<void> _editConfig(JsonMap config) async {
+    try {
+      final freshConfig = await _fetchFreshConfig(config);
+      if (!mounted) return;
+      await _showConfigDialog(config: freshConfig);
+    } on ApiException catch (_) {
+      if (!mounted) return;
+      await _showConfigDialog(config: config);
+    }
   }
 
   List<JsonMap> get _filteredConfigs {
@@ -623,16 +1447,12 @@ class _AdminSystemConfigScreenState extends State<AdminSystemConfigScreen> {
               spacing: 10,
               children: [
                 OutlinedButton.icon(
-                  onPressed: () => _showJsonDetail(
-                    context,
-                    title: 'Chi tiet cau hinh',
-                    data: config,
-                  ),
+                  onPressed: () => _showConfigDetail(config),
                   icon: const Icon(Icons.visibility_outlined),
                   label: const Text('Chi tiet'),
                 ),
                 FilledButton.icon(
-                  onPressed: () => _showConfigDialog(config: config),
+                  onPressed: () => _editConfig(config),
                   icon: const Icon(Icons.edit_outlined),
                   label: const Text('Cap nhat'),
                 ),
@@ -2069,6 +2889,30 @@ void _showSnack(BuildContext context, String message, {bool isError = false}) {
     SnackBar(
       content: Text(message),
       backgroundColor: isError ? Colors.redAccent : Colors.green,
+    ),
+  );
+}
+
+Future<bool?> _confirmAction(
+  BuildContext context, {
+  required String title,
+  required String message,
+}) {
+  return showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Huy'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Xac nhan'),
+        ),
+      ],
     ),
   );
 }

@@ -1,0 +1,11 @@
+﻿.git
+.agents
+.codex
+**/.dart_tool
+**/build
+**/.venv
+**/__pycache__
+**/*.log
+**/.env
+**/memory.db
+**/memory.db-*

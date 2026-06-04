@@ -57,6 +57,7 @@ class StaySmartApp extends StatelessWidget {
         '/admin-reviews': (context) => const AdminReviewModerationScreen(),
         '/admin-notifications': (context) =>
             const AdminNotificationManagementScreen(),
+        '/admin-coupons': (context) => const AdminCouponManagementScreen(),
         '/admin-system-configs': (context) => const AdminSystemConfigScreen(),
         '/admin-audit-logs': (context) => const AdminAuditLogScreen(),
         '/admin-integrations': (context) =>

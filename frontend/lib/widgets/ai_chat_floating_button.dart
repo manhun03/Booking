@@ -138,6 +138,12 @@ class _AiChatFloatingButtonState extends State<AiChatFloatingButton> {
             ),
           ),
           IconButton(
+            tooltip: 'Lịch sử AI',
+            onPressed: _isSending ? null : () => unawaited(_showThreadHistory()),
+            icon: const Icon(Icons.history, color: AppColors.white, size: 18),
+          ),
+          IconButton(
+            tooltip: 'Đoạn chat mới',
             onPressed: _isSending ? null : _clearConversation,
             icon: const Icon(Icons.refresh, color: AppColors.white, size: 18),
           ),
@@ -442,6 +448,111 @@ class _AiChatFloatingButtonState extends State<AiChatFloatingButton> {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _showThreadHistory() async {
+    if (!ApiService().isAuthenticated) {
+      setState(() {
+        _errorMessage = 'Vui lòng đăng nhập để xem lịch sử AI.';
+      });
+      return;
+    }
+    try {
+      final threads = await ApiService().fetchAiChatThreads();
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Lịch sử AI'),
+          content: SizedBox(
+            width: 420,
+            child: threads.isEmpty
+                ? const Text('Chưa có lịch sử chat AI.')
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: threads.length,
+                    itemBuilder: (context, index) {
+                      final thread = threads[index];
+                      final threadId = thread['threadId']?.toString() ?? '';
+                      return ListTile(
+                        leading: const Icon(Icons.forum_outlined),
+                        title: Text(thread['title']?.toString() ?? 'AI thread'),
+                        subtitle: Text(threadId),
+                        onTap: threadId.isEmpty
+                            ? null
+                            : () {
+                                Navigator.of(dialogContext).pop();
+                                unawaited(_loadAiThread(threadId));
+                              },
+                        trailing: IconButton(
+                          tooltip: 'Xóa thread',
+                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          onPressed: threadId.isEmpty
+                              ? null
+                              : () async {
+                                  await ApiService().deleteAiChatThread(threadId);
+                                  if (!dialogContext.mounted) return;
+                                  if (_threadId == threadId) _clearConversation();
+                                  if (Navigator.of(dialogContext).canPop()) {
+                                    Navigator.of(dialogContext).pop();
+                                  }
+                                },
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Đóng'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _errorMessage = error.toString());
+    }
+  }
+
+  Future<void> _loadAiThread(String threadId) async {
+    setState(() {
+      _isSending = true;
+      _errorMessage = null;
+    });
+    try {
+      final messages = await ApiService().fetchAiChatThreadMessages(threadId);
+      if (!mounted) return;
+      setState(() {
+        _threadId = threadId;
+        _messages
+          ..clear()
+          ..addAll(messages.map(_messageFromThread));
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _errorMessage = error.toString());
+    }
+    if (!mounted) return;
+    setState(() => _isSending = false);
+    _scrollToBottom();
+  }
+
+  _AiChatMessage _messageFromThread(Map<String, dynamic> message) {
+    final role = (message['role']?.toString() ?? '').toLowerCase();
+    final isUser = role.contains('user') ||
+        role.contains('human') ||
+        role.contains('customer');
+    final createdAt = DateTime.tryParse(
+          message['createdAt']?.toString() ?? '',
+        )?.toLocal() ??
+        DateTime.now();
+    return _AiChatMessage(
+      text: message['content']?.toString() ?? '',
+      isUser: isUser,
+      createdAt: createdAt,
     );
   }
 
